@@ -28,8 +28,7 @@ export const COMMENT_PREFIXES = ["//", "/*", "*", "*/", "#"];
 // Names the marker migration of a one-event guard suspension, or None (armed). decision-069
 // (kata dzdh) set it for the pb1e one-baseline rebuild; that rebuild landed and re-armed it.
 // There is no env var, CLI flag or file that turns the guard off: it is a source edit a PR reviews.
-export const BASELINE_REBUILD_SUSPENSION: string | null =
-  "1785185000_seed_app_docs_proxy_residue.js";
+export const BASELINE_REBUILD_SUSPENSION: string | null = null;
 
 /** A blank or comment-prefixed line — the syntactic unit both modes gate on. */
 export function is_comment_line(line: string): boolean {
