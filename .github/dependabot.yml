@@ -1,0 +1,32 @@
+# Owner ruling 2026-08-08: version-update PRs for MAJOR bumps only (minor/patch ignored);
+# security-alert severity filtering (critical/high) is a UI-only auto-triage rule.
+# target-branch is load-bearing: a block carrying it governs VERSION updates only, so the
+# ignore rules below cannot suppress security-update PRs (which use defaults, no ignores).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    target-branch: main
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
+      # Owner ruling 2026-08-11 (decision-030): TS 7.0 ships no JS API — typescript-eslint and
+      # @hey-api/openapi-ts crash. Capped until the 7.1 API + both tools support it (TASK-180).
+      - dependency-name: "typescript"
+        versions: [">=7"]
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: main
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"

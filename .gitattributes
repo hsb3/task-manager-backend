@@ -1,0 +1,14 @@
+# GENERATED FILE — DO NOT EDIT BY HAND. Regenerate with: bun scripts/gen_gitattributes.ts
+.gitattributes merge=binary
+docs/generated/component-map.html merge=binary
+docs/generated/component-map.json merge=binary
+docs/generated/coverage.md merge=binary
+docs/generated/decisions.md merge=binary
+docs/generated/feature-register.md merge=binary
+docs/generated/status.html merge=binary
+openapi.json merge=binary
+pb_hooks/field_patterns.json merge=binary
+pb_migrations/1785185000_seed_app_docs_proxy_residue.js merge=binary
+schema/** merge=binary
+scripts/model/current/** merge=binary
+web/lib/api/generated/** merge=binary

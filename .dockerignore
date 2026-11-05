@@ -1,0 +1,5 @@
+# Root build context is the PocketBase image; its Dockerfile copies only pb_migrations and pb_hooks.
+# Allowlist so the whole repo (pb_data, .git, web/node_modules, nested worktrees, untracked secrets) is not shipped as context.
+*
+!pb_migrations
+!pb_hooks

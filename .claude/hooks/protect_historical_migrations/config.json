@@ -1,0 +1,14 @@
+{
+  "_description": "Block Edit/Write/NotebookEdit on pb_migrations/ files that already exist on origin/main (repo law: never edit historical migrations). Wired in this repo's tracked .claude/settings.json; this snippet is the copy-paste source.",
+  "PreToolUse": [
+    {
+      "matcher": "Edit|Write|NotebookEdit",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect_historical_migrations/hook.sh"
+        }
+      ]
+    }
+  ]
+}

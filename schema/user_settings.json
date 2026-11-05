@@ -1,0 +1,146 @@
+{
+  "name": "user_settings",
+  "type": "base",
+  "fields": [
+    {
+      "autogeneratePattern": "[a-z0-9]{15}",
+      "help": "",
+      "hidden": false,
+      "id": "text3208210256",
+      "max": 15,
+      "min": 15,
+      "name": "id",
+      "pattern": "^[a-z0-9]+$",
+      "presentable": false,
+      "primaryKey": true,
+      "required": true,
+      "system": true,
+      "type": "text"
+    },
+    {
+      "cascadeDelete": true,
+      "collectionId": "_pb_users_auth_",
+      "help": "",
+      "hidden": false,
+      "id": "relation2000000110",
+      "maxSelect": 1,
+      "minSelect": 1,
+      "name": "user",
+      "presentable": false,
+      "required": true,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "select2000000111",
+      "maxSelect": 1,
+      "name": "theme",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "select",
+      "values": [
+        "light",
+        "dark",
+        "system"
+      ]
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "select2000000112",
+      "maxSelect": 1,
+      "name": "font",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "select",
+      "values": [
+        "system",
+        "sans",
+        "mono"
+      ]
+    },
+    {
+      "hidden": false,
+      "id": "autodate2990389176",
+      "name": "created",
+      "onCreate": true,
+      "onUpdate": false,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    },
+    {
+      "hidden": false,
+      "id": "autodate3332085495",
+      "name": "updated",
+      "onCreate": true,
+      "onUpdate": true,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "number2000000113",
+      "max": 24,
+      "min": 12,
+      "name": "font_size",
+      "onlyInt": true,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    },
+    {
+      "cascadeDelete": false,
+      "collectionId": "pbc_300200007",
+      "help": "",
+      "hidden": false,
+      "id": "relation2000000114",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "default_view",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "cascadeDelete": false,
+      "collectionId": "pbc_484305853",
+      "help": "",
+      "hidden": false,
+      "id": "relation2000000115",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "default_project",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text2000000116",
+      "max": 64,
+      "min": 0,
+      "name": "time_zone",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    }
+  ],
+  "indexes": [
+    "CREATE UNIQUE INDEX `idx_user_settings_user` ON `user_settings` (`user`)"
+  ]
+}

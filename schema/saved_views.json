@@ -1,0 +1,225 @@
+{
+  "name": "saved_views",
+  "type": "base",
+  "fields": [
+    {
+      "autogeneratePattern": "[a-z0-9]{15}",
+      "help": "",
+      "hidden": false,
+      "id": "text3208210256",
+      "max": 15,
+      "min": 15,
+      "name": "id",
+      "pattern": "^[a-z0-9]+$",
+      "presentable": false,
+      "primaryKey": true,
+      "required": true,
+      "system": true,
+      "type": "text"
+    },
+    {
+      "cascadeDelete": true,
+      "collectionId": "pbc_300100001",
+      "help": "",
+      "hidden": false,
+      "id": "relation3070000001",
+      "maxSelect": 1,
+      "minSelect": 1,
+      "name": "workspace",
+      "presentable": false,
+      "required": true,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "cascadeDelete": true,
+      "collectionId": "_pb_users_auth_",
+      "help": "",
+      "hidden": false,
+      "id": "relation3070000002",
+      "maxSelect": 1,
+      "minSelect": 1,
+      "name": "owner",
+      "presentable": false,
+      "required": true,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text3070000003",
+      "max": 200,
+      "min": 0,
+      "name": "name",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "json3070000004",
+      "maxSize": 2000000,
+      "name": "filterData",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "json"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "select3070000005",
+      "maxSelect": 1,
+      "name": "scope",
+      "presentable": false,
+      "required": true,
+      "system": false,
+      "type": "select",
+      "values": [
+        "personal",
+        "workspace"
+      ]
+    },
+    {
+      "hidden": false,
+      "id": "autodate2990389176",
+      "name": "created",
+      "onCreate": true,
+      "onUpdate": false,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    },
+    {
+      "hidden": false,
+      "id": "autodate3332085495",
+      "name": "updated",
+      "onCreate": true,
+      "onUpdate": true,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "",
+      "hidden": false,
+      "id": "text3070000006",
+      "max": 2000,
+      "min": 0,
+      "name": "description",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "json3070000007",
+      "maxSize": 2000000,
+      "name": "columns",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "json"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "select3070000008",
+      "maxSelect": 1,
+      "name": "density",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "select",
+      "values": [
+        "compact",
+        "cozy"
+      ]
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "select3070000009",
+      "maxSelect": 1,
+      "name": "mode",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "select",
+      "values": [
+        "list",
+        "board"
+      ]
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "select3070000010",
+      "maxSelect": 1,
+      "name": "group_by",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "select",
+      "values": [
+        "status",
+        "assignee",
+        "priority",
+        "none",
+        "project"
+      ]
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "json3070000011",
+      "maxSize": 2000000,
+      "name": "sort",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "json"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "number3070000012",
+      "max": null,
+      "min": null,
+      "name": "position",
+      "onlyInt": false,
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "number"
+    },
+    {
+      "cascadeDelete": true,
+      "collectionId": "pbc_484305853",
+      "help": "",
+      "hidden": false,
+      "id": "relation3070000013",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "project",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    }
+  ],
+  "indexes": [
+    "CREATE INDEX `idx_saved_views_workspace` ON `saved_views` (`workspace`)"
+  ]
+}

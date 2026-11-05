@@ -1,0 +1,9 @@
+{
+  "listRule": "@request.auth.id != \"\"",
+  "viewRule": "@request.auth.id != \"\"",
+  "createRule": "@request.body.approved:isset = false",
+  "updateRule": "id = @request.auth.id && @request.body.approved:isset = false",
+  "deleteRule": "id = @request.auth.id",
+  "authRule": "verified = true && approved = true",
+  "manageRule": null
+}

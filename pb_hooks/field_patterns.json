@@ -1,0 +1,71 @@
+{
+  "app_docs": {
+    "id": "^[a-z0-9]+$",
+    "slug": "^((collection|concept|decision|hook|route):)?[a-z0-9]+([-_][a-z0-9]+)*$"
+  },
+  "app_settings": {
+    "id": "^[a-z0-9]+$",
+    "key": "^[a-z0-9]+([-_][a-z0-9]+)*$"
+  },
+  "comments": {
+    "id": "^[a-z0-9]+$"
+  },
+  "cycles": {
+    "id": "^[a-z0-9]+$"
+  },
+  "decisions": {
+    "id": "^[a-z0-9]+$"
+  },
+  "documents": {
+    "id": "^[a-z0-9]+$"
+  },
+  "invitation_events": {
+    "id": "^[a-z0-9]+$"
+  },
+  "labels": {
+    "id": "^[a-z0-9]+$"
+  },
+  "milestones": {
+    "id": "^[a-z0-9]+$"
+  },
+  "notifications": {
+    "id": "^[a-z0-9]+$"
+  },
+  "projects": {
+    "id": "^[a-z0-9]+$",
+    "key": "^[A-Z][A-Z0-9]{0,7}$"
+  },
+  "saved_views": {
+    "id": "^[a-z0-9]+$"
+  },
+  "statuses": {
+    "id": "^[a-z0-9]+$"
+  },
+  "task_activity": {
+    "id": "^[a-z0-9]+$"
+  },
+  "task_subscribers": {
+    "id": "^[a-z0-9]+$"
+  },
+  "tasks": {
+    "id": "^[a-z0-9]+$"
+  },
+  "templates": {
+    "id": "^[a-z0-9]+$"
+  },
+  "user_settings": {
+    "id": "^[a-z0-9]+$"
+  },
+  "users": {
+    "id": "^[a-z0-9]+$"
+  },
+  "workspace_invitations": {
+    "id": "^[a-z0-9]+$"
+  },
+  "workspace_members": {
+    "id": "^[a-z0-9]+$"
+  },
+  "workspaces": {
+    "id": "^[a-z0-9]+$"
+  }
+}

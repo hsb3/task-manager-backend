@@ -1,0 +1,29 @@
+#!/bin/sh
+# Launches the pre-commit jobs in lefthook.yml. Activate once per checkout (Lefthook required): git config extensions.worktreeConfig true && git config --worktree core.hooksPath .githooks
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root" || exit 1
+. "$root/scripts/verification-env.sh" || exit 1
+
+if ! command -v lefthook >/dev/null 2>&1; then
+  echo "✗ commit blocked — Lefthook is not on PATH, so no pre-commit check can run."
+  echo "  Install the version mise.toml pins (run: mise install), then re-commit."
+  exit 1
+fi
+
+# Lefthook 2.1.12 merges the first of these over lefthook.yml (internal/config/loader.go:36-43, 185), where a job can be skipped.
+for name in lefthook-local .lefthook-local .config/lefthook-local; do
+  for ext in yml yaml json jsonc toml; do
+    if [ -e "$name.$ext" ]; then
+      echo "✗ commit blocked — $name.$ext overrides lefthook.yml locally and can skip checks;"
+      echo "  delete it, or commit with --no-verify deliberately."
+      exit 1
+    fi
+  done
+done
+
+# Each of these makes Lefthook skip jobs (LEFTHOOK=0 with no message at all), so none may leak in.
+unset LEFTHOOK LEFTHOOK_CONFIG LEFTHOOK_EXCLUDE
+# --no-stage-fixed: otherwise Lefthook stashes and checks out partially staged files for the whole run.
+# --force: otherwise an empty staged set skips every job, including the derivations that must fail loud.
+exec lefthook run pre-commit --no-auto-install --no-stage-fixed --force

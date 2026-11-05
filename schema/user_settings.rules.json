@@ -1,0 +1,7 @@
+{
+  "listRule": "@request.auth.id != \"\" && user = @request.auth.id",
+  "viewRule": "@request.auth.id != \"\" && user = @request.auth.id",
+  "createRule": "@request.auth.id != \"\" && user = @request.auth.id",
+  "updateRule": "@request.auth.id != \"\" && user = @request.auth.id && @request.body.user:isset = false",
+  "deleteRule": "@request.auth.id != \"\" && user = @request.auth.id"
+}

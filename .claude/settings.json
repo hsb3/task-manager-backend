@@ -1,0 +1,83 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh run watch *)",
+      "Bash(gh pr merge *)",
+      "Bash(gh issue create *)",
+      "Bash(make dod)",
+      "Bash(make dod ARGS=-n)",
+      "Bash(make dod-strict)",
+      "Bash(make next-migration-slot)",
+      "Bash(bun scripts/check_app_docs.ts)",
+      "Bash(bun scripts/gen_openapi.ts --check)",
+      "Bash(bun scripts/gen_decisions.ts --check)",
+      "Bash(bun scripts/gen_coverage.ts --check)",
+      "Bash(bun scripts/check_constants.ts)",
+      "Bash(bun scripts/check_decision_cards.ts)",
+      "Bash(kata *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/lane_snapshots/hook.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/kata_attention/hook.sh start"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "logout|prompt_input_exit|bypass_permissions_disabled|other",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/kata_attention/hook.sh end"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect_historical_migrations/hook.sh"
+          },
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/no_agent_writes_on_main/hook.ts"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/no_agent_writes_on_main/hook.ts"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "code-desk@dotfiles-agents": true,
+    "atelier@dotfiles-agents": true,
+    "pocketbase@dotfiles-agents": true,
+    "solo-skills@dotfiles-agents": true,
+    "owner-signoff@dotfiles-agents": true
+  }
+}

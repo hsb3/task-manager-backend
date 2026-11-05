@@ -1,0 +1,153 @@
+// Source of truth for docs/assets/overview.svg — regenerate, never hand-edit the SVG:
+//   dot -Tsvg docs/assets/overview.dot -o docs/assets/overview.svg
+// Scope is drawn as containment, not as edges: a full 20-collection FK graph is
+// illegible once GitHub scales the image into its ~900px README column, so nesting
+// carries workspace/project scope and only the non-obvious relations get an arrow.
+// Total width is held near 800pt for the same reason — wider means smaller text.
+// Every fill/stroke/fontcolor is explicit and the canvas is opaque, so GitHub renders
+// the SVG identically on its light and dark themes: nothing inherits a page colour.
+digraph overview {
+  rankdir=TB
+  compound=true
+  bgcolor="#f6f8fa"
+  pad="0.3"
+  nodesep="0.34"
+  ranksep="0.45"
+  splines=spline
+  fontname="Helvetica"
+  labelloc="b"
+  labeljust="l"
+  fontsize="9.5"
+  fontcolor="#59636e"
+  label=<<BR/><FONT COLOR="#1f2328"><B>Items</B></FONT> — tasks, decisions, documents and milestones — carry a <FONT COLOR="#1f2328"><B>draft</B></FONT> flag, and a delete moves the row to a <FONT COLOR="#1f2328"><B>30-day trash</B></FONT> that a daily cron then purges.<BR ALIGN="LEFT"/>Access is <FONT COLOR="#1f2328"><B>API rules compiled into SQL</B></FONT> rather than hand-written checks, so the same policy holds for every client.<BR ALIGN="LEFT"/>>
+
+  node [shape=box style="rounded,filled" fillcolor="#ffffff" color="#d0d7de"
+        penwidth="1.2" fontname="Helvetica" fontsize="12" fontcolor="#1f2328"
+        margin="0.11,0.06"]
+  edge [color="#8c959f" fontname="Helvetica" fontsize="9" fontcolor="#59636e"
+        penwidth="1.1" arrowsize="0.6"]
+
+  // ═══════════════ component A — the data model ═══════════════
+  subgraph cluster_instance {
+    style="rounded,filled" fillcolor="#eef4fb" color="#adc9e8" penwidth="1.2"
+    labeljust="l" labelloc="t" fontsize="10" fontcolor="#0550ae" fontname="Helvetica"
+    label=<<B>Instance</B> <FONT POINT-SIZE="9">— outside any workspace</FONT>>
+
+    users [color="#0969da" penwidth="1.8" label=<<B>users</B>>]
+    user_settings [label=<user_settings>]
+    app_settings [label=<app_settings>]
+    app_docs [style="rounded,filled,dashed" label=<app_docs>]
+    {rank=same; users; user_settings; app_settings; app_docs}
+  }
+
+  subgraph cluster_ws {
+    style="rounded,filled" fillcolor="#f3eefb" color="#c9b6ea" penwidth="1.4"
+    labeljust="l" labelloc="t" fontsize="10.5" fontcolor="#6639ba" fontname="Helvetica"
+    label=<<B>workspaces</B> <FONT POINT-SIZE="9">— the tenant boundary: everything below belongs to exactly one</FONT>>
+
+    workspaces [color="#8250df" penwidth="1.8" label=<<B>workspaces</B>>]
+    workspace_members [color="#8250df" penwidth="1.6"
+      label=<<B>workspace_members</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">admin · member · viewer (read-only)</FONT>>]
+
+    decisions [color="#8250df" penwidth="1.4"
+      label=<<B>decisions</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">project optional</FONT>>]
+    documents [color="#8250df" penwidth="1.4"
+      label=<<B>documents</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">project optional</FONT>>]
+    {rank=same; workspaces; workspace_members; decisions; documents}
+
+    subgraph cluster_vocab {
+      style="rounded,filled" fillcolor="#fdf1e7" color="#f0c9a4" penwidth="1.1"
+      labeljust="l" labelloc="t" fontsize="9.5" fontcolor="#bc4c00" fontname="Helvetica"
+      label=<<B>Vocabulary</B> <FONT POINT-SIZE="9">— data, not hard-coded</FONT>>
+      statuses [color="#bc4c00" penwidth="1.4" label=<<B>statuses</B>>]
+      labels [color="#bc4c00" penwidth="1.4" label=<<B>labels</B>>]
+      {rank=same; statuses; labels}
+    }
+
+    subgraph cluster_prod {
+      style="rounded,filled" fillcolor="#f0f2f4" color="#d0d7de" penwidth="1.1"
+      labeljust="l" labelloc="t" fontsize="9.5" fontcolor="#59636e" fontname="Helvetica"
+      label=<<B>Productivity</B>>
+      templates [label=<templates>]
+      saved_views [label=<saved_views>]
+      {rank=same; templates; saved_views}
+    }
+
+    subgraph cluster_proj {
+      style="rounded,filled" fillcolor="#eef4fb" color="#adc9e8" penwidth="1.3"
+      labeljust="l" labelloc="t" fontsize="10" fontcolor="#0550ae" fontname="Helvetica"
+      label=<<B>projects</B> <FONT POINT-SIZE="9">— a task may belong to one; a milestone must</FONT>>
+
+      projects [color="#0969da" penwidth="1.7" label=<<B>projects</B>>]
+      milestones [color="#0969da" penwidth="1.4" label=<<B>milestones</B>>]
+      tasks [color="#0969da" penwidth="1.8"
+        label=<<B>tasks</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">per-workspace seq · subtasks · deps</FONT>>]
+      project_stats [style="rounded,filled,dashed" color="#6639ba" penwidth="1.4"
+        label=<<B>project_stats</B><BR/><FONT POINT-SIZE="9" COLOR="#6639ba">SQL view — derived, not a table</FONT>>]
+      {rank=same; tasks; milestones}
+    }
+  }
+
+  subgraph cluster_collab {
+    style="rounded,filled" fillcolor="#e9f6ec" color="#addcbb" penwidth="1.2"
+    labeljust="l" labelloc="t" fontsize="10" fontcolor="#1a7f37" fontname="Helvetica"
+    label=<<B>Collaboration</B> <FONT POINT-SIZE="9">— comments also hang off documents and decisions</FONT>>
+
+    comments [color="#1a7f37" penwidth="1.4"
+      label=<<B>comments</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">threaded · reactions</FONT>>]
+    task_activity [color="#1a7f37" penwidth="1.4"
+      label=<<B>task_activity</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">field-level audit</FONT>>]
+    task_subscribers [color="#1a7f37" penwidth="1.4" label=<task_subscribers>]
+    notifications [color="#1a7f37" penwidth="1.4"
+      label=<<B>notifications</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">fan-out · unread digest</FONT>>]
+    comments -> task_subscribers [style=invis]
+    task_activity -> notifications [style=invis]
+    {rank=same; comments; task_activity}
+    {rank=same; task_subscribers; notifications}
+  }
+
+  // only the relations containment cannot state
+  // a label on a downward arrow reads as the relationship; on an upward arrow it is
+  // the referencing field, so "owns"/"membership" rather than the raw `owner`/`user`
+  users -> workspaces [label="owns" weight=10]
+  users -> workspace_members [label="membership" weight=4]
+  workspaces -> statuses [style=invis weight=4]
+  workspace_members -> labels [style=invis weight=4]
+  decisions -> templates [style=invis weight=4]
+  documents -> saved_views [style=invis weight=4]
+  statuses -> projects [style=invis weight=6]
+  templates -> projects [style=invis weight=6]
+  projects -> tasks [weight=10]
+  projects -> milestones [weight=6]
+  tasks -> statuses [label="status" color="#bc4c00" fontcolor="#bc4c00" constraint=false]
+  tasks -> labels [label="labels ×n" color="#bc4c00" fontcolor="#bc4c00" constraint=false]
+  tasks -> milestones [label="milestone" constraint=false]
+  tasks -> project_stats [style=dashed color="#6639ba" label="counts per status"
+                          fontcolor="#6639ba" weight=4]
+  tasks -> comments [label="thread · audit trail · watchers" weight=10]
+
+  // ═══════════════ component B — the ship loop ═══════════════
+  subgraph cluster_ship {
+    style="rounded,filled" fillcolor="#eef4fb" color="#adc9e8" penwidth="1.4"
+    labeljust="l" labelloc="t" fontsize="10.5" fontcolor="#0550ae" fontname="Helvetica"
+    label=<<B>Ship loop</B> <FONT POINT-SIZE="9">— everything but the data lives in git</FONT>>
+
+    push [color="#0969da" penwidth="1.6"
+      label=<<B>git push · main</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">migrations · hooks · web</FONT>>]
+    ci [color="#0969da" penwidth="1.6"
+      label=<<B>GitHub Actions</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">suite battery · app_docs</FONT><BR/><FONT POINT-SIZE="9" COLOR="#59636e">web gates · browser e2e</FONT>>]
+    svc_pb [color="#0969da" penwidth="1.6"
+      label=<<B>Railway: pocketbase</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">API + dashboard</FONT>>]
+    svc_web [color="#0969da" penwidth="1.6"
+      label=<<B>Railway: web</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">the Next app</FONT>>]
+    live [fillcolor="#dafbe1" color="#1a7f37" penwidth="1.7" fontcolor="#0a5c25"
+      label=<<B>live</B><BR/><FONT POINT-SIZE="9" COLOR="#0a5c25">one binary + SQLite on a volume</FONT><BR/><FONT POINT-SIZE="9" COLOR="#0a5c25">migrations replay on boot</FONT>>]
+
+    push -> ci [color="#0969da"]
+    ci -> svc_pb [label="each service deploys only\nwhen its own paths change"
+                  color="#0969da" fontcolor="#0550ae"]
+    ci -> svc_web [color="#0969da"]
+    svc_pb -> live [color="#0969da"]
+    svc_web -> live [color="#0969da"]
+  }
+}

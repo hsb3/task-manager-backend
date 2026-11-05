@@ -1,0 +1,4 @@
+{
+  "printWidth": 100,
+  "overrides": [{ "files": "pb_hooks/**", "options": { "printWidth": 80 } }]
+}

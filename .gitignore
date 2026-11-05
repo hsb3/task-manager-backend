@@ -1,0 +1,50 @@
+# secrets & local config — at any depth. The *.example siblings stay tracked.
+.env
+.env.local
+
+# PocketBase binary + data (rebuild from pb_migrations/ + scripts/seed.ts, don't inherit a DB)
+/pocketbase
+pb_data/
+pb.log
+*.zip
+
+# Railway IaC SDK install (root package.json exists only for it)
+/node_modules/
+
+# harness / editor noise
+logs/
+.DS_Store
+.dod-exit
+# Playwright writes here when invoked from the repo root instead of web/; web/.gitignore's
+# own /test-results/ is anchored to web/ and does not reach this one.
+/test-results/
+battery-manifests/
+.playwright-browsers/
+
+# secrets & live-op files (repo-local, never tracked)
+.claude/operations/
+
+# machine-local opencode config (may carry MCP tokens; opencode can't read env from settings.local.json)
+.opencode/opencode.json
+
+# machine-local agent scratch (foreman-kit reviewer memory etc.)
+.claude/agent-memory/
+
+# >>> cc-project-memory (managed) >>>
+# narrow-ignore: ignore only machine-local/transient; track everything else under .claude/
+# (memory/, rules/, settings.json stay tracked & transferable)
+.claude/settings.local.json
+.claude/worktrees/
+.claude/*.lock
+.claude/**/.DS_Store
+# <<< cc-project-memory (managed) <<<
+
+# atelier handoff freshness signal. The handoff itself is kata issue 91s4 (project task-manager); this file
+# carries no content, only an mtime, and machine-local mtime is not something to share.
+.agents/handoff.stamp
+
+# kata per-machine overrides (daemon URL etc.) — written by `kata init`, never committed
+.kata.local.toml
+
+# Per-checkout verification environment
+.venv/
