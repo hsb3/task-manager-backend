@@ -46,7 +46,7 @@ test_saved_views · 8133 = test_stale_write · 8134 = test_subscribers_notificat
 = test_productivity_flow · 8136 = test_user_settings_font · 8137 = test_vocab_upsert ·
 8138 = test_fresh_workspace · 8139 = test_rescope_guard · 8140 = test_priority_vocab ·
 8141 = test_inspire · 8142 = test_notifications_trash_cascade · 8143 = test_counts_route · 8144 =
-test_invite_mirror · 8145 = test_mutation_proof · 8149 = test_invitations · 8150 = test_invitation_limits · 8151 = test_workspace_save_tx · 8152 = test_agent_probe · 8165 = test_path_scope · 8166 = test_owner_defaults · 8147 =
+test_invite_mirror · 8145 = test_mutation_proof · 8146 = test_api_keys · 8149 = test_invitations · 8150 = test_invitation_limits · 8151 = test_workspace_save_tx · 8152 = test_agent_probe · 8165 = test_path_scope · 8166 = test_owner_defaults · 8147 =
 test_pb_refusal_statuses · 8148 = test_draft_publish. SMTP sinks:
 2526 battery email · 2527 battery hardening · 2528-2531 test_observability · 2532
 test_collab_flow · 2533 test_subscribers_notifications. `scripts/check_port_collisions.ts`

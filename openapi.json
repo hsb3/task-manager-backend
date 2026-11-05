@@ -1,6 +1,85 @@
 {
   "components": {
     "schemas": {
+      "ApiKeysListResult": {
+        "description": "Paginated list of `api_keys` records.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKeysRecord"
+            },
+            "type": "array"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "perPage": {
+            "type": "integer"
+          },
+          "totalItems": {
+            "type": "integer"
+          },
+          "totalPages": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "perPage",
+          "totalItems",
+          "totalPages",
+          "items"
+        ],
+        "type": "object"
+      },
+      "ApiKeysRecord": {
+        "description": "A `api_keys` record (base collection).",
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key_hash": {
+            "description": "Hidden system field — not returned in API responses.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "scope": {
+            "enum": [
+              "read",
+              "write"
+            ],
+            "type": "string"
+          },
+          "updated": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "user": {
+            "description": "Relation record id (target collection: users).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "scope",
+          "user"
+        ],
+        "type": "object"
+      },
       "AppDocsListResult": {
         "description": "Paginated list of `app_docs` records.",
         "properties": {
@@ -2109,6 +2188,259 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/collections/api_keys/records": {
+      "get": {
+        "description": "Access governed by the collection's list API rule.",
+        "parameters": [
+          {
+            "description": "Page number (1-based).",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Records per page.",
+            "in": "query",
+            "name": "perPage",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated sort fields, e.g. `-created,title`.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "PocketBase filter expression.",
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated relations to expand (dynamic).",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated fields to return.",
+            "in": "query",
+            "name": "fields",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Skip the totalItems/totalPages count for speed.",
+            "in": "query",
+            "name": "skipTotal",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeysListResult"
+                }
+              }
+            },
+            "description": "Paginated list."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List/search api_keys records.",
+        "tags": [
+          "api_keys"
+        ]
+      },
+      "post": {
+        "description": "Access governed by the collection's create API rule.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeysRecord"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeysRecord"
+                }
+              }
+            },
+            "description": "The created record."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a api_keys record.",
+        "tags": [
+          "api_keys"
+        ]
+      }
+    },
+    "/api/collections/api_keys/records/{id}": {
+      "delete": {
+        "description": "Access governed by the collection's delete API rule.",
+        "parameters": [
+          {
+            "description": "Record id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted (no content)."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a api_keys record.",
+        "tags": [
+          "api_keys"
+        ]
+      },
+      "get": {
+        "description": "Access governed by the collection's view API rule.",
+        "parameters": [
+          {
+            "description": "Record id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated relations to expand (dynamic).",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated fields to return.",
+            "in": "query",
+            "name": "fields",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeysRecord"
+                }
+              }
+            },
+            "description": "The record."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Fetch one api_keys record.",
+        "tags": [
+          "api_keys"
+        ]
+      },
+      "patch": {
+        "description": "Access governed by the collection's update API rule.",
+        "parameters": [
+          {
+            "description": "Record id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeysRecord"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeysRecord"
+                }
+              }
+            },
+            "description": "The updated record."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a api_keys record.",
+        "tags": [
+          "api_keys"
+        ]
+      }
+    },
     "/api/collections/app_docs/records": {
       "get": {
         "description": "Access governed by the collection's list API rule.",
@@ -8263,6 +8595,10 @@
     }
   },
   "tags": [
+    {
+      "description": "`api_keys` collection endpoints.",
+      "name": "api_keys"
+    },
     {
       "description": "`app_docs` collection endpoints.",
       "name": "app_docs"
