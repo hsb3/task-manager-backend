@@ -15,7 +15,7 @@
  * R6  GET  /api/collections/workspace_invitations/records?filter=... — owner/active-admin's
  *     pending list.
  *
- * Every response key set is asserted as a SET (.agents/memory/mock-call-assertion-undefined-keys.md):
+ * Every response key set is asserted as a SET:
  * a subset check cannot fail on an extra leaked key.
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy. Port 8149 +

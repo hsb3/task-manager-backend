@@ -186,8 +186,8 @@ export function port_is_free(port: number, host: string = "127.0.0.1"): Promise<
   // connect-and-refuse, never bind-and-release: a bind check false-positives on TIME_WAIT.
   // One host is enough BECAUSE it is a connect: measured, every holder that can answer a
   // room's health poll on 127.0.0.1 (0.0.0.0, 127.0.0.1, dual-stack ::) accepts a connection
-  // there, and an IPv6-only holder can neither answer it nor block our bind. web/e2e's
-  // two-host PROBE_HOSTS is an artifact of BIND-probing; copied here it would refuse usable
+  // there, and an IPv6-only holder can neither answer it nor block our bind. a two-host
+  // PROBE_HOSTS list is an artifact of BIND-probing; copied here it would refuse usable
   // ports — tests/test_roomkit_creds.ts pins both halves.
   // Only an explicit refusal proves nothing listens: a timeout means a stranger holding the
   // port with a saturated accept backlog is dropping our SYN, which must not read as free.

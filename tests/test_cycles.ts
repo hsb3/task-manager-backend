@@ -6,54 +6,6 @@
  * the end-of-cycle rollover of unfinished work (§9, driven through the superuser route
  * and, in §9n, through the registered cron job itself).
  *
- * verify_grep tokens for scripts/model/target/cycles.yml — do not rename without updating
- * the model target facets in lockstep:
- *     default span
- *     range refused
- *     overlap refused
- *     workspace immutable
- *     the submitted time of day is discarded, both ends stored at midnight
- *     a span of ONE MILLISECOND is one day
- *     a cycle starting on the day another one ENDS
- *     Bob (suspended admin) list → 200 empty
- *     Bob (suspended admin) create → 400
- *     cross-workspace cycle refused on CREATE
- *     assigning a cycle leaves the task in its project
- *     view filter by cycle returns exactly the tasks in that cycle
- *     deleting a cycle clears the pointer and keeps the task
- *     task rolled into the next cycle
- *     is resolved, so it stays on the ended cycle
- *     the auto-created next cycle starts the day after the ended one
- *     the auto-created next cycle is the same length as the cycle that ended
- *     the auto-created cycle is named for the day it starts
- *     an existing next cycle is used, and no second one is created
- *     a workspace dormant for months is caught up by ONE run
- *     a second run moves nothing: every task still holds the cycle it already held
- *     one run sweeps both ended cycles in date order
- *     one run lands the work in the final cycle, not an intermediate one
- *     a cycle that has not ended is not swept: its task keeps it
- *     a cycle whose LAST DAY is today is still running, so its task keeps it too
- *     rollover never crosses a workspace boundary
- *     a rolled task keeps its project
- *     Alice adds a triage status to ws A
- *     its status is cleared, so it carries no category at all
- *     a workspace whose only held task sits in a trashed project rolls nothing
- *     a task whose project is in the trash never rolls: it stays on the cycle that ended
- *     a workspace whose only held task is hidden by its project has no cycle minted for it
- *     restoring the project puts the task back in the running: the next sweep rolls it
- *     the rollover reaches the live board: the moved task arrives on the workspace channel
- *     …and the broadcast carries the cycle the task landed on
- *     the broadcast is actorless, because the sweep is systemic
- *     a trashed workspace is skipped: only the live control workspace rolls
- *     the control workspace's task rolled off the cycle that ended
- *     a task in a trashed workspace never rolls: it stays on the cycle that ended
- *     a trashed workspace has no cycle minted inside it
- *     restoring the workspace puts its board back in the running: the next sweep rolls it
- *     superuser runs the registered cron job → 204
- *     the cron run moves the live workspace's task within the poll deadline
- *     the same cron run leaves a trashed workspace's task on the cycle that ended
- *     the cron mints no cycle inside a trashed workspace
- *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy (the cycle hooks
  * under test live there), scripts/seed.ts fixtures. Port 8117 + PB_PORT_OFFSET (suite
  * self-boot band per CLAUDE.md).

@@ -16,15 +16,6 @@
  * is the ruling-F derived coverage: future tenant edges (content-chain OR taxonomy) cannot ship
  * unguarded and unnoticed.
  *
- * verify_grep tokens for scripts/model/target/*.yml (scope.rescope facets; projects.owner is
- * cited by the owner-immutable-after-create invariant) — do not rename without updating those
- * targets in lockstep:
- *     rescope-immutable:workspaces.owner
- *     rescope-immutable:workspace_members.workspace
- *     rescope-immutable:workspace_members.user
- *     rescope-immutable:user_settings.user
- *     rescope-immutable:projects.owner
- *
  * Self-booting clean room, --hooksDir from a pb_hooks copy, scripts/seed.ts fixtures.
  */
 

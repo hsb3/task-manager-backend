@@ -232,7 +232,7 @@ options:
   // EXPIRED is the tripwire that stops the suspension above being forgotten: it is red only
   // between the rebuild landing and the re-arm PR, both of which the same lane owns.
   // tests/test_historical_migration_guard.ts asserts the live state here is not EXPIRED, so
-  // make dod and CI raise that alarm too, not lefthook.yml's staged-paths job alone.
+  // make check and CI raise that alarm too, not lefthook.yml's staged-paths job alone.
   const state = suspension_state(marker_on_ref());
   if (state !== "ARMED") {
     print(suspension_message(state));

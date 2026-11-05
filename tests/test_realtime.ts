@@ -3,9 +3,8 @@
 
 Each create/update/purge of an item collection (tasks/decisions/documents/milestones)
 broadcasts a raw envelope {collection,id,action,actorId,rawChangedFields,rawRecord} on the
-PER-WORKSPACE topic `rt:project_items:{workspaceId}` to that workspace's subscribers. The
-web/ reshape utility (lib/realtime-events.ts) turns the envelope into the contract
-RealtimeEvent. This suite proves the emit side on the wire.
+PER-WORKSPACE topic `rt:project_items:{workspaceId}` to that workspace's subscribers. A
+client reshapes the envelope into its own event type. This suite proves the emit side on the wire.
 
 Tenant isolation (the reason the topic is workspace-scoped + guarded by
 onRealtimeSubscribeRequest): a NON-MEMBER who tries to subscribe to another workspace's topic

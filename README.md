@@ -20,11 +20,6 @@ code.
 - **Reproducible from git alone** — clone and the migrations rebuild everything;
   push and CI plus Railway deploy it. The database is the only thing not in git.
 
-![The items list: tasks and milestones side by side, with status, assignee, sub-task progress and comment counts](docs/assets/screenshot-items.png)
-
-The screen above is the app running against the sample data `scripts/seed.ts`
-creates, so `make dev` gets you there in one command.
-
 ## Quick start
 
 The `pocketbase` binary, `pb_data/` and `.env` are gitignored, so a fresh clone
@@ -33,10 +28,8 @@ builds the backend rather than inheriting one:
 ```bash
 # Install mise first, then trust this checkout's reviewed runtime pins.
 mise trust
-make setup                 # runtimes (incl. Lefthook), npm ci, PocketBase and local config
-git config extensions.worktreeConfig true && git config --worktree core.hooksPath .githooks   # once per checkout: pre-commit runs lefthook.yml; fails if Lefthook is missing
-# Repeat in each checkout/worktree; existing config and pb_data survive.
-make dev                  # web + PocketBase, seeds a fresh database
+make setup                 # runtimes (incl. Lefthook), bun install, PocketBase, local config, pre-commit hook
+make dev                   # PocketBase on http://127.0.0.1:8090, seeds a fresh database
 ```
 
 `make dev` needs no hand setup, in a clone or a worktree: it writes a local `.env`
@@ -55,15 +48,26 @@ migrations and gated against drift on every commit — it is never hand-edited.
 [`docs/generated/decisions.md`](docs/generated/decisions.md) records the product and schema rulings
 behind it, generated the same way.
 
+Against `make dev`, sign in as a seeded user and call the REST API with the token (PocketBase
+takes it in `Authorization` with no `Bearer` prefix):
+
+```bash
+TOKEN=$(curl -s http://127.0.0.1:8090/api/collections/users/auth-with-password \
+  -H 'Content-Type: application/json' \
+  -d '{"identity":"alice@example.com","password":"test123456"}' | jq -r .token)
+curl -s -H "Authorization: $TOKEN" http://127.0.0.1:8090/api/collections/tasks/records
+```
+
 ## Verify
 
-The gate runners select the Bun and Node versions pinned in `mise.toml`.
+The gate runners select the Bun version pinned in `mise.toml`.
 For individual commands, activate the same environment first:
 
 ```bash
 . scripts/verification-env.sh
-bash scripts/run_suite_battery.sh   # the whole battery — what CI runs
-bun tests/test_rules.ts         # one suite (any tests/test_*.ts runs solo)
+make check                          # the gate: static checks, then the whole battery
+make check-static                   # its server-free half
+bun tests/test_rules.ts             # one suite (any tests/test_*.ts runs solo)
 ```
 
 Each suite boots its own clean server, probes the full role matrix, and exits
@@ -71,7 +75,7 @@ non-zero on any failure. On macOS the battery retries a suite once if its
 connection drops mid-run (a local file-watcher artifact); CI is unaffected.
 
 CI splits the battery across four runners by `scripts/battery_shards.tsv`, and a verify job
-fails when any suite ran in no shard. `make battery` and `make dod` run it whole.
+fails when any suite ran in no shard. `make battery` and `make check` run it whole.
 
 ## Configuration
 
@@ -81,7 +85,6 @@ Two layers, each with a tracked `.example` sibling and a gitignored real file:
 | --- | --- | --- |
 | `.env` | deployment config, mirrors the Railway service variables; locally, the dev superuser `make env` writes | the `pb_hooks/` env boot hooks, the Dockerfile, `make dev` |
 | `.env.local` | local-testing overrides — ports, paths, mail sink | `scripts/`, `tests/` |
-| `web/.env.local` | the web app's own dev vars | Next.js |
 
 ## Layout
 
@@ -89,13 +92,5 @@ Two layers, each with a tracked `.example` sibling and a gitignored real file:
   per-collection docs (`scripts/gen_schema.ts`). `pb_hooks/` — validation,
   lifecycle and custom routes.
 - `scripts/` — dev tooling and the generators. `tests/` — end-to-end proofs.
-- `web/` — the Next.js app, deployed as its own service and talking to PocketBase
-  through a proxy seam.
-- [`deploy/`](deploy/README.md) — local Docker stacks, Railway configuration and deployment recipes.
+- [`deploy/`](deploy/README.md) — Railway configuration and deployment recipes.
 Tasks, decisions and planning docs live on the kata board, not in this repo.
-
-## History
-
-This repo began as a hands-on PocketBase course. That material — twenty-one
-modules with their own README — is preserved on the
-[`learning`](../../tree/learning) branch.

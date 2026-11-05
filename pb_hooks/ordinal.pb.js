@@ -100,8 +100,7 @@ onRecordUpdateRequest((e) => {
 
   const db = e.app.db();
   // KEEP IN SYNC: project-order — ordinal ASC, created DESC, id ASC is also spelled in
-  // tests/test_ordinal.ts (project_order), web/lib/proxy/handlers/project_items.ts (the list
-  // default sort) and web/components/resource/use-board-drop.ts (the stored-order comparator).
+  // tests/test_ordinal.ts (project_order).
   const ORDER = "ordinal, created DESC, id";
   // The project's other tasks in list order (ordinal, newest first, id); FRACTIONAL template.
   const others = () => {

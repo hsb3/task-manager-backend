@@ -2,7 +2,7 @@
 /**E2E proof of the signup lifecycle, end to end in one clean room:
 
 (a)-(g) a public signup — the same `POST /api/collections/users/records` call
-`web/app/api/auth/signup/route.ts` proxies — gets the exact same auto-provisioned
+a web client sends — gets the exact same auto-provisioned
 workspace/workspace_members/project/user_settings shape a seeded user gets, once a
 superuser flips verified+approved true (pb_hooks/main.pb.js's
 onRecordAfterCreateSuccess("users") hook).
@@ -171,7 +171,7 @@ try {
   await room.start();
 
   // COVERS: hook:main.pb.js#onRecordAfterCreateSuccess:users, rule:users.create
-  console.log("\n── (a) public signup — same body shape as web/app/api/auth/signup/route.ts ──");
+  console.log("\n── (a) public signup — same body shape a web client sends ──");
   const signup_email = "signup-e2e@example.com";
   const [signup_status, signup_body] = await api(
     room.base_url,
@@ -270,7 +270,7 @@ try {
   // COVERS: hook:auth_identity.pb.js#onRecordCreate:users, hook:auth_identity.pb.js#onRecordUpdate:users
   console.log("\n── (h) PBTT-363: a stored email is trimmed + lowercased ──");
 
-  // v1:1785150000_settings.js caps ANONYMOUS POST /api/collections/users/records at 5 per
+  // The app_settings rate limits cap ANONYMOUS POST /api/collections/users/records at 5 per
   // 60s and a superuser token bypasses it, so only the checks that are specifically
   // about the public path spend from that budget — (a) plus two here.
   const signup = (email: string, name: string, token: string | null = null) =>
@@ -311,7 +311,7 @@ try {
   );
 
   // The first variant goes over the PUBLIC path — that 400 is what
-  // web/lib/auth/signup-core.ts classifies as a verdict and shows the person verbatim.
+  // a client treats as a verdict and shows the person verbatim.
   let dup_body: any;
   for (const [variant, as_su] of [
     ["mixed.case@example.com", false],
@@ -666,7 +666,7 @@ try {
     "\n── (h9b) the index-caught refusal is the body the sign-up screen must classify ──",
   );
   // The pre-scan's verdict never reaches this loser, so its per-field failure code is the
-  // only thing naming what happened — that is what web/lib/auth/signup-core.ts keys on.
+  // only thing naming what happened — that is what a client keys on.
   const rounds_run = round_no + 1;
   if (index_loser === null) {
     // A miss proves nothing about the body shape, so it FAILS rather than declaring a skip:

@@ -13,9 +13,6 @@ function rejectBlankName(e) {
   return e.next();
 }
 
-// The literal collection tag is load-bearing: scripts/gen_coverage.ts refuses an untagged
-// registration, so the all-collections form of these hooks cannot be used here.
-
 onRecordCreateRequest(rejectBlankName, "app_docs");
 onRecordUpdateRequest(rejectBlankName, "app_docs");
 onRecordCreateRequest(rejectBlankName, "app_settings");

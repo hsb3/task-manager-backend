@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Battery check: `migrate up` -> `migrate down N` -> `migrate up` must LOSE no app_docs span.
+ * Static check: `migrate up` -> `migrate down N` -> `migrate up` must LOSE no app_docs span.
  *
  * An app_docs seed migration's `down()` is a documented no-op ("app_docs prose is
  * re-established on any fresh boot") — reverting one does not undo its `extend()` calls, so
  * reapplying it after a partial revert re-runs `extend()` a second time and DUPLICATES the
  * appended text (measured: g2act1col2docs3 grows 3160 -> 4412 bytes, a fragment appearing
- * twice, when replaying `down 3` across v1:1785173400_seed_app_docs_ownership_transfer_record.js).
+ * twice, when replaying `down 3` across the v1 seed that added the ownership-transfer record).
  * That duplication is the ACCEPTED cost of the no-op `down()` and is not what this gate
  * polices — it asserts only that no span present before the round trip goes MISSING after it,
  * the failure mode a real revert-then-reapply (an operator undoing a bad recent migration)
@@ -17,9 +17,8 @@
  * exercises real recent app_docs mutation as the migration set grows, rather than a stale
  * depth that eventually reverts too far or not far enough.
  *
- * Home: the battery (and `make dod`'s backend scope, which runs the battery) — NOT
- * pre-commit, which stays commit-fast; a full migration replay plus a second down+up pass is
- * too slow for a commit hook.
+ * Home: `make check-static`, which runs every scripts/check_*.ts and which the pre-commit hook
+ * runs too (lefthook.yml), so every commit pays for the replay plus the down+up pass.
  *
  * Span definition, `normalize`/`spans`/`MIN_SPAN_CHARS`, are imported (read-only) from
  * scripts/check_app_docs_history.ts, whose own docstring declares them a public API.

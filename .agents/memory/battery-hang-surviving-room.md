@@ -14,5 +14,5 @@ boots from a scratch COPY of `pb_hooks` (AGENTS.md clean-room law). `test_app_ad
 `api()` still absorbs one refused connection; its ⚠ retry line is normal output.
 
 **How to apply:** output frozen + a lone `pocketbase serve` child under `run_suite_battery.sh` =
-kill that pid by number (scratch room, safe) and the battery resumes. Never pattern-kill:
-[[pkill-by-script-name-kills-other-lanes]].
+kill that pid by number (scratch room, safe) and the battery resumes. Never pattern-kill by script name:
+sibling lanes run the same script names.

@@ -10,5 +10,5 @@ plus the full record body from a blind `PATCH` by id, and could `DELETE` it, bec
 delete carried a weaker predicate than list/view.
 
 **How to apply:** a privacy predicate goes on list, view, update AND delete; probe the write
-operations by id as the excluded role, not only the reads. Related:
-[[pb-update-rule-evaluates-old-record]], [[pb-ored-rule-admits-anonymous]].
+operations by id as the excluded role, not only the reads. The pocketbase plugin's
+field notes cover updateRule-sees-the-OLD-record and OR-ed rules admitting anonymous callers.

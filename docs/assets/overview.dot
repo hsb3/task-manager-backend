@@ -133,21 +133,17 @@ digraph overview {
     label=<<B>Ship loop</B> <FONT POINT-SIZE="9">— everything but the data lives in git</FONT>>
 
     push [color="#0969da" penwidth="1.6"
-      label=<<B>git push · main</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">migrations · hooks · web</FONT>>]
+      label=<<B>git push · main</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">migrations · hooks</FONT>>]
     ci [color="#0969da" penwidth="1.6"
-      label=<<B>GitHub Actions</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">suite battery · app_docs</FONT><BR/><FONT POINT-SIZE="9" COLOR="#59636e">web gates · browser e2e</FONT>>]
+      label=<<B>GitHub Actions</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">suite battery · app_docs</FONT><BR/><FONT POINT-SIZE="9" COLOR="#59636e">static checks</FONT>>]
     svc_pb [color="#0969da" penwidth="1.6"
       label=<<B>Railway: pocketbase</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">API + dashboard</FONT>>]
-    svc_web [color="#0969da" penwidth="1.6"
-      label=<<B>Railway: web</B><BR/><FONT POINT-SIZE="9" COLOR="#59636e">the Next app</FONT>>]
     live [fillcolor="#dafbe1" color="#1a7f37" penwidth="1.7" fontcolor="#0a5c25"
       label=<<B>live</B><BR/><FONT POINT-SIZE="9" COLOR="#0a5c25">one binary + SQLite on a volume</FONT><BR/><FONT POINT-SIZE="9" COLOR="#0a5c25">migrations replay on boot</FONT>>]
 
     push -> ci [color="#0969da"]
-    ci -> svc_pb [label="each service deploys only\nwhen its own paths change"
+    ci -> svc_pb [label="deploys when migrations,\nhooks or the Dockerfile change"
                   color="#0969da" fontcolor="#0550ae"]
-    ci -> svc_web [color="#0969da"]
     svc_pb -> live [color="#0969da"]
-    svc_web -> live [color="#0969da"]
   }
 }

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Launches the pre-commit jobs in lefthook.yml. Activate once per checkout (Lefthook required): git config extensions.worktreeConfig true && git config --worktree core.hooksPath .githooks
+# Launches the pre-commit jobs in lefthook.yml. Activate once per clone (Lefthook required): make setup
 
 root="$(git rev-parse --show-toplevel)"
 cd "$root" || exit 1

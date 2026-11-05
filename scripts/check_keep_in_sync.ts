@@ -10,9 +10,9 @@
  * that line:
  *
  *   named file  — a path or bare filename with a source extension ("realtime.pb.js",
- *                 "web/package.json"). Resolved against the repo root, then against every
- *                 ancestor directory of the marker's own file (web/ imports read as
- *                 "lib/settings/apply.ts"), then by unique basename.
+ *                 "pb_hooks/lib/workspace_rules.js"). Resolved against the repo root, then
+ *                 against every ancestor directory of the marker's own file ("lib/workspace_rules.js"
+ *                 from inside pb_hooks/), then by unique basename.
  *   literal     — the inner text of a backticked or double-quoted span. Delimiters are dropped,
  *                 so JSON's \" escaping cannot hide an otherwise identical match.
  *
@@ -102,7 +102,7 @@ const cp_len = (s: string): number => [...s].length;
 /**
  * Root-relative paths of every tracked file; `root` must be a git work tree.
  *
- * Names come from the index, bytes from disk — scripts/with_staged_tree.sh makes them agree at commit.
+ * Names come from the index, bytes from disk.
  */
 export function scan_files(root: string): string[] {
   // An untracked file, ignored or not, is not source; a new file is checked once staged.
@@ -208,7 +208,7 @@ export function resolve(
 ): [string | null, string] {
   const candidate = py_lstrip(token, "([");
   if (on_disk.has(candidate)) return [candidate, "resolved"];
-  // web/ names its own imports from the package root, not the repo root.
+  // A marker may name a path relative to an ancestor of its own file, not the repo root.
   const dir = path.posix.dirname(origin);
   const parts = dir !== "." ? dir.split("/") : [];
   for (let depth = parts.length; depth > 0; depth--) {

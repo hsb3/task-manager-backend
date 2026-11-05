@@ -621,8 +621,6 @@ check(
   tup("viewer", 400),
 );
 
-// gen_coverage takes the rest of a marker LINE as ids: a wrapped continuation is silently
-// dropped, a trailing aside becomes a bogus id.
 // COVERS: rule:tasks.update, rule:tasks.delete
 // COVERS: rule:comments.update, rule:comments.delete
 // COVERS: rule:saved_views.update, rule:saved_views.delete

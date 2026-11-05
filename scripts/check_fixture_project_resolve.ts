@@ -11,7 +11,7 @@
  * fixture literal named `Workspace items` collides with the container's own reserved display
  * name (`pb_hooks/shadow.pb.js`), breaking any resolve-by-name lookup for that string.
  *
- * Scope: `tests/**\/*.ts` and `web/e2e/**\/*.ts(x)`. Two independent, purely textual checks —
+ * Scope: `tests/**\/*.ts`. Two independent, purely textual checks —
  * no server, no parser:
  *
  *   (a) POSITIONAL RESOLVE: a `projects/records` read whose nearby text mentions `workspace`
@@ -37,8 +37,8 @@ import path from "node:path";
 import { parse_args } from "./_argparse.ts";
 import { by_code_point, print, py_strip, read_text, splitlines } from "./_py.ts";
 
-export const SCAN_GLOBS = ["tests/**/*.ts", "web/e2e/**/*.ts", "web/e2e/**/*.tsx"];
-export const EXCLUDE_DIR_NAMES = new Set(["node_modules", ".next", "__pycache__"]);
+export const SCAN_GLOBS = ["tests/**/*.ts"];
+export const EXCLUDE_DIR_NAMES = new Set(["node_modules", "__pycache__"]);
 // Its own unit-pin suite plants the trigger strings as scratch-file CONTENT inside string
 // literals, to prove detection — scanning it would flag the checker's own test fixtures.
 export const SELF_TEST = "test_fixture_project_resolve_checker.ts";
@@ -47,7 +47,7 @@ export const SELF_TEST = "test_fixture_project_resolve_checker.ts";
 // statement (or a helper function's whole body) — that is what lets the workspace/shadow/key
 // check see a `qs = urlencode({...})` dict built a couple of lines ABOVE the fetch
 // (tests/test_item_keys.ts's find_project shape) and the positional-pick check see an
-// `items[0]` a couple of lines BELOW it (my-items.spec.ts's pre-#657 shape), while not
+// `items[0]` a couple of lines BELOW it (the pre-#657 e2e shape), while not
 // bleeding into the next unrelated function.
 export const MAX_BLOCK = 20;
 

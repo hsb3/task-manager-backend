@@ -15,17 +15,13 @@ derives a committed `openapi.json` from that source, instead of hand-writing the
 adopting an immature community converter.
 
 **Why:** the spec can never silently drift from the schema (a `--check` mode exits
-non-zero on staleness, wired like any other generated-artifact gate); the frontend gets
-auto-generated types; and the generator doubles as an equivalence proof — regenerating
+non-zero on staleness, wired like any other generated-artifact gate); consumers can generate
+types from it; and the generator doubles as an equivalence proof — regenerating
 before and after a schema refactor must be byte-identical if the model is unchanged.
 
 **How to apply:**
 - Generator derives from the real source of truth (migrations replay / live schema read),
   not from docs; byte-stable output (sorted keys, no timestamps) so `--check` is a diff.
-- Prove the spec with the actual consumer, not a linter alone: e.g. `openapi-typescript`
-  must emit types that typecheck — that is the use case, so it is the honest gate.
-- Reference implementation: `scripts/gen_openapi.py` in hsb3/task-manager (pattern
-  mirrors that repo's `gen_decisions.py` generated-artifact convention).
-- Same shape works for any derived artifact: generate from truth, commit, drift-gate,
-  consumer-proof. See [[interactive-learning-structure]] for the course context it
-  emerged from.
+- Reference implementation: `scripts/gen_openapi.ts` (`--check` is the drift gate;
+  same convention as `gen_decisions.ts`).
+- Same shape works for any derived artifact: generate from truth, commit, drift-gate.

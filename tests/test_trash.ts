@@ -13,13 +13,6 @@
  * PATCH (updateRule on workspace_members is owner-only). Needs superuser creds
  * from env (PB_SUPERUSER_EMAIL/PASSWORD) to promote Carol, inject aged
  * `trashed` timestamps, mint/clean up throwaways, and drive the purge route.
- *
- * verify_grep tokens for model/target/*.yml — keep in sync:
- *     surface-exclusion — trashed rows absent from LIST surfaces
- *     delete-to-trash    — member DELETE traps to trash 204 + trashed set
- *     trash-restore      — PATCH trashed="" returns row to lists
- *     purge-rights       — member 2nd DELETE 400 veto; owner/admin purge 204
- *     cron-expiry        — trigger purges aged rows, spares fresh
  */
 
 import { randomBytes } from "node:crypto";
@@ -1765,7 +1758,7 @@ console.log(
  * 501 rows via /api/batch (settings: batch.maxRequests=50) — far fewer round trips
  * than one POST per row. `token` must be the superuser: 501+501 sub-requests blow past
  * the general 300/60s API rate limit that gates a regular authenticated user (superusers
- * are exempt, v1:1785150000_settings.js). Returns the created ids in request order.
+ * are exempt, per the app_settings rate limits). Returns the created ids in request order.
  */
 async function batch_create(
   coll: string,
@@ -1817,7 +1810,7 @@ const [zara] = await login(zara_email);
 const ZARA_WS = (await find_id("workspaces", "owner", zara_id, su))!;
 check("T20 setup: resolved Zara's auto-provisioned workspace", truthy(ZARA_WS), true);
 
-// PB aborts a whole batch as a bare 400 once it runs past batch.timeout (v1:1785150000_settings.js),
+// PB aborts a whole batch as a bare 400 once it runs past batch.timeout (the settings batch config),
 // which a loaded host crosses at 50 creates; the bulk fixture is not what T20 proves.
 let settings: any;
 [, settings] = await api("GET", "/api/settings", su);

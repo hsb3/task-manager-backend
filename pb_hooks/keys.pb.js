@@ -10,8 +10,6 @@
 // Pooled JSVM: each handler below is a self-contained top-level function registered DIRECTLY,
 // the house idiom (see main.pb.js's validateTaskStatusWs) — nothing is CALLED across callbacks.
 
-// KEEP IN SYNC: the prefix suggestion here mirrors the backfill in
-// v1:pb_migrations/1785158900_project_item_keys.js.
 function assignProjectKey(e) {
   // A shadow project (decision-052) takes no prefix: it must never squat one a member may
   // later choose, and its items stay keyless the way project-less items were.
@@ -83,8 +81,8 @@ function lockProjectKey(e) {
 onRecordUpdate(lockProjectKey, "projects");
 
 // item_seq is the server's own counter: rewinding it hands the next create a number an item
-// already wears, and that item is then committed with no label at all. Request tier because the
-// 1785158900 backfill writes the counter through its own app.save().
+// already wears, and that item is then committed with no label at all. Request tier so it
+// refuses only a client's write, never a server-side save.
 // KEEP IN SYNC: this is refuseSubmittedItemKey's rule, for the counter behind the key.
 function refuseSubmittedItemSeq(e) {
   if (e.record.get("item_seq") !== e.record.original().get("item_seq")) {
@@ -193,8 +191,8 @@ onRecordAfterCreateSuccess(assignItemKey, "milestones");
 
 // The key follows the item (decision-043): moving an item to another project leaves its label
 // alone, so this guard is also what stops a move from re-keying it into the new project's range.
-// Lenient on an EMPTY original by necessity: this universal tier fires for the 1785158900
-// backfill's own app.save() too, and PB aborts the boot on a migration a hook refuses.
+// Lenient on an EMPTY original: this universal tier also fires on a server-side save that labels
+// an unkeyed item, and PB aborts the boot on a migration a hook refuses.
 // KEEP IN SYNC: refuseSubmittedItemKey below is this rule without the empty-original escape.
 function lockItemKey(e) {
   const original = e.record.original().get("key");
@@ -209,8 +207,8 @@ onRecordUpdate(lockItemKey, "documents");
 onRecordUpdate(lockItemKey, "milestones");
 
 // assignItemKey is the only minter, so an item born without a project is keyless for
-// life and no client may PATCH itself a label the server never issued. Request tier because it
-// must NOT see the backfill: that write is exactly the empty-original case escaped above.
+// life and no client may PATCH itself a label the server never issued. Request tier so it never
+// sees a server-side save: that write is exactly the empty-original case escaped above.
 // KEEP IN SYNC: this is lockItemKey's rule, strict on the empty original.
 function refuseSubmittedItemKey(e) {
   if (e.record.get("key") !== e.record.original().get("key")) {

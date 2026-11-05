@@ -41,9 +41,8 @@ window between its two calls cannot be widened from outside without a flag this 
 carry, and the two paths share the same functions.
 
 DECLARED BOUND — the notification is proven as a stored, correctly-scoped row. Nothing here
-proves how it RENDERS: that the reshaper maps `ownership_transferred` to the `ownership`
-contract kind, and that the bell renders that kind, is proven by the web unit tests
-(`web/lib/proxy/handlers/notifications.test.ts`, `web/components/shell/notifications-bell.test.ts`).
+proves how it RENDERS: a client mapping `ownership_transferred` to a display kind is outside
+this server-side suite.
 
 DECLARED BOUND — the round count here is deliberately small, because the app_settings rate
 limit is one budget for the whole file. The idle-versus-loaded replication that a concurrency
@@ -183,7 +182,7 @@ function check_in(label: string, got: any, allowed: any[]): void {
 
 /**
  * A PB error message normalized for comparison — the wire form is capitalized and
- * period-terminated (.agents/memory/pb-wire-message-normalization.md).
+ * period-terminated.
  */
 function wire(body: any): string {
   return py_rstrip(py_strip(body.message || ""), ".").toLowerCase();
@@ -1282,8 +1281,8 @@ check(
 );
 
 console.log("\n── §15 THE OPERATOR RECIPE FOR THE SUPERUSER PATH ──");
-// The route requires a superuser to name the owner it believes is current, and nothing in web/
-// or scripts/ could send it (kca7). The recipe READS that owner, so the operator never types it.
+// The route requires a superuser to name the owner it believes is current, and nothing in scripts/
+// could send it (kca7). The recipe READS that owner, so the operator never types it.
 const [gus_id, gus_email] = await su_create_user("Gus");
 const GUS_WS = (await find_id("workspaces", "owner", gus_id, su))!;
 check("recipe: Gus has an auto-provisioned workspace", GUS_WS !== null, true);

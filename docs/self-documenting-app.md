@@ -66,14 +66,12 @@ non-system collection lacks a `collection:<name>` doc. It replays `pb_migrations
 into a throwaway DB (no server/port/auth) and compares `_collections` against
 `app_docs`, so it checks exactly what ships.
 
-- **Pre-commit:** [`../lefthook.yml`](../lefthook.yml) runs it when a
-  commit touches `schema/` or `pb_migrations/`. Activate once per checkout (Lefthook required,
-  `make setup` installs it):
-  `git config extensions.worktreeConfig true && git config --worktree core.hooksPath .githooks`.
+- **Pre-commit:** [`../lefthook.yml`](../lefthook.yml) runs it on every commit, inside
+  `make check-static`. `make setup` installs Lefthook and activates the hook.
 - **CI:** [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml) downloads
   PocketBase and runs the same script on push/PR. The suite battery runs split across four
   runners by [`../scripts/battery_shards.tsv`](../scripts/battery_shards.tsv), and a verify job
-  fails when any suite ran in no shard; `make battery` and `make dod` run it whole.
+  fails when any suite ran in no shard; `make battery` and `make check` run it whole.
 
 ```bash
 bun scripts/check_app_docs.ts   # ✅ all N collections documented  /  ❌ lists the gaps

@@ -20,5 +20,5 @@ generators and their drift gates are listed in `AGENTS.md` (`gen_schema.ts`, `ge
 
 Wave-scale consequence: every merge into `main` re-conflicts the next PR's generated artifacts,
 so a lane landing behind a sibling should expect **one rebase per sibling landing**, each ending
-in a regeneration rather than a resolution. Rebase immediately before taking the landing lock,
-not earlier — see [[root-gate-on-rebased-tree]] for why the gate has to run on the rebased tree.
+in a regeneration rather than a resolution. Rebase immediately before the final gate run,
+not earlier, so the gate proves the rebased tree.

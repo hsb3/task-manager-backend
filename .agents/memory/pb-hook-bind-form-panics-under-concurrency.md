@@ -27,5 +27,4 @@ shape found them.
 question). Update/delete guards panicked the same way (F7 on 6f1x) and went plain in wave v8
 lane Z1; no `.bind({...})` registration remains in pb_hooks. The rule now lives in
 `.agents/rules/pocketbase.md`. Any new concurrency claim needs a barrier-released probe, not
-a sequential suite: see [[proofs-must-be-falsifiable]] and
-[[independent-diff-review-before-commit]].
+a sequential suite: see [[proofs-must-be-falsifiable]].

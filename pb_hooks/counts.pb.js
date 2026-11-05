@@ -141,8 +141,7 @@ routerAdd(
     );
 
     const idList = function (raw) {
-      // An already-decoded array is a legitimate input on the proxy side of this pair; accepted
-      // here too so one rule covers both, never so this hook can receive one (the view casts TEXT).
+      // Defensive only: the view casts these columns to TEXT, so a decoded array never arrives.
       if (Array.isArray(raw)) return raw;
       if (typeof raw !== "string" || raw === "") return [];
       try {

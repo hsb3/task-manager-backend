@@ -15,4 +15,4 @@ silently, the same class as a port collision one layer down.
 
 **How to apply:** every worker makes its scratch with `mktemp -d` (as the recipe in
 `.agents/rules/ports.md` does) or a PID-unique path, never a fixed name under a shared temp
-root, and deletes only what it created. Related: [[never-write-in-a-live-agents-worktree]].
+root, and deletes only what it created.

@@ -16,4 +16,4 @@ the same commit, so the claim could not be told apart. Check `git rev-parse HEAD
 in a new worktree before relying on either.
 
 **How to apply:** after creating a worktree, copy `.env`, set `PB_BIN`, and confirm the base
-commit is the one you meant. Moving local main: [[main-checkout-locked]].
+commit is the one you meant.

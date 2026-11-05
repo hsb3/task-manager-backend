@@ -2,7 +2,6 @@
 paths:
   - "tests/**"
   - "scripts/**"
-  - "web/e2e/**"
   - "Makefile"
 ---
 
@@ -13,8 +12,7 @@ paths:
 whole run relocates with one variable instead of a file edit: `PB_PORT_OFFSET=200 bash
 scripts/run_suite_battery.sh` shifts every room and SMTP sink by 200. Use 100 or more so the
 shifted layout clears the defaults entirely; TWO CONCURRENT consumers need offsets ≥200 apart —
-the default layout spans more than 100 ports (8090→8193), so 400 vs 500 overlap at the edges
-(8190-8193+400 = 8090-8093+500; killed a lane's dod mid-run in wave 14); write it as a plain
+the default layout already spans most of 100 ports (8090→8166) and grows with every suite; write it as a plain
 decimal (the battery re-parses it with `py_int()` (`scripts/_py.ts`) so bash can't read `010` as octal, and
 both halves reject a non-integer loudly). Need a room while something else is running? Set
 `PB_PORT_OFFSET` — do NOT hand-pick a raw number out of a band. **A collision is SILENT if nothing preflights:** a suite treats any healthy server on its port as
@@ -22,16 +20,13 @@ its own, so it will seed and pass green against a stranger's database. Every sel
 `tests/test_*.ts` and `scripts/load_smoketest.ts` now preflights through `tests/roomkit.ts`
 (gated by `scripts/check_room_preflight.ts`, which prints the current count) — that is what makes
 a RUNTIME clash loud, not the band; `scripts/check_port_collisions.ts` is what makes two suites
-sharing the same DEFAULT loud, before either ever boots. That is how a `make dod` got killed
-mid-run, and the "probe" band is already occupied by suites. **The one thing the
+sharing the same DEFAULT loud, before either ever boots. **The one thing the
 offset does NOT move** is the container's `PORT` — `Dockerfile`'s `EXPOSE` is a build-time
-directive that cannot read it, so that literal stays. The web e2e ports (`E2E_PB_PORT` in
-`scripts/dod.sh`,
-`web/e2e/support/ports.ts`, held together by `scripts/check_keep_in_sync.ts`) and
-`scripts/smtp_sink.ts`'s `SINK_PORT` all DO shift with it. Per-site vars still win where they
+directive that cannot read it, so that literal stays. `scripts/smtp_sink.ts`'s `SINK_PORT`
+DOES shift with it. Per-site vars still win where they
 exist (`PB_URL`, `PB_PUBLIC_URL`, `MAIL_SINK_PORT`, `PB_SINK_PORT`, `SINK_PORT`).
 
-**Defaults:** 8090 dev (off-limits to tests) · 8091-8093 battery rooms · 8096-8097 e2e ·
+**Defaults:** 8090 dev (off-limits to tests) · 8091-8093 battery rooms ·
 8094/8095/8098/8099 "probes" — ALSO the defaults of test_oauth, test_backups,
 test_observability, test_vocab_flow, test_item_keys (which boots THREE sequential servers
 on its one port — 8099 stays busy for the whole suite, not one boot) and
@@ -51,11 +46,8 @@ test_saved_views · 8133 = test_stale_write · 8134 = test_subscribers_notificat
 = test_productivity_flow · 8136 = test_user_settings_font · 8137 = test_vocab_upsert ·
 8138 = test_fresh_workspace · 8139 = test_rescope_guard · 8140 = test_priority_vocab ·
 8141 = test_inspire · 8142 = test_notifications_trash_cascade · 8143 = test_counts_route · 8144 =
-test_invite_mirror · 8145 = test_mutation_proof · 8149 = test_invitations · 8150 = test_invitation_limits · 8151 = test_workspace_save_tx · 8165 = test_path_scope · 8166 = test_owner_defaults · 8146 =
-`web/e2e/support/clean-room.test.ts`, the vitest clean-room suite, which is a vitest room
-rather than a battery suite and so is not listed in the self-boot band above · 8147 =
-test_pb_refusal_statuses · 8148 = test_draft_publish ·
-8190-8191 + app 3102 web probes · 8192-8193 + app 3103 web e2e. SMTP sinks:
+test_invite_mirror · 8145 = test_mutation_proof · 8149 = test_invitations · 8150 = test_invitation_limits · 8151 = test_workspace_save_tx · 8165 = test_path_scope · 8166 = test_owner_defaults · 8147 =
+test_pb_refusal_statuses · 8148 = test_draft_publish. SMTP sinks:
 2526 battery email · 2527 battery hardening · 2528-2531 test_observability · 2532
 test_collab_flow · 2533 test_subscribers_notifications. `scripts/check_port_collisions.ts`
 prints the ports shared by design (the dev port, the probe band, the one hardening sink).
@@ -88,18 +80,9 @@ battery is running.
 `No such file or directory`. `PB_BIN=/path/to/pocketbase` relocates the BINARY the way
 `PB_PORT_OFFSET` relocates the ports, and every consumer reads it: self-booting suites via
 `tests/roomkit.ts`'s `pb_bin()`, `scripts/seed.ts` (its old `PB_BINARY` spelling still works
-but loses to `PB_BIN`), `scripts/gen_*.ts`, `web/e2e/support/clean-room.ts`, the Makefile's
+but loses to `PB_BIN`), `scripts/gen_*.ts`, the Makefile's
 `dev`/`backend`/`superuser`/`otp` (all through `scripts/pb_migrate.ts --print-bin`), and
 `scripts/run_suite_battery.sh` — which exports it to every child, and with an inbound value
 uses that binary AS-IS: it refuses on a version other than its pinned `PB_VERSION` instead of
 downloading over a path it does not own (it only downloads/chmods when the resolved path is
 the repo's own `./pocketbase`). Substitute it in the recipe above for `./pocketbase` too.
-
-**Each worktree owns its `core.hooksPath`** (`extensions.worktreeConfig`; `scripts/land.sh --lock`
-sets main's and unsets the shared value, `git worktree add` copies it into new trees). Never set
-it without `--worktree`: Claude Code's worktree setup rewrites a shared relative value to an
-absolute one, and `make dod`'s preflight refuses in every tree it reaches.
-
-**A worktree under `/Volumes` is unsupported** (the repo left that SMB share on 2026-08-30, and
-Turbopack's cache cannot fsync there): cut every worktree under the local clone. The measured
-symptoms and their cures, should the mount ever return, are in `.agents/memory/repo-on-smb-share.md`.

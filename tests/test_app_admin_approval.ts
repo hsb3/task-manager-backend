@@ -109,7 +109,7 @@ async function find_id(
 }
 
 // The suite stays under the 10/60s users auth-with-password rate limit
-// (v1:1785150000_settings.js) — every call below is counted, budget is 8.
+// (the app_settings rate limits) — every call below is counted, budget is 8.
 async function login(email: string): Promise<[number, string | null]> {
   const [s, r] = await api("POST", "/api/collections/users/auth-with-password", null, {
     identity: email,

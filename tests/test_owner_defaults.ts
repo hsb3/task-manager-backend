@@ -2,8 +2,8 @@
 /**
  * decision-077 owner/author defaulting: a create that omits `owner` (projects, workspaces,
  * saved_views) or `author` (comments) is stamped with the authenticated caller by PocketBase
- * itself (pb_hooks/owner.pb.js, pb_hooks/author.pb.js), so the proxy no longer has to resolve
- * and send it. Authority never widens: a caller naming SOMEONE ELSE as owner is refused by the
+ * itself (pb_hooks/owner.pb.js, pb_hooks/author.pb.js), so a client need not resolve and send
+ * it. Authority never widens: a caller naming SOMEONE ELSE as owner is refused by the
  * createRule (400) and a spoofed comment author is overwritten; a superuser keeps what it
  * submitted (seed/import fidelity); a non-member, a viewer and anon stay refused.
  *

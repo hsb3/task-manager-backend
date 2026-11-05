@@ -25,7 +25,6 @@ function check(label: string, got: any, want: any): void {
 function scratch_tree(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pb-fixture-resolve-checker-"));
   fs.mkdirSync(path.join(root, "tests"));
-  fs.mkdirSync(path.join(root, "web", "e2e"), { recursive: true });
   return root;
 }
 
@@ -188,12 +187,12 @@ let [rc, out] = run_cli();
 check("shipped configuration exits 0", rc, 0);
 check("...and says so", out.includes("✅ check_fixture_project_resolve:"), true);
 
-console.log("\n── (e) CLI: the my-items.spec.ts shape PR #657 fixed, replayed pre-fix, is RED ──");
+console.log("\n── (e) CLI: the fixture shape PR #657 fixed, replayed pre-fix, is RED ──");
 let root = scratch_tree();
 try {
   write(
     root,
-    "web/e2e/my-items.spec.ts",
+    "tests/test_my_items_plant.ts",
     "const projects = await pb(\n" +
       "  base,\n" +
       "  `/api/collections/projects/records?filter=${esc" +
@@ -215,7 +214,7 @@ root = scratch_tree();
 try {
   write(
     root,
-    "web/e2e/my-items.spec.ts",
+    "tests/test_my_items_plant.ts",
     "const projects = await pb(\n" +
       "  base,\n" +
       "  `/api/collections/projects/records?filter=${esc" +

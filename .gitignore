@@ -8,18 +8,13 @@ pb_data/
 pb.log
 *.zip
 
-# Railway IaC SDK install (root package.json exists only for it)
+# bun install (prettier, typescript, the Railway IaC SDK)
 /node_modules/
 
 # harness / editor noise
 logs/
 .DS_Store
-.dod-exit
-# Playwright writes here when invoked from the repo root instead of web/; web/.gitignore's
-# own /test-results/ is anchored to web/ and does not reach this one.
-/test-results/
 battery-manifests/
-.playwright-browsers/
 
 # secrets & live-op files (repo-local, never tracked)
 .claude/operations/
@@ -39,7 +34,7 @@ battery-manifests/
 .claude/**/.DS_Store
 # <<< cc-project-memory (managed) <<<
 
-# atelier handoff freshness signal. The handoff itself is kata issue 91s4 (project task-manager); this file
+# atelier handoff freshness signal. The handoff itself is the `handoff`-labelled kata card (project task-manager-backend); this file
 # carries no content, only an mtime, and machine-local mtime is not something to share.
 .agents/handoff.stamp
 

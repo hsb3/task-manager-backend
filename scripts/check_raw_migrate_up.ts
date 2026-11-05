@@ -35,8 +35,8 @@
 // literally: an unrecognised capture or branch is an error, never a pass, because a shape
 // this gate cannot read is a shape it cannot vouch for. Statements are split on `;` with
 // single-quoted spans blanked first, so an `exit 1` inside a message is prose — but a
-// `;`-separated `&&`/`||` chain reads as one statement and would not. It runs nothing: that
-// the parsed CMD behaves this way is scripts/check_container_preflight.ts's job.
+// `;`-separated `&&`/`||` chain reads as one statement and would not. It runs nothing, so it
+// vouches for the CMD's shape, never for how it behaves.
 //
 // Usage:
 //     bun scripts/check_raw_migrate_up.ts [--table]

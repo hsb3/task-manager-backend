@@ -28,6 +28,3 @@ retiring its use.
 opaque id would do. Before leaving a field in place "for now", delete it. Recorded in-repo as
 decision-017 with the full rationale and TASK-093 as the execution — but the rulings are
 broader than that one task, so check them against any schema or addressing change.
-
-See [[feedback-revalidate-task-premise]] for the related habit of re-deriving a premise before
-acting on it — ruling 1 surfaced because a decision's own recon had gone stale.

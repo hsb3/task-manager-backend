@@ -4,7 +4,7 @@
  * both the PreToolUse hook (protect_historical_migrations) and lefthook.yml's pre-commit staged
  * guard. No PocketBase server; every fixture is a throwaway git repo in fs.mkdtempSync().
  * There is no test_hook.ts beside the Claude hook - this file is that self-check, for both
- * modes; the Codex twin has its own, gated as the battery label test_codex_migration_hook.
+ * modes.
  */
 
 import fs from "node:fs";

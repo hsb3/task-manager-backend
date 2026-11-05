@@ -197,7 +197,7 @@ export function migrate_up(
 }
 
 if (import.meta.main) {
-  // Mostly a library — the one CLI mode lets a non-Python caller (web/e2e's clean-room.ts)
+  // Mostly a library — the one CLI mode lets a caller that cannot import it (a shell script)
   // resolve the same binary this repo's callers do, instead of re-implementing it.
   const usage = "usage: pb_migrate.ts [-h] [--print-bin]";
   const args = parse_args(

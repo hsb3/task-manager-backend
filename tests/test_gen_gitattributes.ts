@@ -116,13 +116,13 @@ function build_fixture(): void {
       "const REPO = path.dirname(path.dirname(path.resolve(import.meta.path)));\n" +
       'const OUTPUT = path.join(REPO, "docs", "CHANGELOG");\n',
   );
-  // Anchored on repo_root(), the shape scripts/gen_coverage.ts declares.
+  // Anchored on repo_root(), the shape scripts/gen_app_docs_seed.ts declares.
   write(
-    "scripts/gen_coverage.ts",
+    "scripts/gen_zeta.ts",
     'import path from "node:path";\n' +
       'import { repo_root } from "./_repo_root.ts";\n' +
       "const REPO = repo_root(import.meta.path);\n" +
-      'const OUTPUT = path.join(REPO, "docs", "generated", "coverage.md");\n',
+      'const OUTPUT = path.join(REPO, "docs", "generated", "zeta.md");\n',
   );
 }
 
@@ -139,7 +139,7 @@ check("patterns derived from every generator shape, plus the self-entry", attrib
   "docs/alpha.md merge=binary",
   "docs/beta.html merge=binary",
   "docs/closure.html merge=binary",
-  "docs/generated/coverage.md merge=binary",
+  "docs/generated/zeta.md merge=binary",
   "scripts/model/current/** merge=binary",
 ]);
 check("--check is green right after a write", run("--check").returncode, 0);

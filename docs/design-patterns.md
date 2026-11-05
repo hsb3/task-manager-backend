@@ -1,8 +1,8 @@
 ---
 title: Design patterns
 status: current
-version: 3
-updated: 2026-10-24
+version: 4
+updated: 2026-11-05
 ---
 
 # Design patterns
@@ -369,10 +369,8 @@ markup terms belong in comments and change descriptions. When a specification st
 fact a label should convey, translate it into a user's words instead of pasting the
 specification's own phrasing, which is written for implementers.
 
-**Here:** `AGENTS.md` carries this as a conduct rule, and
-`.agents/memory/feedback-ui-copy-not-implementation-detail.md` records the incident that
-produced it: a specification line describing a mechanism shipped verbatim as the helper
-text under a settings control.
+**Here:** `AGENTS.md` carries this as a conduct rule, born of an incident: a specification line
+describing a mechanism shipped verbatim as the helper text under a settings control.
 
 ### Mount shared context over the subtree that uses it
 
@@ -442,8 +440,7 @@ command's status instead, which is how a red gate gets announced as green.
 
 **Here:** decision-012 makes the definition of done four commands, the first of which
 derives its own scope, and replaces an unsatisfiable absolute score with a
-no-new-errors check; `AGENTS.md`'s gate law forbids reading a gate's result through a pipe
-and points a piped caller at the sentinel file.
+no-new-errors check; `AGENTS.md`'s gate law forbids reading a gate's result through a pipe.
 
 ### A proof counts only after it has been seen fail
 
@@ -498,8 +495,8 @@ external standard, ship the calculation that produces it from its inputs, and re
 across the range of real conditions rather than as one flat figure. When a cited source
 cannot be found on inspection, replace it with one that can and record the correction.
 
-**Here:** `.agents/memory/feedback-no-magic-number-choices.md` records the refusal to pick
-between two caps and the instruction to compute scenarios instead; decision-032 replaces
+**Here:** the owner refused to pick
+between two caps and instructed that scenarios be computed instead; decision-032 replaces
 an unsourceable measure citation with the accessibility criterion and a published measure
 scale after the original could not be located.
 
@@ -544,8 +541,8 @@ gap is deliberate, in which case the outcome is a ruling that closes it, not a t
 rebuilds it. A limitation that is being accepted is recorded with its escalation path, and
 the assertions around it are left honest rather than strengthened into flakes.
 
-**Here:** `.agents/memory/feedback-revalidate-task-premise.md` carries the rule and the
-incident behind it; decision-034 and decision-035 each close a recorded gap as a ruling after re-validation
+**Here:** the rule came from an incident where a stale task
+premise was acted on; decision-034 and decision-035 each close a recorded gap as a ruling after re-validation
 found the behaviour deliberate, and decision-036 and decision-037 close one by ruling the
 capability out rather than filing work for it; decision-024
 accepts an undiagnosed race, records the structural fix as the escalation path, and forbids

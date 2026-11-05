@@ -1,8 +1,8 @@
 ---
 title: Deployment recipes
 status: current
-version: 11
-updated: 2026-10-24
+version: 12
+updated: 2026-11-05
 ---
 
 # Deployment recipes
@@ -14,7 +14,7 @@ credential, a resource id, or a live URL; those stay in `.claude/operations/` (u
 Anything that cannot be stated without one belongs there, not here.
 
 Run these commands from the repository root. Application images remain defined by
-`Dockerfile` and `web/Dockerfile`; stack orchestration lives here. Railway configuration
+`Dockerfile`. Railway configuration
 and its preview/apply commands are in [railway/README.md](railway/README.md).
 
 ## Bootstrapping a new Railway project
@@ -29,8 +29,8 @@ are independent of each other):
    the WHOLE configuration while it declares a custom domain the project lacks ("Custom-domain
    registration is not supported by Railway configuration. Add <domain> in the dashboard, then
    run railway config pull.", measured from `config plan`). So: delete the `domains:` entries
-   from `deploy/railway/railway.ts`, run `railway config apply`, add the web domain and the
-   pocketbase domain on their services in the dashboard, create at the registrar the CNAME record
+   from `deploy/railway/railway.ts`, run `railway config apply`, add the
+   pocketbase domain on its service in the dashboard, create at the registrar the CNAME record
    Railway shows for each, `git restore deploy/railway/railway.ts`, and confirm
    `railway config plan --detailed-exit-code` exits 0. This order is derived from the measured
    refusal, not run on an empty project. Every URL below depends on these domains.
@@ -39,13 +39,9 @@ are independent of each other):
    `--reset` rotates them, see Backups below). Use the S3 name it reports, not the resource name.
 3. **Resend.** An API key from the Resend dashboard; a sender on a domain verified there if mail
    must reach anyone but the Resend account owner.
-4. **GitHub OAuth app.** Create it with the authorization callback URL
-   `https://<web domain>/api/auth/oauth/github/callback`. The web app runs the flow itself (not
-   PocketBase's `/api/oauth2-redirect`, decision-011's correction) and builds the callback from
-   `RAILWAY_PUBLIC_DOMAIN` (`web/app/api/auth/oauth/github/start/route.ts`), which carries the
-   custom domain once one is attached. Attach it (step 1) before trying GitHub sign-in: without
-   it the callback is built on Railway's generated domain and does not match the OAuth app. The
-   app issues the client id and secret.
+4. **GitHub OAuth app.** Create it with the authorization callback URL of the client app that
+   runs the flow, which is the client's own route, not PocketBase's `/api/oauth2-redirect`
+   (decision-011's correction). The app issues the client id and secret.
 5. **`pocketbase` variables, all before its first boot.**
 
    | variable | what it does | value comes from |
@@ -54,7 +50,7 @@ are independent of each other):
    | `RESEND_API_KEY` | turns on real mail through Resend's SMTP bridge (`pb_hooks/mail.pb.js`) | Resend dashboard (step 3) |
    | `MAIL_SENDER_ADDRESS` | the From address | an address on the Resend-verified domain; unset, Resend's sandbox sender |
    | `PB_PUBLIC_URL` | the link base in verification and password-reset emails, which open PocketBase's own confirmation pages | `https://<pocketbase domain>` (step 1) |
-   | `PB_CORS_ORIGINS` | the CORS allowlist `serve` gets as `--origins` (`Dockerfile`) | the web origin, `https://<web domain>`; unset, `*` |
+   | `PB_CORS_ORIGINS` | the CORS allowlist `serve` gets as `--origins` (`Dockerfile`) | the client app's origin; unset, `*` |
    | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | enable GitHub sign-in (`pb_hooks/oauth.pb.js`); both or neither | GitHub OAuth app (step 4) |
    | `APP_ADMIN_EMAILS` | comma-separated accounts, besides the superuser, allowed to approve new signups (`pb_hooks/routes.pb.js`) | owner's choice |
    | `ALERT_EMAIL` | recipient of the error-rate alert mail (`pb_hooks/alerts.pb.js`); needs `RESEND_API_KEY` | owner's choice |
@@ -68,23 +64,11 @@ are independent of each other):
    `PB_FILES_S3_*` means uploads land on the volume and are not moved to S3 when it is switched on
    later (`pb_hooks/files.pb.js` only repoints the storage setting).
    Every other variable is re-read on each boot, so setting it later and redeploying is enough.
-6. **`web` variables, before its first build.**
-
-   | variable | what it does | value comes from |
-   | --- | --- | --- |
-   | `WEB_PUBLIC_HOSTS` | the proxy guard's host allowlist (`web/proxy.ts`) | `<web domain>` (step 1), no port |
-   | `NEXT_PUBLIC_PB_URL` | the browser's direct realtime connection, and the CSP's `connect-src` (`web/lib/realtime.ts`, `web/proxy.ts`) | `https://<pocketbase domain>` (step 1) |
-   | `PB_URL` | the server-side proxy's PocketBase address (`web/lib/proxy/pb.ts`) | the private-network address, `http://<pocketbase service name>.railway.internal:8080` |
-
-   Unset `WEB_PUBLIC_HOSTS` makes every request 500, the healthcheck included, so the deploy
-   fails. Unset `PB_URL` points the proxy at `127.0.0.1:8090`, so every sign-in and API call
-   fails. `NEXT_PUBLIC_PB_URL` is baked in at BUILD time (`web/Dockerfile`): set after the first
-   build, it changes nothing until `web` redeploys, and until then live updates silently point at
-   `127.0.0.1:8090`.
-7. **Deploy-failure alert.** Re-create the notification rule in
+6. **Deploy-failure alert.** Re-create the notification rule in
    "When a pocketbase deploy fails" below; it is not in the IaC.
-8. **Verify.** Both healthchecks green, the superuser logs into `/_/` with its emailed code, and a
-   GitHub sign-in on the web domain completes.
+7. **Verify.** The healthcheck is green, the superuser logs into `/_/` with its emailed code, and
+   `GET /api/collections/users/auth-methods` lists `github` under
+   `oauth2.providers`.
 
 ## When a pocketbase deploy fails
 
@@ -119,111 +103,6 @@ environments unless marked.
 5. **Fix main.** Revert the refused migration by PR. Until main is fixed, the next pocketbase
    deploy from main fails the same way (its watch patterns include `pb_migrations/**`).
 
-## Local Railway stand-in (docker compose)
-
-`deploy/local/docker-compose.yml` reproduces the two Railway services (PocketBase + Next web) on one
-host, for when the deployed instance is down or you need prod-image parity locally. It
-builds the SAME `Dockerfile` and `web/Dockerfile` Railway builds — not the `make dev`
-native-binary path.
-
-It runs in one of two modes, and picking the wrong one wastes an afternoon:
-
-| mode | command | superuser MFA | data |
-| --- | --- | --- | --- |
-| prod-parity (default) | `make compose-up` | on, exactly as deployed | empty |
-| local-dev | `make compose-dev` | **off** | seeded |
-
-**Prod-parity — use it to reproduce the deployed image.** Same migrations, same hooks, same
-MFA posture. It is deliberately near-impossible to log into: the second factor is an emailed
-one-time code, the stack has no mailer, so the dashboard is closed to you, and `scripts/seed.ts`
-cannot authenticate either (its CLI OTP fallback mints against the HOST `pb_data`, never the
-container's volume). Right mode for "does the image boot and serve?", wrong mode for clicking
-around.
-
-**Local-dev — use it to actually use the app locally.** One command builds both images, waits
-for `/api/health`, and seeds:
-
-    make compose-dev
-
-Afterwards the dashboard at `/_/` takes the superuser password alone (no second factor) and
-`alice@example.com` / `test123456` signs into the web app. Re-running is safe: `scripts/seed.ts`
-is append-only, so a second run reports the volume as already seeded and leaves it alone.
-The container log carries a one-line `LOCAL DEV MODE: superuser MFA is OFF` banner, written the
-first time a request arrives after a boot.
-
-**MFA-off is written into the data volume, so it outlives the mode.** Going back to
-`make compose-up` on a volume that has been through local-dev leaves the superuser password-only
-(measured: HTTP 200 with no `mfaId`) — the hook is gone, but nothing turns MFA back on. For a
-genuinely prod-parity run, start from a wiped volume: `make compose-down ARGS=-v`.
-
-**Why MFA-off cannot leak into a deploy.** The switch is not an env var or a setting — it is a
-file, `deploy/local/mfa-off.pb.js`, that lives OUTSIDE every path `Dockerfile` copies
-(`COPY pb_hooks /pb/pb_hooks` is the one that would carry it). `deploy/local/docker-compose.local.yml`
-bind-mounts it into the container's hooks dir, and that mount is the only way it ever runs: the
-prod image does not contain the file, so no variable and no misconfiguration can switch it on
-there. `scripts/check_local_mode_isolation.ts` (battery) re-derives that from the Dockerfile and
-`pb_hooks/` on every run. The hook is request middleware rather than a boot hook because pending
-migrations apply after the bootstrap chain and would overwrite a boot-time flip on a first boot.
-
-    make compose-up      # prod-parity images
-    make compose-dev     # prod-parity + MFA off + seeded (local-dev)
-    make compose-down    # stops containers; pb_data volume SURVIVES
-    make compose-down ARGS=-v   # also wipes the pb_data named volume (destroys local data)
-
-The Make targets pass `--project-directory` pointing at the repository root, preserving
-root `.env` lookup, the Compose project name and existing named volumes. For other
-Compose operations, use `docker compose --project-directory . -f deploy/local/docker-compose.yml`
-from the repository root; add `-f deploy/local/docker-compose.local.yml` for local-dev.
-
-Endpoints: PocketBase `http://127.0.0.1:8090` (dashboard `/_/`), web `http://127.0.0.1:3000`.
-Superuser creds come from `.env` (`PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD`, same file
-`make dev` uses); with no `.env` the compose file falls back to `admin@example.com` /
-`changeme123456`. Data lives in the `pb_data` named volume, so a `compose down` (without `-v`)
-then `compose up` keeps every record.
-
-- **The two-URL gotcha — the one wiring detail that silently breaks login/SSE if collapsed.**
-  The web service is handed TWO different PocketBase addresses:
-  - `NEXT_PUBLIC_PB_URL` (a build ARG, baked into the browser bundle for the direct-SSE
-    realtime channel, decision-004) MUST be the host-published address `http://127.0.0.1:8090`.
-    The browser runs on the host and cannot resolve the compose DNS name.
-  - `PB_URL` (a runtime env, the server-side proxy target) MUST be the compose-internal
-    `http://pocketbase:8090`. It is a container-to-container hop.
-  They are set at different layers (`build.args` vs `environment`) on purpose; making them
-  equal breaks one seam or the other with no error at startup.
-- **Host-port override:** if 8090/3000 are occupied, set `PB_HOST_PORT` / `WEB_HOST_PORT`
-  before `compose up` or `make compose-dev` (both read them, and the seed follows
-  `PB_HOST_PORT`). `NEXT_PUBLIC_PB_URL` is derived from `PB_HOST_PORT`, so changing the
-  published PB port forces (and correctly re-bakes) a web rebuild.
-
-### Testing against the container stack
-
-Two test environments exist, and only one uses containers:
-
-| environment | used by | PocketBase runs as | superuser | MFA bypass |
-| --- | --- | --- | --- | --- |
-| clean room | backend suites, the battery, `web/` e2e | host binary, scratch `pb_data` + scratch copies of `pb_migrations/` and `pb_hooks/` (`tests/roomkit.ts`) | `pocketbase superuser upsert` before `serve` (`scripts/run_suite_battery.sh`) | the `*superuser_mfa.js` migration is deleted from the scratch copy |
-| compose stack | `web-carbon/` e2e (`make carbon-e2e`, CI job `carbon-e2e`) | the production `Dockerfile` image, `linux/amd64` | `PB_SUPERUSER_*` env; the image CMD runs `superuser create` after `migrate up` | `docker-compose.local.yml` mounts `deploy/local/mfa-off.pb.js` |
-
-Neither path has a signup step: the superuser is written from the CLI before the first request.
-
-`web-carbon/e2e/support/runtime.mjs` (Playwright global setup) boots the compose stack per run:
-
-1. Copies the tracked tree into a temp directory, so the run never builds from uncommitted
-   noise or writes into the checkout.
-2. Writes an env file and an override with a throwaway superuser and isolated host ports
-   (`CARBON_PB_PORT` 14390, `CARBON_NEXT_PORT` 9302, `CARBON_APP_PORT` 9702 by default) and a
-   compose network subnet that no existing Docker network uses (`docker-subnet.ts`).
-3. `docker compose up -d --build --wait` with `docker-compose.yml` + `docker-compose.local.yml`
-   + that override, then seeds with `scripts/seed.ts`, turns PB rate limits off, and adds the
-   e2e-only fixtures.
-4. Builds `web-carbon/` and serves it with `vite preview` on the host, proxying to the Next
-   container. Teardown (`global-teardown.ts`) stops it and runs `compose down -v`.
-
-**Browsers run on the host, not in a container.** Playwright drives a locally installed
-Chromium (`npx playwright install chromium` in CI) against the host-published ports. Running the
-browser inside the compose network would need a glibc Playwright image as an extra service and
-`NEXT_PUBLIC_PB_URL` pointing at an address that container can resolve; nothing does that today.
-
 ## Deploy gating
 
 - **A green prod deploy proves the service BOOTED, never that its code passed CI.** What gates
@@ -238,7 +117,7 @@ browser inside the compose network would need a glibc Playwright image as an ext
   fails, Railway marks that deploy SKIPPED permanently — a green rerun does NOT resurrect it.
   Recover with a trivial watch-path push or `environmentTriggersDeploy`. Always check
   `railway deployment list` after a rerun. (A SKIPPED deploy reading "No changes to watched
-  files" is just the two-service split working.)
+  files" is just the watch patterns working.)
 - **A commit that failed CI and was re-run green will still deploy** under any gate that reads
   `/runs/{id}/jobs?filter=latest` — earlier attempts are hidden. Run `31136231688` on main shows
   four green jobs there while `filter=all` shows `suite-battery` attempt 1 `failure`. Decide
@@ -263,7 +142,7 @@ browser inside the compose network would need a glibc Playwright image as an ext
   pipe buffer (~64KB), so it is **nondeterministic and passes every small test**. Measured on
   this repo's own path text: correct at 44KB, wrong at 67KB and above.
 
-      if grep -qE '^web/' <<< "$files"; then      # here-string: no pipe, no SIGPIPE
+      if grep -qE '^pb_hooks/' <<< "$files"; then      # here-string: no pipe, no SIGPIPE
 
   Any `big | grep -q`, `big | head`, `big | first-match-and-exit` under `pipefail` is the same
   bug. Reach for a here-string, `case`, or `[[ =~ ]]`.
@@ -342,6 +221,9 @@ browser inside the compose network would need a glibc Playwright image as an ext
 
 ## PocketBase in production
 
+- **Clients reach realtime directly on this service's public domain** (the direct-SSE realtime
+  channel, decision-004), so that domain MUST serve `/api/realtime` to clients outside Railway.
+
 - **A prod deploy's stdout is banner-only** — hook and migration logger output goes to the
   `_logs` DB, so `Applied <migration>` lines never appear in the deploy log. Prove a migration
   ran by READBACK of a value only it writes; PB aborts boot on a failed migration, so one
@@ -361,35 +243,3 @@ browser inside the compose network would need a glibc Playwright image as an ext
 - **Proving transactional/alert mail was DELIVERED needs no inbox access** — Resend's
   `GET /emails` reports `last_event: delivered`. `ALERT_SELFTEST=1` arms a one-shot send on the
   first request after boot; unset it afterwards or every deploy emails.
-
-## Frontend edge behaviour
-
-- **A client-supplied `X-Forwarded-Host` never wins at Railway's edge** (TASK-064, probed live
-  2026-08-07). The Next half of the bypass is real and confirmed in source, and the rule is
-  stricter than an earlier version of this bullet claimed: `action-handler.js:431` calls
-  `parseHostHeader(req.headers)` with ONE argument, so the function's `EITHER x-forwarded-host OR
-  host` branch (reachable only when a second argument is passed) never runs. The live check is
-  the one-argument fallthrough — `x-forwarded-host`'s first comma-separated entry if present,
-  ELSE `host` — compared against `Origin`. Behind a pass-through proxy Next's check alone is
-  exploitable through that single path: forward a foreign `Origin` with a matching injected
-  `X-Forwarded-Host` and it passes on the header alone (the proxy guard's allowlist, next bullet,
-  refuses that shape first). A four-case live differential shows Railway is not such a
-  proxy: the same foreign-`Origin`-plus-injected-header case (single value or comma-list, either
-  order) is rejected exactly as if no header were sent, while a same-origin request reaches
-  action resolution. Against this corrected rule, `serverActions.allowedOrigins` is still left
-  unpinned by choice — **re-probe before putting any new proxy in front of the web service.**
-  Verified against Next 16.3.4 (its `action-handler.js` does not differ from 16.3.0);
-  `web/lib/next-version.test.ts` pins that version and fails loudly on a bump so this bullet
-  gets re-checked before it goes stale.
-- **`WEB_PUBLIC_HOSTS` is the proxy guard's host allowlist** — a runtime variable on the `web`
-  service, value held in Railway only: comma-separated lowercase `host[:port]`, one entry per
-  environment (its own public domain; a new domain needs its entry or every write from it is
-  refused). Never write a default port (`:443`, `:80`): Origin drops it, so that entry matches nothing.
-  `web/proxy.ts` refuses a foreign-`Origin` write whose trusted forwarded host is not listed.
-  Unset in a production build, the server still prints `Ready`, then every request, the
-  `/api/health` healthcheck included, answers 500 with the variable named in the log. Development
-  and tests default to `127.0.0.1:*` and `localhost:*`; the compose stack sets its own.
-- **Probe idiom (read-only, mutates nothing):** POST a page route with a bogus `Next-Action` id.
-  `x-nextjs-action-not-found: 1` means the CSRF check PASSED; `403 Forbidden` (the proxy guard)
-  or, with the guard bypassed, a bare 500 from Next means it was rejected.
-  The bogus id guarantees no action ever executes.
