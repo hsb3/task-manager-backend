@@ -53,7 +53,7 @@ are independent of each other):
    | `PB_SUPERUSER_EMAIL`, `PB_SUPERUSER_PASSWORD` | the image creates this superuser on boot (`Dockerfile` CMD, `create` only) | owner's choice; the address must receive mail (login is MFA by emailed code), and until a Resend domain is verified only the Resend account owner's inbox does |
    | `RESEND_API_KEY` | turns on real mail through Resend's SMTP bridge (`pb_hooks/mail.pb.js`) | Resend dashboard (step 3) |
    | `MAIL_SENDER_ADDRESS` | the From address | an address on the Resend-verified domain; unset, Resend's sandbox sender |
-   | `WEB_APP_URL` | the link base in verification and password-reset emails | `https://<web domain>` (step 1) |
+   | `PB_PUBLIC_URL` | the link base in verification and password-reset emails, which open PocketBase's own confirmation pages | `https://<pocketbase domain>` (step 1) |
    | `PB_CORS_ORIGINS` | the CORS allowlist `serve` gets as `--origins` (`Dockerfile`) | the web origin, `https://<web domain>`; unset, `*` |
    | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | enable GitHub sign-in (`pb_hooks/oauth.pb.js`); both or neither | GitHub OAuth app (step 4) |
    | `APP_ADMIN_EMAILS` | comma-separated accounts, besides the superuser, allowed to approve new signups (`pb_hooks/routes.pb.js`) | owner's choice |

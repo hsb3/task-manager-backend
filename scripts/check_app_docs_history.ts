@@ -21,18 +21,13 @@
  * every retargeted cross-reference.
  *
  * RATCHET: only drops attributed to a migration at or after BASELINE are policed; earlier
- * ones are counted and reported as grandfathered, never as findings. Card bj2j retired the
- * SUPERSEDED WORDING convention — blocks of knowingly false prose the corpus carried only so
- * this gate could keep seeing them — and moved BASELINE to the first stamp still unwritten,
- * so the re-seed that removed them is the only pre-baseline migration that drops any span
- * and its drops are the only grandfathered ones. The bound costs zero future detection —
- * every re-seed after it necessarily lands above the baseline — and a grandfathered
- * migration already on origin/main is immutable by repo law (a PreToolUse hook and a
- * pre-commit block enforce it), so its drops can neither change nor recur. One window is
- * narrower than that: a NEW migration hand-stamped 1785180501-1785180599 would be
- * grandfathered too, immutability does not yet attach to it, and nothing in this checker
- * refuses it — `make next-migration-slot` cannot produce such a stamp, and
- * tests/test_app_docs_history_checker.ts is what refuses one, by pinning the newest
+ * ones are counted and reported as grandfathered, never as findings. BASELINE is the stamp of
+ * the baseline seed (gen_app_docs_seed.ts DEFAULT_OUTPUT), the one migration that seeds the
+ * corpus, so the only grandfathered files are the baseline migrations before it, which seed no
+ * prose; every re-seed lands above it. One window is narrower than that: a NEW migration
+ * hand-stamped between the newest grandfathered file and BASELINE would be grandfathered too,
+ * and nothing in this checker refuses it — `make next-migration-slot` cannot produce such a
+ * stamp, and tests/test_app_docs_history_checker.ts is what refuses one, by pinning the newest
  * grandfathered file and the next free slot. The filter is on the DROPPING migration,
  * not on when the span was introduced — a span seeded long before the baseline and deleted
  * by a migration after it is still caught.
@@ -84,67 +79,10 @@ export const CITATION = new RegExp(
 );
 
 // Oldest DROPPING migration this gate polices — ratchet rationale in the docstring.
-export const BASELINE = "1785180600";
+export const BASELINE = "1785185300";
 
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
-export const ALLOWLIST = new Map<string, string>([
-  [
-    JSON.stringify([
-      "1785181500_seed_app_docs_tasks_author.js",
-      "collection:project_items",
-      "Columns: type (task/decision/document/milestone)",
-    ]),
-    "card erjp: tasks gained an author, so the column list no longer says it is empty for tasks",
-  ],
-  [
-    JSON.stringify([
-      "1785184700_seed_app_docs_decision_077_tasks_move.js",
-      "route:tracker-trash",
-      "Rows come from four collections (tasks, decisions, documents, milestones), each fetched",
-    ]),
-    "card rrgg: the trash route counts and pages in PocketBase, so the per-collection bound and truncated field are gone",
-  ],
-  [
-    JSON.stringify([
-      "1785184700_seed_app_docs_decision_077_tasks_move.js",
-      "route:tracker-trash",
-      "Proven by tests/test_trash.py and tests/test_visibility_invariants.py.",
-    ]),
-    "card rrgg: both suites moved to TypeScript, so the citation names the .ts files",
-  ],
-  [
-    JSON.stringify([
-      "1785184800_seed_app_docs_project_items_counts.js",
-      "collection:project_items",
-      "RULE EQUIVALENCE: the list and view rules are the same expression",
-    ]),
-    "card q46b: the viewRule is now the listRule plus a trash branch, so the two rules are no longer the same expression",
-  ],
-  [
-    JSON.stringify([
-      "1785184800_seed_app_docs_project_items_counts.js",
-      "collection:project_items",
-      "Since migration 1785164900 the list and view rules both end with the trashed",
-    ]),
-    "card q46b: a trashed row is now served by id to whom the trash route shows it, so it is no longer 404 by id at every tier",
-  ],
-  [
-    JSON.stringify([
-      "1785185000_seed_app_docs_proxy_residue.js",
-      "collection:projects",
-      "CREATE (W1 #64, hardened by the read-only viewer tier",
-    ]),
-    "decision-077, card 1pv6: owner is now optional on create, so the quoted projects createRule paragraph was resynced to the live rule",
-  ],
-  [
-    JSON.stringify([
-      "1785185000_seed_app_docs_proxy_residue.js",
-      "decision:project-create-membership-guard",
-      "How (W1, #64), since hardened by the read-only viewer tier",
-    ]),
-    "decision-077, card 1pv6: owner is now optional on create, so the quoted projects createRule paragraph was resynced to the live rule",
-  ],
-]);
+export const ALLOWLIST = new Map<string, string>([]);
 
 export class Drop {
   constructor(
@@ -361,10 +299,10 @@ options:
   --migrations-dir MIGRATIONS_DIR
                         default: repo pb_migrations/
   --since MIGRATION     police drops at/after this migration or timestamp
-                        (default: 1785180600)
+                        (default: 1785185300)
   --json                machine-readable report
 
-RATCHET BOUND: only drops attributed to a migration at or after 1785180600 are
+RATCHET BOUND: only drops attributed to a migration at or after 1785185300 are
 policed. Earlier ones are grandfathered and counted in the coverage block of
 every run. That is not suppression: a historical migration cannot be edited
 (repo law, hook-enforced), so a pre-baseline drop can never change or recur,

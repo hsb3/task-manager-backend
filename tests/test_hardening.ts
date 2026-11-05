@@ -49,7 +49,7 @@ const PB = process.env.PB_URL ?? `http://127.0.0.1:${8090 + PORT_OFFSET}`;
 const [SU_EMAIL, SU_PASSWORD] = roomkit.superuser_creds();
 const MAILDIR = process.env.PB_MAILDIR;
 const SINK_PORT = process.env.PB_SINK_PORT ?? String(2527 + PORT_OFFSET);
-const APP_URL = process.env.WEB_APP_URL ?? "http://127.0.0.1:3000";
+const APP_URL = process.env.PB_PUBLIC_URL ?? "http://127.0.0.1:8090";
 
 async function api(
   method: string,
@@ -188,13 +188,13 @@ check("auth-with-otp with a wrong code → 400", s, 400);
 
 // ── mail.pb.js: appURL boot-hook line fires even with RESEND_API_KEY unset ──
 // This room boots WITHOUT RESEND_API_KEY (run_suite_battery.sh's hard_room) — the
-// only room in the battery that proves the WEB_APP_URL line is independent of the
+// only room in the battery that proves the PB_PUBLIC_URL line is independent of the
 // SMTP guard, not accidentally nested inside it.
 console.log("\n── mail.pb.js: settings.meta.appURL set independent of RESEND_API_KEY ──");
 [s, r] = await api("GET", "/api/settings", su_token);
 check("GET /api/settings", s, 200);
 check(
-  "meta.appURL set from WEB_APP_URL fallback (RESEND unset)",
+  "meta.appURL set from PB_PUBLIC_URL fallback (RESEND unset)",
   (r.meta === undefined ? {} : r.meta).appURL,
   APP_URL,
 );

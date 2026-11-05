@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 // projects/workspaces/saved_views: owner is stamped from the caller at create (decision-077), so
 // no client has to resolve and send it. The createRule refuses a submitted owner naming anyone
-// else (v2:1785184000_owner_defaults.js); this hook fills the omitted one.
+// else (v2:1785185200_collections.js); this hook fills the omitted one.
 
 // Pooled JSVM: each callback runs in an isolated runtime and CANNOT reach a shared
 // top-level helper — each block below is inlined byte-identically per collection on purpose.
