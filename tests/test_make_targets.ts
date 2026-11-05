@@ -102,6 +102,7 @@ function copy_resolver(root: string): void {
       ["bun", "scripts/gen_a.ts --check"],
       ["bun", "scripts/model/extract_current.ts --check"],
       ["bun", "scripts/check_b.ts"],
+      ["bun", "scripts/check_migration_citations.ts"],
       ["bun", "scripts/check_historical_migrations.ts --staged"],
     ];
 

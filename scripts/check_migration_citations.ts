@@ -65,6 +65,8 @@ export const PRUNE_REL_PREFIXES = [
   "docs/generated/",
   // The migration set legitimately names itself, and the historical guard forbids editing it.
   "pb_migrations/",
+  // The vendored v1 file list is the lookup table, not a citation.
+  "scripts/migrations-v1.txt",
 ];
 
 // .gitattributes lists every GENERATED artifact (scripts/gen_gitattributes.ts writes it from

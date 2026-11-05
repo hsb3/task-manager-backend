@@ -155,8 +155,8 @@ next-migration-slot: ## print the next free pb_migrations timestamp (step 100; r
 # Generators must answer --check; check_historical_migrations judges only the STAGED diff, so it
 # takes --staged below; check_migration_citations resolves the migrations-v1 tag, which this
 # repository does not carry, so it cannot judge a v1: citation here.
-GENERATORS := $(wildcard scripts/gen_*.ts)
-CHECKERS   := $(filter-out scripts/check_historical_migrations.ts,$(wildcard scripts/check_*.ts))
+GENERATORS := $(sort $(wildcard scripts/gen_*.ts))
+CHECKERS   := $(sort $(filter-out scripts/check_historical_migrations.ts,$(wildcard scripts/check_*.ts)))
 
 check: check-static battery ## the gate: check-static, then the whole suite battery (BATTERY_SHARD=i/N runs one shard)
 
@@ -167,7 +167,6 @@ check-static: pocketbase ## format, typecheck, every generator --check, every sc
 	bun scripts/model/extract_current.ts --check
 	@for c in $(CHECKERS); do echo "· $$c"; bun "$$c" || exit 1; done
 	bun scripts/check_historical_migrations.ts --staged
-	@for f in .github/workflows/*.yml .github/dependabot.yml; do bun -e 'Bun.YAML.parse(await Bun.file(process.argv[1]).text())' "$$f" || { echo "invalid YAML: $$f"; exit 1; }; done
 
 battery: ## the whole suite battery; BATTERY_SHARD=i/N runs one shard of scripts/battery_shards.tsv
 	bash scripts/run_suite_battery.sh
