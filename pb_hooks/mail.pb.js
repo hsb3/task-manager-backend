@@ -1,7 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 // ── Boot hook: configure Resend SMTP from the environment ────────────────────
-// Migration 1785102300 brands the email *templates*, but PocketBase still needs
+// The users collection brands the email *templates*, but PocketBase still needs
 // a real SMTP transport to actually SEND them — the built-in sandbox mailer only
 // logs. We wire that transport up at boot instead of hand-editing settings in the
 // dashboard, so the same code path configures dev, CI, and Railway purely from an
@@ -15,13 +15,11 @@
 onBootstrap((e) => {
   e.next();
 
-  // appURL drives {APP_URL} in the verification/reset-password email templates
-  // (see v1:pb_migrations/1785154700_users_web_auth_links.js) — it must point at
-  // web/'s own domain, not PB's default, REGARDLESS of whether SMTP is
-  // configured, so this sits before (and independent of) the RESEND guard
-  // below. Local dev falls back to the Next dev server's own origin.
+  // appURL drives {APP_URL} in the auth email templates, which link to PocketBase's own
+  // confirmation pages, so it is this server's public URL whether or not SMTP is configured.
   const settings0 = e.app.settings();
-  settings0.meta.appURL = $os.getenv("WEB_APP_URL") || "http://127.0.0.1:3000";
+  settings0.meta.appURL =
+    $os.getenv("PB_PUBLIC_URL") || "http://127.0.0.1:8090";
   e.app.save(settings0);
 
   const key = $os.getenv("RESEND_API_KEY");

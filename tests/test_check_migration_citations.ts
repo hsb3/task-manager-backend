@@ -34,7 +34,7 @@ const REFUSAL = "❌";
 // this file's own constants; each citation under test is built by interpolation instead.
 const V1_ONLY = "1785150000_settings.js";
 const V1_ALSO = "1785152200_tasks_vocab.js";
-const V2_ONLY = "1785180100_collections_snapshot.js";
+const V2_ONLY = "1785185200_collections.js";
 const GHOST = "1785999999_not_a_real_migration.js";
 
 const FAILS: string[] = [];

@@ -175,19 +175,18 @@ for (const token of ["PBTT-543", "TASK-061", "decision-021", "card nw9w"]) {
 }
 
 console.log("\n── (g) the ratchet: filter on the DROPPING migration, never on introduction ──");
-// Since bj2j the bound sits just above the re-seed that retired the SUPERSEDED WORDING
-// convention, so that one migration and its predecessors are the whole grandfathered set;
-// pinning the newest pre-baseline file survives every later migration and fails if the
-// baseline moves again.
+// The bound sits at the baseline seed, so the baseline migrations before it are the whole
+// grandfathered set; pinning the newest pre-baseline file survives every later migration and
+// fails if the baseline moves again.
 const GRANDFATHERED = fs
   .readdirSync(path.join(REPO_ROOT, "pb_migrations"))
   .filter((name) => name.endsWith(".js") && hist.stamp(name) < hist.stamp(hist.BASELINE));
 check(
-  "the newest grandfathered migration is the wording-retirement re-seed",
+  "the newest grandfathered migration is the baseline collections migration",
   // A baseline moved below the whole tree empties this set; report that as the failed
   // check it is rather than dying on an empty max.
   GRANDFATHERED.sort(by_code_point).at(-1) ?? "<none: BASELINE sits below every migration>",
-  "1785180500_seed_app_docs_superseded_wording_retired.js",
+  "1785185200_collections.js",
 );
 // The pin above fixes the newest grandfathered file, so it catches a baseline moved DOWN but
 // not one moved UP past the whole tree — the only direction that widens the amnesty, and the

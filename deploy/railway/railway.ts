@@ -57,10 +57,10 @@ export default defineRailway(() => {
       PB_FILES_S3_ENDPOINT: preserve(),
       PB_FILES_S3_REGION: preserve(),
       PB_FILES_S3_SECRET: preserve(),
+      PB_PUBLIC_URL: preserve(),
       PB_SUPERUSER_EMAIL: preserve(),
       PB_SUPERUSER_PASSWORD: preserve(),
       RESEND_API_KEY: preserve(),
-      WEB_APP_URL: preserve(),
     },
   });
 

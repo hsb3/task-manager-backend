@@ -44,7 +44,7 @@ Sites:
   `e.app`, so each site anchors on its own `INLINED SWEEP` marker and drift in either copy is
   reported against that copy's own line.
 - `schema/project_items.view.json` — `project_items` view SQL (written by
-  `v2:pb_migrations/1785183100_project_items_counts.js`), the resolved half, **2 of 6 only**
+  `v2:pb_migrations/1785185200_collections.js`), the resolved half, **2 of 6 only**
   (`completed`, `canceled`), repeated once per column: `status_terminal` and `open` read both, and
   `status_off_pipeline` reads `canceled` alone. Each copy is counted, so dropping one column's copy
   is drift.

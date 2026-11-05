@@ -29,7 +29,7 @@ directive that cannot read it, so that literal stays. The web e2e ports (`E2E_PB
 `scripts/dod.sh`,
 `web/e2e/support/ports.ts`, held together by `scripts/check_keep_in_sync.ts`) and
 `scripts/smtp_sink.ts`'s `SINK_PORT` all DO shift with it. Per-site vars still win where they
-exist (`PB_URL`, `WEB_APP_URL`, `MAIL_SINK_PORT`, `PB_SINK_PORT`, `SINK_PORT`).
+exist (`PB_URL`, `PB_PUBLIC_URL`, `MAIL_SINK_PORT`, `PB_SINK_PORT`, `SINK_PORT`).
 
 **Defaults:** 8090 dev (off-limits to tests) · 8091-8093 battery rooms · 8096-8097 e2e ·
 8094/8095/8098/8099 "probes" — ALSO the defaults of test_oauth, test_backups,

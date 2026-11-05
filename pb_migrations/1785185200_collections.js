@@ -9,7 +9,6 @@
 // The oauth2 block is stripped from both auth collections on purpose: on a fresh database
 // onBootstrap runs BEFORE the migrations, so a snapshot re-asserting oauth2.enabled=false
 // overwrites what pb_hooks/oauth.pb.js just wrote and GitHub login stays off until the second
-// boot. `migrate collections` re-emits it -- strip it again after any regeneration.
 migrate((app) => {
   const snapshot = [
     {
@@ -814,14 +813,14 @@ migrate((app) => {
         "duration": 1800
       },
       "resetPasswordTemplate": {
-        "body": "<p>Hello,</p>\n<p>We received a request to reset the password on your Task Tracker account.</p>\n<p>Click the button below to choose a new password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/reset-password?token={TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can safely ignore this email — your password won't change.</i></p>\n<p>\n  Thanks,<br/>\n  The Task Tracker team\n</p>",
+        "body": "<p>Hello,</p>\n<p>We received a request to reset the password on your Task Tracker account.</p>\n<p>Click the button below to choose a new password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can safely ignore this email — your password won't change.</i></p>\n<p>\n  Thanks,<br/>\n  The Task Tracker team\n</p>",
         "subject": "Reset your Task Tracker password"
       },
       "system": false,
       "type": "auth",
       "updateRule": "id = @request.auth.id && @request.body.approved:isset = false",
       "verificationTemplate": {
-        "body": "<p>Hello,</p>\n<p>Welcome to Task Tracker! We're glad you're here.</p>\n<p>Click the button below to confirm your email address and activate your account.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/verify-email?token={TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm my account</a>\n</p>\n<p><i>If you didn't create a Task Tracker account, you can safely ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  The Task Tracker team\n</p>",
+        "body": "<p>Hello,</p>\n<p>Welcome to Task Tracker! We're glad you're here.</p>\n<p>Click the button below to confirm your email address and activate your account.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm my account</a>\n</p>\n<p><i>If you didn't create a Task Tracker account, you can safely ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  The Task Tracker team\n</p>",
         "subject": "Confirm your Task Tracker account"
       },
       "verificationToken": {
@@ -1018,7 +1017,7 @@ migrate((app) => {
       "viewRule": "@request.auth.id != \"\""
     },
     {
-      "createRule": "@request.auth.id != \"\" && owner = @request.auth.id",
+      "createRule": "@request.auth.id != \"\" && (owner = \"\" || owner = @request.auth.id)",
       "deleteRule": "owner = @request.auth.id",
       "fields": [
         {
@@ -1132,11 +1131,11 @@ migrate((app) => {
       "system": false,
       "type": "base",
       "updateRule": "(@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.role ?= \"admin\" && workspace_members_via_workspace.status ?= \"active\"))) && @request.body.owner:isset = false",
-      "viewRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && (workspace_members_via_workspace.status ?= \"active\" || workspace_members_via_workspace.status ?= \"invited\"))) && trashed = \"\""
+      "viewRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.status ?= \"active\")) && trashed = \"\""
     },
     {
-      "createRule": "@request.auth.id != \"\" && @request.body.status = \"invited\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\" && @request.body.role = \"member\")) && workspace.trashed = \"\"",
-      "deleteRule": "(workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\") || (user = @request.auth.id && workspace.owner != @request.auth.id)) && workspace.trashed = \"\"",
+      "createRule": null,
+      "deleteRule": "(workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\") || (user = @request.auth.id && workspace.owner != @request.auth.id)) && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
       "fields": [
         {
           "autogeneratePattern": "[a-z0-9]{15}",
@@ -1229,7 +1228,6 @@ migrate((app) => {
           "type": "select",
           "values": [
             "active",
-            "invited",
             "suspended"
           ]
         }
@@ -1242,12 +1240,12 @@ migrate((app) => {
       "name": "workspace_members",
       "system": false,
       "type": "base",
-      "updateRule": "(workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\" && @request.body.role:isset = false) || (user = @request.auth.id && status = \"invited\" && @request.body.status = \"active\" && @request.body.role:isset = false)) && @request.body.workspace:isset = false && @request.body.user:isset = false && workspace.trashed = \"\"",
-      "viewRule": "@request.auth.id != \"\" && (user = @request.auth.id || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\"))"
+      "updateRule": "(workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\" && @request.body.role:isset = false)) && @request.body.workspace:isset = false && @request.body.user:isset = false && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
+      "viewRule": "@request.auth.id != \"\" && (user = @request.auth.id || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (@request.query.workspace:isset = false || workspace = @request.query.workspace)"
     },
     {
-      "createRule": "@request.auth.id != \"\" && owner = @request.auth.id && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace = \"\" || workspace.trashed = \"\") && @request.body.shadow:isset = false",
-      "deleteRule": "(workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && shadow = false",
+      "createRule": "@request.auth.id != \"\" && (owner = \"\" || owner = @request.auth.id) && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace = \"\" || workspace.trashed = \"\") && @request.body.shadow:isset = false",
+      "deleteRule": "(workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && shadow = false && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
       "fields": [
         {
           "autogeneratePattern": "[a-z0-9]{15}",
@@ -1402,8 +1400,8 @@ migrate((app) => {
       "name": "projects",
       "system": false,
       "type": "base",
-      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.owner:isset = false && (trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && shadow = false && @request.body.shadow:isset = false",
-      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && shadow = false"
+      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.owner:isset = false && (trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && shadow = false && @request.body.shadow:isset = false && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
+      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && shadow = false && (@request.query.workspace:isset = false || workspace = @request.query.workspace)"
     },
     {
       "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace = \"\" || workspace.trashed = \"\") && (project = \"\" || project.workspace.trashed = \"\")",
@@ -1953,13 +1951,29 @@ migrate((app) => {
           "required": false,
           "system": false,
           "type": "relation"
+        },
+        {
+          "cascadeDelete": false,
+          "collectionId": "_pb_users_auth_",
+          "help": "",
+          "hidden": false,
+          "id": "relation4000000204",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "author",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "relation"
         }
       ],
       "id": "pbc_2602490748",
       "indexes": [
         "CREATE INDEX `idx_tasks_project` ON `tasks` (`project`)",
         "CREATE INDEX `idx_tasks_assignee` ON `tasks` (`assignee`)",
-        "CREATE UNIQUE INDEX `idx_tasks_ws_key` ON `tasks` (`workspace`,`key`) WHERE `key` != ''"
+        "CREATE UNIQUE INDEX `idx_tasks_ws_key` ON `tasks` (`workspace`,`key`) WHERE `key` != ''",
+        "CREATE INDEX `idx_tasks_parent` ON `tasks` (`parent`)",
+        "CREATE INDEX `idx_tasks_milestone` ON `tasks` (`milestone`)"
       ],
       "listRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\") || assignee = @request.auth.id) && trashed = \"\" && (project = \"\" || (project.created != \"\" && project.trashed = \"\")) && workspace.trashed = \"\"",
       "name": "tasks",
@@ -1969,8 +1983,8 @@ migrate((app) => {
       "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\") || assignee = @request.auth.id) && trashed = \"\" && (project = \"\" || (project.created != \"\" && project.trashed = \"\")) && workspace.trashed = \"\""
     },
     {
-      "createRule": "@request.auth.id != \"\" && (parent = \"\" || (parent.parent = \"\" && parent.task = task && parent.document = document && parent.decision = decision)) && ((task != \"\" && document = \"\" && decision = \"\" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id)) || (document != \"\" && task = \"\" && decision = \"\" && (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && document.workspace.workspace_members_via_workspace.status ?= \"active\"))) || (decision != \"\" && task = \"\" && document = \"\" && (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\")))) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\"))",
-      "deleteRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && (author = @request.auth.id || task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?= \"admin\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\") || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\")) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\"))",
+      "createRule": "@request.auth.id != \"\" && (parent = \"\" || (parent.parent = \"\" && parent.task = task && parent.document = document && parent.decision = decision)) && ((task != \"\" && document = \"\" && decision = \"\" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id)) || (document != \"\" && task = \"\" && decision = \"\" && (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && document.workspace.workspace_members_via_workspace.status ?= \"active\"))) || (decision != \"\" && task = \"\" && document = \"\" && (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\")))) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\")) && (document = \"\" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\")) && (decision = \"\" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))",
+      "deleteRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && (author = @request.auth.id || task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?= \"admin\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\") || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\")) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\")) && (document = \"\" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\")) && (decision = \"\" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))",
       "fields": [
         {
           "autogeneratePattern": "[a-z0-9]{15}",
@@ -2116,14 +2130,16 @@ migrate((app) => {
       ],
       "id": "pbc_300100004",
       "indexes": [
-        "CREATE INDEX `idx_comments_task` ON `comments` (`task`)"
+        "CREATE INDEX `idx_comments_task` ON `comments` (`task`)",
+        "CREATE INDEX `idx_comments_document` ON `comments` (`document`)",
+        "CREATE INDEX `idx_comments_decision` ON `comments` (`decision`)"
       ],
-      "listRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\"))",
+      "listRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\")) && (document = \"\" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\")) && (decision = \"\" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))",
       "name": "comments",
       "system": false,
       "type": "base",
-      "updateRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && @request.body.task:isset = false && @request.body.document:isset = false && @request.body.decision:isset = false && @request.body.author:isset = false && @request.body.parent:isset = false && (author = @request.auth.id || task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?= \"admin\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\") || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\") || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && document.workspace.workspace_members_via_workspace.status ?= \"active\") || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.body:isset = false && @request.body.parent:isset = false && @request.body.task:isset = false && @request.body.document:isset = false && @request.body.decision:isset = false && @request.body.author:isset = false && @request.body.edited:isset = false && @request.body.reactions:isset = true)) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\"))",
-      "viewRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\"))"
+      "updateRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && @request.body.task:isset = false && @request.body.document:isset = false && @request.body.decision:isset = false && @request.body.author:isset = false && @request.body.parent:isset = false && (author = @request.auth.id || task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?= \"admin\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\") || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\") || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && document.workspace.workspace_members_via_workspace.status ?= \"active\") || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?!= \"viewer\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.body:isset = false && @request.body.parent:isset = false && @request.body.task:isset = false && @request.body.document:isset = false && @request.body.decision:isset = false && @request.body.author:isset = false && @request.body.edited:isset = false && @request.body.reactions:isset = true)) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\")) && (document = \"\" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\")) && (decision = \"\" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))",
+      "viewRule": "@request.auth.id != \"\" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\") || task.assignee = @request.auth.id) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) || (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))) && (task = \"\" || (task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || (document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || (decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\")) && (document = \"\" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\")) && (decision = \"\" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\"))"
     },
     {
       "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace = \"\" || workspace.trashed = \"\") && (project = \"\" || project.workspace.trashed = \"\")",
@@ -2722,158 +2738,6 @@ migrate((app) => {
       "viewRule": "@request.auth.id != \"\" && user = @request.auth.id"
     },
     {
-      "createRule": null,
-      "deleteRule": null,
-      "fields": [
-        {
-          "autogeneratePattern": "",
-          "help": "",
-          "hidden": false,
-          "id": "text3208210256",
-          "max": 0,
-          "min": 0,
-          "name": "id",
-          "pattern": "^[a-z0-9]+$",
-          "presentable": false,
-          "primaryKey": true,
-          "required": true,
-          "system": true,
-          "type": "text"
-        },
-        {
-          "autogeneratePattern": "",
-          "help": "",
-          "hidden": false,
-          "id": "_clone_8SfH",
-          "max": 200,
-          "min": 0,
-          "name": "name",
-          "pattern": "",
-          "presentable": false,
-          "primaryKey": false,
-          "required": true,
-          "system": false,
-          "type": "text"
-        },
-        {
-          "cascadeDelete": true,
-          "collectionId": "_pb_users_auth_",
-          "help": "",
-          "hidden": false,
-          "id": "_clone_cd9m",
-          "maxSelect": 1,
-          "minSelect": 0,
-          "name": "owner",
-          "presentable": false,
-          "required": true,
-          "system": false,
-          "type": "relation"
-        },
-        {
-          "cascadeDelete": true,
-          "collectionId": "pbc_300100001",
-          "help": "",
-          "hidden": false,
-          "id": "_clone_rEIT",
-          "maxSelect": 1,
-          "minSelect": 0,
-          "name": "workspace",
-          "presentable": false,
-          "required": true,
-          "system": false,
-          "type": "relation"
-        },
-        {
-          "help": "",
-          "hidden": false,
-          "id": "number3257917790",
-          "max": null,
-          "min": null,
-          "name": "total",
-          "onlyInt": true,
-          "presentable": false,
-          "required": false,
-          "system": false,
-          "type": "number"
-        },
-        {
-          "help": "",
-          "hidden": false,
-          "id": "json3124505842",
-          "maxSize": 1,
-          "name": "triage",
-          "presentable": false,
-          "required": false,
-          "system": false,
-          "type": "json"
-        },
-        {
-          "help": "",
-          "hidden": false,
-          "id": "json2527749",
-          "maxSize": 1,
-          "name": "backlog",
-          "presentable": false,
-          "required": false,
-          "system": false,
-          "type": "json"
-        },
-        {
-          "help": "",
-          "hidden": false,
-          "id": "json2963695897",
-          "maxSize": 1,
-          "name": "unstarted",
-          "presentable": false,
-          "required": false,
-          "system": false,
-          "type": "json"
-        },
-        {
-          "help": "",
-          "hidden": false,
-          "id": "json3029767898",
-          "maxSize": 1,
-          "name": "started",
-          "presentable": false,
-          "required": false,
-          "system": false,
-          "type": "json"
-        },
-        {
-          "help": "",
-          "hidden": false,
-          "id": "json989355118",
-          "maxSize": 1,
-          "name": "completed",
-          "presentable": false,
-          "required": false,
-          "system": false,
-          "type": "json"
-        },
-        {
-          "help": "",
-          "hidden": false,
-          "id": "json3851113217",
-          "maxSize": 1,
-          "name": "canceled",
-          "presentable": false,
-          "required": false,
-          "system": false,
-          "type": "json"
-        }
-      ],
-      "id": "pbc_1529397700",
-      "indexes": [],
-      "listRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))",
-      "name": "project_stats",
-      "system": false,
-      "type": "view",
-      "updateRule": null,
-      "viewQuery": "SELECT p.id AS id, p.name AS name, p.owner AS owner, p.workspace AS workspace, COUNT(t.id) AS total, SUM(CASE WHEN s.category='triage' THEN 1 ELSE 0 END) AS triage, SUM(CASE WHEN s.category='backlog' THEN 1 ELSE 0 END) AS backlog, SUM(CASE WHEN s.category='unstarted' THEN 1 ELSE 0 END) AS unstarted, SUM(CASE WHEN s.category='started' THEN 1 ELSE 0 END) AS started, SUM(CASE WHEN s.category='completed' THEN 1 ELSE 0 END) AS completed, SUM(CASE WHEN s.category='canceled' THEN 1 ELSE 0 END) AS canceled FROM projects p LEFT JOIN tasks t ON t.project = p.id AND t.trashed = '' LEFT JOIN statuses s ON t.status = s.id WHERE p.trashed = '' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id = p.workspace AND w.trashed = '') AND p.shadow = 0 GROUP BY p.id, p.name, p.owner, p.workspace",
-      "viewRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))"
-    },
-    {
       "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
       "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
       "fields": [
@@ -3153,7 +3017,7 @@ migrate((app) => {
       "id": "pbc_300200002",
       "indexes": [
         "CREATE UNIQUE INDEX `idx_statuses_ws_name` ON `statuses` (`workspace`,`name`)",
-        "CREATE UNIQUE INDEX `idx_statuses_ws_default` ON `statuses` (`workspace`) WHERE `is_default` = TRUE"
+        "CREATE UNIQUE INDEX `idx_statuses_ws_default` ON `statuses` (`workspace`, `is_default`) WHERE `is_default` = TRUE"
       ],
       "listRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\"))",
       "name": "statuses",
@@ -3612,7 +3476,7 @@ migrate((app) => {
     },
     {
       "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
-      "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
+      "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
       "fields": [
         {
           "autogeneratePattern": "[a-z0-9]{15}",
@@ -3727,12 +3591,12 @@ migrate((app) => {
       "name": "templates",
       "system": false,
       "type": "base",
-      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.workspace:isset = false && workspace.trashed = \"\"",
-      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\"))"
+      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.workspace:isset = false && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
+      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (@request.query.workspace:isset = false || workspace = @request.query.workspace)"
     },
     {
-      "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.owner = @request.auth.id && workspace.trashed = \"\"",
-      "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (owner = @request.auth.id || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
+      "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (@request.body.owner:isset = false || @request.body.owner = @request.auth.id) && workspace.trashed = \"\"",
+      "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (owner = @request.auth.id || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
       "fields": [
         {
           "autogeneratePattern": "[a-z0-9]{15}",
@@ -3959,8 +3823,264 @@ migrate((app) => {
       "name": "saved_views",
       "system": false,
       "type": "base",
-      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (owner = @request.auth.id || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.workspace:isset = false && workspace.trashed = \"\"",
-      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (scope = \"workspace\" || owner = @request.auth.id) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\"))"
+      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (owner = @request.auth.id || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.workspace:isset = false && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
+      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (scope = \"workspace\" || owner = @request.auth.id) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (@request.query.workspace:isset = false || workspace = @request.query.workspace)"
+    },
+    {
+      "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
+      "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
+      "fields": [
+        {
+          "autogeneratePattern": "[a-z0-9]{15}",
+          "help": "",
+          "hidden": false,
+          "id": "text3208210256",
+          "max": 15,
+          "min": 15,
+          "name": "id",
+          "pattern": "^[a-z0-9]+$",
+          "presentable": false,
+          "primaryKey": true,
+          "required": true,
+          "system": true,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text3000000801",
+          "max": 200,
+          "min": 0,
+          "name": "name",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": true,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "cascadeDelete": true,
+          "collectionId": "pbc_300100001",
+          "help": "",
+          "hidden": false,
+          "id": "relation3000000802",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "workspace",
+          "presentable": false,
+          "required": true,
+          "system": false,
+          "type": "relation"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "date3000000803",
+          "max": "",
+          "min": "",
+          "name": "starts_on",
+          "presentable": false,
+          "required": true,
+          "system": false,
+          "type": "date"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "date3000000804",
+          "max": "",
+          "min": "",
+          "name": "ends_on",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "date"
+        },
+        {
+          "hidden": false,
+          "id": "autodate2990389176",
+          "name": "created",
+          "onCreate": true,
+          "onUpdate": false,
+          "presentable": false,
+          "system": false,
+          "type": "autodate"
+        },
+        {
+          "hidden": false,
+          "id": "autodate3332085495",
+          "name": "updated",
+          "onCreate": true,
+          "onUpdate": true,
+          "presentable": false,
+          "system": false,
+          "type": "autodate"
+        }
+      ],
+      "id": "pbc_300200008",
+      "indexes": [
+        "CREATE INDEX `idx_cycles_workspace` ON `cycles` (`workspace`)"
+      ],
+      "listRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\"))",
+      "name": "cycles",
+      "system": false,
+      "type": "base",
+      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.workspace:isset = false && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
+      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (@request.query.workspace:isset = false || workspace = @request.query.workspace)"
+    },
+    {
+      "createRule": null,
+      "deleteRule": null,
+      "fields": [
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text3208210256",
+          "max": 0,
+          "min": 0,
+          "name": "id",
+          "pattern": "^[a-z0-9]+$",
+          "presentable": false,
+          "primaryKey": true,
+          "required": true,
+          "system": true,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "_clone_T3BN",
+          "max": 200,
+          "min": 0,
+          "name": "name",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": true,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "cascadeDelete": true,
+          "collectionId": "_pb_users_auth_",
+          "help": "",
+          "hidden": false,
+          "id": "_clone_ue3e",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "owner",
+          "presentable": false,
+          "required": true,
+          "system": false,
+          "type": "relation"
+        },
+        {
+          "cascadeDelete": true,
+          "collectionId": "pbc_300100001",
+          "help": "",
+          "hidden": false,
+          "id": "_clone_lpbI",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "workspace",
+          "presentable": false,
+          "required": true,
+          "system": false,
+          "type": "relation"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "number3257917790",
+          "max": null,
+          "min": null,
+          "name": "total",
+          "onlyInt": true,
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "number"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "json3124505842",
+          "maxSize": 1,
+          "name": "triage",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "json2527749",
+          "maxSize": 1,
+          "name": "backlog",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "json2963695897",
+          "maxSize": 1,
+          "name": "unstarted",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "json3029767898",
+          "maxSize": 1,
+          "name": "started",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "json989355118",
+          "maxSize": 1,
+          "name": "completed",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "json3851113217",
+          "maxSize": 1,
+          "name": "canceled",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "json"
+        }
+      ],
+      "id": "pbc_1529397700",
+      "indexes": [],
+      "listRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))",
+      "name": "project_stats",
+      "system": false,
+      "type": "view",
+      "updateRule": null,
+      "viewQuery": "SELECT p.id AS id, p.name AS name, p.owner AS owner, p.workspace AS workspace, COUNT(t.id) AS total, SUM(CASE WHEN s.category='triage' THEN 1 ELSE 0 END) AS triage, SUM(CASE WHEN s.category='backlog' THEN 1 ELSE 0 END) AS backlog, SUM(CASE WHEN s.category='unstarted' THEN 1 ELSE 0 END) AS unstarted, SUM(CASE WHEN s.category='started' THEN 1 ELSE 0 END) AS started, SUM(CASE WHEN s.category='completed' THEN 1 ELSE 0 END) AS completed, SUM(CASE WHEN s.category='canceled' THEN 1 ELSE 0 END) AS canceled FROM projects p LEFT JOIN tasks t ON t.project = p.id AND t.trashed = '' LEFT JOIN statuses s ON t.status = s.id WHERE p.trashed = '' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id = p.workspace AND w.trashed = '') AND p.shadow = 0 GROUP BY p.id, p.name, p.owner, p.workspace",
+      "viewRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))"
     },
     {
       "createRule": null,
@@ -4383,6 +4503,49 @@ migrate((app) => {
           "required": false,
           "system": false,
           "type": "text"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "number742644883",
+          "max": null,
+          "min": null,
+          "name": "comment_count",
+          "onlyInt": false,
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "number"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "bool312586905",
+          "name": "status_terminal",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "bool"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "bool973114802",
+          "name": "status_off_pipeline",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "bool"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "bool2758837156",
+          "name": "open",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "bool"
         }
       ],
       "id": "pbc_300300001",
@@ -4392,12 +4555,12 @@ migrate((app) => {
       "system": false,
       "type": "view",
       "updateRule": null,
-      "viewQuery": "SELECT u.id AS id, CAST(u.type AS TEXT) AS type, CAST(u.title AS TEXT) AS title, CAST(u.key AS TEXT) AS key, CAST(u.project AS TEXT) AS project, CAST(u.workspace AS TEXT) AS workspace, CAST(u.created AS TEXT) AS created, CAST(u.updated AS TEXT) AS updated, CAST(u.trashed AS TEXT) AS trashed, CAST(u.draft AS BOOLEAN) AS draft, CAST(u.author AS TEXT) AS author, CAST(u.assignee AS TEXT) AS assignee, CAST(u.ordinal AS NUMERIC) AS ordinal, CAST(u.due AS TEXT) AS due, CAST(CASE WHEN u.due IS NULL OR u.due = '' THEN 0 ELSE 1 END AS NUMERIC) AS has_due, CAST(COALESCE(u.priority_rank, 9999) AS NUMERIC) AS priority_rank, CAST(CASE WHEN u.priority_rank IS NULL THEN 0 ELSE 1 END AS NUMERIC) AS has_priority, CAST(u.status AS TEXT) AS status, CAST(u.priority AS TEXT) AS priority, CAST(u.parent AS TEXT) AS parent, CAST(u.milestone AS TEXT) AS milestone, CAST(u.labels AS TEXT) AS labels, CAST(u.dependencies AS TEXT) AS dependencies, CAST(u.cycle AS TEXT) AS cycle, CAST(CASE WHEN u.project != '' AND COALESCE((SELECT p.trashed FROM projects p WHERE p.id = u.project), 'missing') != '' THEN 1 ELSE 0 END AS NUMERIC) AS project_trashed, CAST(CASE WHEN (SELECT w.trashed FROM workspaces w WHERE w.id = u.workspace) != '' THEN 1 ELSE 0 END AS NUMERIC) AS workspace_trashed, CAST((SELECT w.owner FROM workspaces w WHERE w.id = u.workspace) AS TEXT) AS workspace_owner, CAST((',' || COALESCE((SELECT group_concat(mem2.user) FROM workspace_members mem2 WHERE mem2.workspace = u.workspace AND mem2.status = 'active'), '') || ',') AS TEXT) AS active_members, CAST((',' || COALESCE((SELECT group_concat(mem3.user) FROM workspace_members mem3 WHERE mem3.workspace = u.workspace AND mem3.status = 'active' AND mem3.role = 'admin'), '') || ',') AS TEXT) AS active_admins FROM (SELECT t.id AS id, 'task' AS type, t.title AS title, t.key AS key, t.project AS project, t.workspace AS workspace, t.created AS created, t.updated AS updated, t.trashed AS trashed, 0 AS draft, '' AS author, t.assignee AS assignee, COALESCE(t.ordinal, 0) AS ordinal, t.due AS due, (SELECT j.key FROM workspaces w, json_each(CASE WHEN json_valid(w.priorities) THEN w.priorities ELSE '[]' END) j WHERE w.id = t.workspace AND json_extract(j.value, '$.id') = t.priority) AS priority_rank, t.status AS status, t.priority AS priority, t.parent AS parent, t.milestone AS milestone, t.labels AS labels, t.dependencies AS dependencies, t.cycle AS cycle FROM tasks t UNION ALL SELECT d.id, 'decision', d.title, d.key, d.project, d.workspace, d.created, d.updated, d.trashed, d.draft, d.author, '', 0, '', NULL, d.status, '', '', '', '', '', '' FROM decisions d UNION ALL SELECT o.id, 'document', o.title, o.key, o.project, o.workspace, o.created, o.updated, o.trashed, o.draft, o.author, '', 0, '', NULL, '', '', '', '', '', '', '' FROM documents o UNION ALL SELECT m.id, 'milestone', m.name, m.key, m.project, m.workspace, m.created, m.updated, m.trashed, m.draft, m.author, '', 0, m.target, NULL, '', '', '', '', '', '', '' FROM milestones m) u",
-      "viewRule": "@request.auth.id != \"\" && ((type = \"task\" && ((workspace_owner = @request.auth.id || active_members ~ @request.auth.id) || assignee = @request.auth.id)) || (type != \"task\" && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))) && trashed = \"\" && project_trashed = 0 && workspace_trashed = 0"
+      "viewQuery": "SELECT u.id AS id, CAST(u.type AS TEXT) AS type, CAST(u.title AS TEXT) AS title, CAST(u.key AS TEXT) AS key, CAST(u.project AS TEXT) AS project, CAST(u.workspace AS TEXT) AS workspace, CAST(u.created AS TEXT) AS created, CAST(u.updated AS TEXT) AS updated, CAST(u.trashed AS TEXT) AS trashed, CAST(u.draft AS BOOLEAN) AS draft, CAST(u.author AS TEXT) AS author, CAST(u.assignee AS TEXT) AS assignee, CAST(u.ordinal AS NUMERIC) AS ordinal, CAST(u.due AS TEXT) AS due, CAST(CASE WHEN u.due IS NULL OR u.due = '' THEN 0 ELSE 1 END AS NUMERIC) AS has_due, CAST(COALESCE(u.priority_rank, 9999) AS NUMERIC) AS priority_rank, CAST(CASE WHEN u.priority_rank IS NULL THEN 0 ELSE 1 END AS NUMERIC) AS has_priority, CAST(u.status AS TEXT) AS status, CAST(u.priority AS TEXT) AS priority, CAST(u.parent AS TEXT) AS parent, CAST(u.milestone AS TEXT) AS milestone, CAST(u.labels AS TEXT) AS labels, CAST(u.dependencies AS TEXT) AS dependencies, CAST(u.cycle AS TEXT) AS cycle, CAST(CASE WHEN u.project != '' AND COALESCE((SELECT p.trashed FROM projects p WHERE p.id = u.project), 'missing') != '' THEN 1 ELSE 0 END AS NUMERIC) AS project_trashed, CAST(CASE WHEN (SELECT w.trashed FROM workspaces w WHERE w.id = u.workspace) != '' THEN 1 ELSE 0 END AS NUMERIC) AS workspace_trashed, CAST((SELECT w.owner FROM workspaces w WHERE w.id = u.workspace) AS TEXT) AS workspace_owner, CAST((',' || COALESCE((SELECT group_concat(mem2.user) FROM workspace_members mem2 WHERE mem2.workspace = u.workspace AND mem2.status = 'active'), '') || ',') AS TEXT) AS active_members, CAST((',' || COALESCE((SELECT group_concat(mem3.user) FROM workspace_members mem3 WHERE mem3.workspace = u.workspace AND mem3.status = 'active' AND mem3.role = 'admin'), '') || ',') AS TEXT) AS active_admins, CAST(CASE WHEN u.trashed != '' THEN 0 ELSE CASE u.type WHEN 'task' THEN (SELECT COUNT(*) FROM comments c WHERE c.task = u.id) WHEN 'document' THEN (SELECT COUNT(*) FROM comments c WHERE c.document = u.id) WHEN 'decision' THEN (SELECT COUNT(*) FROM comments c WHERE c.decision = u.id) ELSE 0 END END AS NUMERIC) AS comment_count, CAST(u.type = 'task' AND EXISTS (SELECT 1 FROM statuses s WHERE s.id = u.status AND s.workspace = u.workspace AND s.category IN ('completed', 'canceled')) AS BOOLEAN) AS status_terminal, CAST(u.type = 'task' AND EXISTS (SELECT 1 FROM statuses s WHERE s.id = u.status AND s.workspace = u.workspace AND s.category = 'canceled') AS BOOLEAN) AS status_off_pipeline, CAST(u.type = 'task' AND EXISTS (SELECT 1 FROM statuses s WHERE s.id = u.status AND s.workspace = u.workspace AND s.category NOT IN ('completed', 'canceled')) AS BOOLEAN) AS open FROM (SELECT t.id AS id, 'task' AS type, t.title AS title, t.key AS key, t.project AS project, t.workspace AS workspace, t.created AS created, t.updated AS updated, t.trashed AS trashed, 0 AS draft, t.author AS author, t.assignee AS assignee, COALESCE(t.ordinal, 0) AS ordinal, t.due AS due, (SELECT j.key FROM workspaces w, json_each(CASE WHEN json_valid(w.priorities) THEN w.priorities ELSE '[]' END) j WHERE w.id = t.workspace AND json_extract(j.value, '$.id') = t.priority) AS priority_rank, t.status AS status, t.priority AS priority, t.parent AS parent, t.milestone AS milestone, t.labels AS labels, t.dependencies AS dependencies, t.cycle AS cycle FROM tasks t UNION ALL SELECT d.id, 'decision', d.title, d.key, d.project, d.workspace, d.created, d.updated, d.trashed, d.draft, d.author, '', 0, '', NULL, d.status, '', '', '', '', '', '' FROM decisions d UNION ALL SELECT o.id, 'document', o.title, o.key, o.project, o.workspace, o.created, o.updated, o.trashed, o.draft, o.author, '', 0, '', NULL, '', '', '', '', '', '', '' FROM documents o UNION ALL SELECT m.id, 'milestone', m.name, m.key, m.project, m.workspace, m.created, m.updated, m.trashed, m.draft, m.author, '', 0, m.target, NULL, '', '', '', '', '', '', '' FROM milestones m) u",
+      "viewRule": "(@request.auth.id != \"\" && ((type = \"task\" && ((workspace_owner = @request.auth.id || active_members ~ @request.auth.id) || assignee = @request.auth.id)) || (type != \"task\" && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))) && trashed = \"\" && project_trashed = 0 && workspace_trashed = 0) || (@request.auth.id != \"\" && trashed != \"\" && workspace_trashed = 0 && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id) && (type = \"task\" || draft = false || author = @request.auth.id || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))"
     },
     {
-      "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
-      "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
+      "createRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\" && @request.body.role = \"member\")) && workspace.trashed = \"\"",
+      "deleteRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)",
       "fields": [
         {
           "autogeneratePattern": "[a-z0-9]{15}",
@@ -4415,26 +4578,11 @@ migrate((app) => {
           "type": "text"
         },
         {
-          "autogeneratePattern": "",
-          "help": "",
-          "hidden": false,
-          "id": "text3000000801",
-          "max": 200,
-          "min": 0,
-          "name": "name",
-          "pattern": "",
-          "presentable": false,
-          "primaryKey": false,
-          "required": true,
-          "system": false,
-          "type": "text"
-        },
-        {
           "cascadeDelete": true,
           "collectionId": "pbc_300100001",
           "help": "",
           "hidden": false,
-          "id": "relation3000000802",
+          "id": "relation4100000001",
           "maxSelect": 1,
           "minSelect": 0,
           "name": "workspace",
@@ -4444,60 +4592,186 @@ migrate((app) => {
           "type": "relation"
         },
         {
+          "autogeneratePattern": "",
           "help": "",
           "hidden": false,
-          "id": "date3000000803",
-          "max": "",
-          "min": "",
-          "name": "starts_on",
+          "id": "text4100000002",
+          "max": 0,
+          "min": 0,
+          "name": "email",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": true,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": true,
+          "id": "text4100000003",
+          "max": 0,
+          "min": 0,
+          "name": "email_key",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": true,
+          "system": false,
+          "type": "text"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "select4100000004",
+          "maxSelect": 1,
+          "name": "role",
           "presentable": false,
           "required": true,
           "system": false,
-          "type": "date"
+          "type": "select",
+          "values": [
+            "admin",
+            "member",
+            "viewer"
+          ]
         },
         {
+          "cascadeDelete": false,
+          "collectionId": "_pb_users_auth_",
           "help": "",
           "hidden": false,
-          "id": "date3000000804",
-          "max": "",
-          "min": "",
-          "name": "ends_on",
+          "id": "relation4100000005",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "invited_by",
           "presentable": false,
           "required": false,
           "system": false,
-          "type": "date"
+          "type": "relation"
         },
         {
           "hidden": false,
-          "id": "autodate2990389176",
+          "id": "autodate4100000006",
           "name": "created",
           "onCreate": true,
           "onUpdate": false,
           "presentable": false,
           "system": false,
           "type": "autodate"
+        }
+      ],
+      "id": "pbc_300400001",
+      "indexes": [
+        "CREATE UNIQUE INDEX `idx_workspace_invitations_ws_key` ON `workspace_invitations` (`workspace`, `email_key`)"
+      ],
+      "listRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\"",
+      "name": "workspace_invitations",
+      "system": false,
+      "type": "base",
+      "updateRule": null,
+      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && workspace.trashed = \"\" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)"
+    },
+    {
+      "createRule": null,
+      "deleteRule": null,
+      "fields": [
+        {
+          "autogeneratePattern": "[a-z0-9]{15}",
+          "help": "",
+          "hidden": false,
+          "id": "text3208210256",
+          "max": 15,
+          "min": 15,
+          "name": "id",
+          "pattern": "^[a-z0-9]+$",
+          "presentable": false,
+          "primaryKey": true,
+          "required": true,
+          "system": true,
+          "type": "text"
+        },
+        {
+          "help": "",
+          "hidden": false,
+          "id": "select4200000001",
+          "maxSelect": 1,
+          "name": "kind",
+          "presentable": false,
+          "required": true,
+          "system": false,
+          "type": "select",
+          "values": [
+            "mint",
+            "decline"
+          ]
+        },
+        {
+          "cascadeDelete": false,
+          "collectionId": "_pb_users_auth_",
+          "help": "",
+          "hidden": false,
+          "id": "relation4200000002",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "inviter",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "relation"
+        },
+        {
+          "cascadeDelete": false,
+          "collectionId": "pbc_300100001",
+          "help": "",
+          "hidden": false,
+          "id": "relation4200000003",
+          "maxSelect": 1,
+          "minSelect": 0,
+          "name": "workspace",
+          "presentable": false,
+          "required": false,
+          "system": false,
+          "type": "relation"
+        },
+        {
+          "autogeneratePattern": "",
+          "help": "",
+          "hidden": false,
+          "id": "text4200000004",
+          "max": 0,
+          "min": 0,
+          "name": "email_key",
+          "pattern": "",
+          "presentable": false,
+          "primaryKey": false,
+          "required": true,
+          "system": false,
+          "type": "text"
         },
         {
           "hidden": false,
-          "id": "autodate3332085495",
-          "name": "updated",
+          "id": "autodate4200000005",
+          "name": "created",
           "onCreate": true,
-          "onUpdate": true,
+          "onUpdate": false,
           "presentable": false,
           "system": false,
           "type": "autodate"
         }
       ],
-      "id": "pbc_300200008",
+      "id": "pbc_300500001",
       "indexes": [
-        "CREATE INDEX `idx_cycles_workspace` ON `cycles` (`workspace`)"
+        "CREATE INDEX `idx_invitation_events_inviter_created` ON `invitation_events` (`inviter`, `created`)",
+        "CREATE INDEX `idx_invitation_events_ws_key_kind_created` ON `invitation_events` (`workspace`, `email_key`, `kind`, `created`)"
       ],
-      "listRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\"))",
-      "name": "cycles",
+      "listRule": null,
+      "name": "invitation_events",
       "system": false,
       "type": "base",
-      "updateRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && @request.body.workspace:isset = false && workspace.trashed = \"\"",
-      "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace.trashed = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= \"admin\" && workspace.workspace_members_via_workspace.status ?= \"active\"))"
+      "updateRule": null,
+      "viewRule": null
     }
   ];
 
