@@ -358,6 +358,20 @@ function proofs(): void {
     ),
   );
 
+  console.log("── 12b. without the tag, the vendored scripts/migrations-v1.txt is the v1 set ──");
+  const vendored = {
+    "scripts/migrations-v1.txt": `${V1_ONLY}\n`,
+    "cite.md": `See v1:${V1_ONLY}.\n`,
+  };
+  const r12b = run(make_repo("vendored", vendored, [V2_ONLY], false));
+  echo(r12b.stdout + r12b.stderr);
+  check("a v1 citation in the vendored list exits 0", r12b.returncode === 0);
+  const r12c = run(
+    make_repo("vendored-ghost", { ...vendored, "cite.md": `See v1:${GHOST}.\n` }, [V2_ONLY], false),
+  );
+  echo(r12c.stdout + r12c.stderr);
+  check("a v1 citation absent from the vendored list exits 1", r12c.returncode === 1);
+
   console.log(
     "── 13. a migration filename outside the derived shape refuses instead of going blind ──",
   );
@@ -374,8 +388,8 @@ function proofs(): void {
   check("the shipped pb_migrations/ set is non-empty", shipped.length > 0);
   cmc.assert_shape(shipped);
   check("every shipped migration basename matches the derived shape", true);
-  // This repository was imported without the migrations-v1 tag, so the checker is not in
-  // make check and the shipped tag half of this section has nothing to read.
+  // This repository has no migrations-v1 tag; its v1 citations resolve against the vendored
+  // list that section 12b proves.
   check("the shipped scan set is non-empty", cmc.tracked_files(REPO_ROOT).length > 0);
 }
 

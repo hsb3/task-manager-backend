@@ -3,9 +3,8 @@
  * E2E pin of the HTTP status PocketBase itself answers each refusal shape with, so a platform
  * upgrade that moves one turns this RED instead of silently invalidating whatever is built on it.
  *
- * The Next proxy passes PocketBase's status straight through (`normalizePbError` in
- * web/lib/proxy/errors.ts maps status → code and rethrows), so for a large share of the contract's
- * non-2xx declarations PocketBase is the only producer. Every status in PB_REFUSAL_STATUSES below
+ * Clients see PocketBase's status straight through, so for a large share of the API's
+ * non-2xx responses PocketBase is the only producer. Every status in PB_REFUSAL_STATUSES below
  * is measured here against this repo's own collections and hooks, never assumed.
  *
  * Two route families answer differently and both are pinned: a COLLECTION RECORD route has no auth

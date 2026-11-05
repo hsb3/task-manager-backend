@@ -288,7 +288,7 @@ for (const [label, family, host, v6only] of [
 
 // The negative space of the comment at roomkit.port_is_free: an IPv6-only holder can neither
 // answer a 127.0.0.1 health poll nor block our bind, so probing for it would refuse a usable
-// port. This goes red the moment someone copies web/e2e's PROBE_HOSTS list in.
+// port. This goes red the moment someone adds a two-host PROBE_HOSTS list.
 for (const [label, host] of [
   ["::1", "::1"],
   [":: v6only", "::"],

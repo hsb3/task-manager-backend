@@ -6,7 +6,11 @@ paths:
   - "schema/**"
 ---
 
-# PocketBase gotchas (these bite; pinned v0.40.4, each measured on the version it names)
+# PocketBase gotchas specific to this repo's hooks (pinned v0.40.4, each measured on the version it names)
+
+The generic PocketBase traps (status codes, custom routes bypassing rules, `expand`, view
+collections, request-scoped hooks, read-then-write races, realtime topics) are in the
+pocketbase plugin's field notes; what follows is what this repo's hooks add.
 
 - `@request.body`, NOT `@request.data` (silent failure).
 - Rule status idiom: list-filtered→200 empty · view/update/delete denied→404 ·
@@ -16,36 +20,23 @@ paths:
   valid empty-relation syntax in rules.
 - Pooled JSVM: hooks cannot share top-level functions/constants across callbacks —
   INLINE per site with `// KEEP IN SYNC:` comments (check_constants gates drift).
-- View collections: no realtime events (clients recompute on `tasks` events; never
-  subscribe to `project_stats`); view column ids (`_clone_*`) regenerate per boot —
-  never diff or reference them.
-- Custom routes BYPASS collection rules — handlers must scope by `e.auth` themselves.
-- `expand` silently omits unviewable records. DELETE success = 204 empty body.
-  JSON-array filters need `?~`. `users.email` hidden on others' records — resolve
-  fixtures by `name`.
-- `migrate down`/`migrate collections` prompt y/N — pipe `printf 'y\n' |`.
-- A migration CANNOT change a field's type in place — applies without error, changes
-  NOTHING. Recipe: add new field → copy rows → detach any view referencing the old
-  column → remove old + rename (worked example collapsed by decision-069's baseline
-  rebuild — `git show migrations-v1:pb_migrations/1785152200_tasks_vocab.js`).
-- A migration citation is written `v1:FILE` (resolves via
-  `git show migrations-v1:pb_migrations/FILE`) or `v2:FILE` (the current tree).
-- Hook read-then-write races under parallel requests (SQLite single-writer serializes
-  the COMMIT, not your read) — use one atomic `UPDATE … RETURNING` via e.app.db() + a
-  UNIQUE index (see tasks.seq / workspaces.seq_counter).
-- `e.auth` is undefined in `After*Success` hooks — capture actor in the `*Request` hook
-  BEFORE `e.next()` and use it there (see `activity.pb.js`, `trash.pb.js`, `realtime.pb.js`).
-- `onRecord*Request` hooks are Request-scoped — they do NOT fire for programmatic
-  `$app.delete()`/`e.app.save()` calls (cron jobs, custom route handlers calling the
-  Go/JS API directly), only for HTTP-request-triggered writes. Anything that must fire
-  for BOTH paths (e.g. a realtime broadcast on delete) belongs on the universal
-  `onRecord*AfterSuccess` hook (see `pb_hooks/realtime.pb.js`, TASK-008.08 — a purge
-  via the 30-day trash cron silently never fired the old *Request-hook broadcast).
-- The converse trap: a UNIVERSAL `onRecord*` hook DOES fire for a migration's own
+- Repo pointers for the generic traps: never subscribe to `project_stats` (a view: no realtime
+  events; clients recompute on `tasks` events); `users.email` is hidden on others' records, so
+  fixtures resolve users by `name`; the atomic `UPDATE … RETURNING` counter is `projects.item_seq`
+  in `pb_hooks/keys.pb.js`; `pb_hooks/activity.pb.js` captures the actor in the `*Request` hook
+  for its universal writer.
+- A migration CANNOT change a field's type in place — applies without error, changes NOTHING.
+  Recipe: add new field → copy rows → detach any view referencing the old column → remove old +
+  rename (worked example collapsed by decision-069's baseline rebuild —
+  `v1:1785152200_tasks_vocab.js`, readable at the v1 tag in `hsb3/task-manager`).
+- A migration citation is written `v1:FILE` (checked against the vendored
+  v1 name list `scripts/migrations-v1.txt`, since the v1 tag lives only in `hsb3/task-manager`) or
+  `v2:FILE` (the current tree).
+- A UNIVERSAL `onRecord*` hook DOES fire for a migration's own
   `e.app.save()` on the `serve` boot path, and throwing there aborts the whole boot
   (`failed to apply migration …`). A strict validation/lock that must never refuse a
   backfill's writes belongs on the `*Request` tier (see `pb_hooks/keys.pb.js`
-  `refuseSubmittedItemKey`, PBTT-487 — the universal placement cost a full build cycle).
+  `refuseSubmittedItemKey` — the universal placement cost a full build cycle).
 - The handler-object registration FORM `$app.onRecordCreateRequest().bind({ id, priority, func })`
   panics PB 0.39.9 under concurrent creates (not re-measured on 0.40.4): the callback is invoked with NO event (`e` is
   undefined), the panic lands mid-create, and items commit unkeyed. Proven with a body that
@@ -65,19 +56,13 @@ paths:
   "transactional cascade" produced 204s with no cascade, 400s with a full cascade, and
   `transaction has already been committed` on unrelated creates (8-way, lane B5). Never mutate
   a shared event property to pull `e.next()` into a transaction; consolidate on
-  `onRecordAfterUpdateSuccess` and accept no atomicity, or wait for a PB-level mechanism (6f1x).
-- Custom `subscriptionsBroker()` topics (a string that isn't a real collection name) are
-  NOT rule-checked by PB — any authenticated client can subscribe to any topic string
-  unless an `onRealtimeSubscribeRequest` hook explicitly authorizes it. A per-tenant
-  topic NAME (`rt:project_items:{workspaceId}`) is not enforcement; the subscribe guard
-  is (see `pb_hooks/realtime.pb.js`, TASK-008.08 — a real cross-tenant leak caught in
-  review).
+  `onRecordAfterUpdateSuccess` and accept no atomicity, or wait for a PB-level mechanism.
 
 # Test-suite authoring pattern (house style)
 
 One suite per collection/flow in `tests/test_<x>.ts`: boots its own clean room (copy,
 correct port band), seeds fixtures by name, probes the FULL role matrix
 (owner/admin/member/non-member/anon) using the status idiom above, prints ✅/❌ per
-check, and self-gates (sys.exit non-zero on any failure). The battery flags ❌
+check, and self-gates (process.exit non-zero on any failure). The battery flags ❌
 glyphs as belt-and-braces. Prove claims against the running server — docs and app_docs
 state only what a test or live call demonstrated.

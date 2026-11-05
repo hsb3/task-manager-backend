@@ -20,4 +20,4 @@ with an explicit priority: `$app.onRecordDeleteRequest().bind({ id, priority: -1
 (plain object; `new Handler({...})` is a ReferenceError). Measured deterministic 8/8. Prove
 across repeated boots, never once. Second trap: a hook file that throws at load does NOT fail the
 boot; PocketBase prints `failed to execute <file>` and serves with that file's hooks silently
-absent, so a guard can vanish with no gate noticing (carded). See [[pb-wire-message-normalization]].
+absent, so a guard can vanish with no gate noticing (carded).

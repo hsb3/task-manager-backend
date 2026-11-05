@@ -1,8 +1,8 @@
 ---
 title: Shared constants (mirror-site registry)
 status: current
-version: 17
-updated: 2026-10-23
+version: 18
+updated: 2026-11-05
 ---
 
 # Shared constants (mirror-site registry)
@@ -28,10 +28,8 @@ Format is machine-parsed: a `### NAME` heading followed by a `Values: a, b, c` l
 Values: triage, backlog, unstarted, started, completed, canceled
 
 Sites:
-- `v1:pb_migrations/1785152100_statuses.js` — the `category` select field's `values` (full 6)
-- `v1:pb_migrations/1785152200_tasks_vocab.js` — `project_stats` view SQL, `s.category='<v>'` (full 6)
-- `v1:pb_migrations/1785152200_tasks_vocab.js` — `DEFAULT_STATUSES` rows' `category:`, **5 of 6 only**
-  (no `triage` row — same intentional partial mirror as the provision seed below)
+- `schema/statuses.json` — the `category` select field's `values` (full 6)
+- `schema/project_stats.view.json` — `project_stats` view SQL, `s.category='<v>'` (full 6)
 - `pb_hooks/main.pb.js` — workspace-provision default-statuses seed, **5 of 6 only**
   (no `triage` row — app_docs: "seeded with five default statuses covering the
   non-triage categories"; `triage` is reachable but not a bootstrap default). This is
@@ -60,7 +58,6 @@ Sites:
 Values: Bug, Feature, Improvement
 
 Sites:
-- `v1:pb_migrations/1785152200_tasks_vocab.js` — seed migration label rows
 - `pb_hooks/main.pb.js` — workspace-provision core-labels seed (`_coreLabels`)
 
 ## 3. NOTIFICATION_KINDS
@@ -70,9 +67,9 @@ Values: assigned, commented, status_done, mentioned, ownership_transferred
 
 The canonical list is READ, not restated: the gate takes it from the `kind` select in the
 generated `schema/notifications.json` (`values_from`), because whichever migration last set
-that select is historical the moment the next one changes it — anchored on
-`v1:1785171300_notifications_mention_kind.js`, the gate went on asserting four values while the
-collection carried five and passed green.
+that select is historical the moment the next one changes it — anchored on the migration
+that added `mentioned`, the gate went on asserting four values while the collection carried
+five and passed green.
 
 Sites:
 - `pb_hooks/notify.pb.js` — gated as TWO copies: the header comment's list (the file's
@@ -109,8 +106,7 @@ Sites:
 Values: task, document
 
 Sites:
-- `v1:pb_migrations/1785152900_templates.js` — the `type` select field's `values`
-  (marked `// KEEP IN SYNC: TEMPLATE_TYPES`)
+- `schema/templates.json` — the `type` select field's `values`
 
 ## 7. TEMPLATE_DATA_KEYS
 
@@ -138,8 +134,6 @@ Values: urgent, high, medium, low
 Sites:
 - `pb_hooks/main.pb.js` — workspace-provision priorities seed (marked
   `// KEEP IN SYNC (default priority vocab)`)
-- `v1:pb_migrations/1785156600_workspaces_priorities_backfill.js` — one-time
-  backfill onto pre-existing empty-vocab workspaces (same marker)
 
 ## 9. PRIORITY_UNSET_TOKEN
 
@@ -155,8 +149,6 @@ Sites:
   `validateWorkspacePriorities` (marked `// KEEP IN SYNC: PRIORITY_UNSET_TOKEN`). That
   marker is the checker's parse anchor and must stay directly above the comparison it
   governs; the `Values:` line is ASSERTED against that literal, not the other way round.
-- `web/lib/priority.ts` — the frontend copy, `PRIORITY_UNSET`, typed against the
-  generated contract enum rather than derived from the hook.
 
 ## 10. TRASH_VISIBILITY_PREDICATES
 

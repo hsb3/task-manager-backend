@@ -36,10 +36,9 @@ onRecordAuthWithPasswordRequest((e) => {
 
 // The CANONICALIZE body below is INLINED IDENTICALLY in the create and update hooks — the
 // pooled JSVM cannot call a top-level helper from a registered callback. KEEP THE TWO BLOCKS
-// IN SYNC, and with the two other copies of the same fold: pb_hooks/oauth.pb.js's linking
-// lookup and v1:1785159900_users_email_key.js's backfill (mirrored offline in
-// scripts/utilities/email_collision_audit.ts's email_key(), drift-checked by
-// scripts/check_email_fold.ts against the immutable backfill).
+// IN SYNC, and with the other copy of the same fold: pb_hooks/oauth.pb.js's linking lookup
+// (mirrored offline in scripts/utilities/email_collision_audit.ts's email_key(), drift-checked
+// by scripts/check_email_fold.ts against the oauth.pb.js copy).
 //
 // THE FOLD (owner ruling 2026-08-31, PBTT-529): trim + lowercase always; for gmail.com and
 // googlemail.com ONLY, drop every '.' from the local part and everything from the first '+'
@@ -71,7 +70,7 @@ onRecordCreate((e) => {
   }
   if (key) {
     // The unique index refuses this too, but as a bare validation error; the scan is what
-    // turns a fold collision into the verbatim message web/lib/auth/signup-core.ts shows.
+    // turns a fold collision into the verbatim message below that a client can show.
     const q = e.app
       .db()
       .newQuery("SELECT id FROM users WHERE email_key = {:k} AND id != {:id}");
@@ -122,7 +121,7 @@ onRecordUpdate((e) => {
   }
   if (key) {
     // The unique index refuses this too, but as a bare validation error; the scan is what
-    // turns a fold collision into the verbatim message web/lib/auth/signup-core.ts shows.
+    // turns a fold collision into the verbatim message below that a client can show.
     const q = e.app
       .db()
       .newQuery("SELECT id FROM users WHERE email_key = {:k} AND id != {:id}");

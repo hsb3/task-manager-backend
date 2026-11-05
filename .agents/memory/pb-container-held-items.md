@@ -19,4 +19,4 @@ but every `projects` list/view rule ends in `shadow = false` (`schema/projects.r
 caller's `expand=project` is empty.
 
 **How to apply:** when touching anything keyed on `task.project.*`, ask what a container-held
-item does; a project-less one is the anomaly. Related: [[pb-expand-omits-hidden-records]].
+item does; a project-less one is the anomaly. PocketBase omits records the caller cannot view from `expand` (see the pocketbase plugin's field notes).

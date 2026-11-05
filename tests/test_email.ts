@@ -234,7 +234,7 @@ check(
   true,
 );
 check(
-  "verification link does NOT point at a web/ route",
+  "verification link does NOT point at an app-side /verify-email route",
   verify_content.includes("/verify-email?token="),
   false,
 );
@@ -306,7 +306,7 @@ check(
   true,
 );
 check(
-  "reset link does NOT point at a web/ route",
+  "reset link does NOT point at an app-side /reset-password route",
   reset_content.includes("/reset-password?token="),
   false,
 );

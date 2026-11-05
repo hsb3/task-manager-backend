@@ -15,4 +15,4 @@ float and Go's scan fails loudly.
 
 **How to apply:** write the template value fractional (`{ ordinal: 0.5 }`) for any number field
 that may hold a fraction, and use `q.all(rows)` (array form) rather than `q.one()` when zero rows
-is a legitimate answer. Related: [[pb-wire-message-normalization]].
+is a legitimate answer.

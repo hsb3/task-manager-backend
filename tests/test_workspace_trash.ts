@@ -814,7 +814,7 @@ try {
   /**
    * `token` must be the superuser: 501+501 sub-requests blow past the general
    * 300/60s API rate limit a regular authenticated user is gated by (superusers are
-   * exempt, v1:1785150000_settings.js). Returns the created ids in request order.
+   * exempt, per the app_settings rate limits). Returns the created ids in request order.
    */
   async function batch_create(
     coll: string,
@@ -857,7 +857,7 @@ try {
 
   const [wendy, wendy_id] = await make_user("Wendy", "wendy@example.com");
   // PB aborts a whole batch as a bare 400 once it runs past batch.timeout
-  // (v1:1785150000_settings.js), which a loaded host crosses; the bulk fixture is not what (8) proves.
+  // (the settings batch config), which a loaded host crosses; the bulk fixture is not what (8) proves.
   const [, settings] = await api("GET", "/api/settings", su);
   const batch_timeout = getitem(getitem(settings, "batch"), "timeout");
   [s] = await api("PATCH", "/api/settings", su, { batch: { timeout: 60 } });

@@ -14,7 +14,7 @@
  * assertion holds in a worktree with unrelated edits in flight.
  *
  * Bounded: only git-tracked files are watched, so a write to an untracked or gitignored path
- * (scratch dirs, pb_data/, web/.next/) is out of scope by design.
+ * (scratch dirs, pb_data/) is out of scope by design.
  */
 
 import fs from "node:fs";

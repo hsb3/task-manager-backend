@@ -4,32 +4,8 @@ export default defineRailway(() => {
   const pocketbaseVolume = volume("pocketbase-volume", { alerts: { usage: { "100": {}, "80": {}, "95": {} } }, allowOnlineResize: true, region: "us-east4-eqdc4a", sizeMB: 50000 });
   const pbBackups = bucket("pb-backups", { region: "iad" });
   const pbFiles = bucket("pb-files", { region: "iad" });
-  const web = service("web", {
-    source: github("hsb3/task-manager", { checkSuites: true, rootDirectory: "web" }),
-    build: { buildEnvironment: "V3", builder: "DOCKERFILE", dockerfilePath: "Dockerfile", watchPatterns: ["web/**"] },
-    healthcheck: "/api/health",
-    replicas: { "us-east4-eqdc4a": 1 },
-    domains: ["tasks-pocketbase.functionform.ai"],
-    env: {
-      NEXT_PUBLIC_PB_URL: preserve(),
-      PB_URL: preserve(),
-      RAILWAY_DEPLOYMENT_DRAINING_SECONDS: "30",
-      RAILWAY_DEPLOYMENT_OVERLAP_SECONDS: "30",
-      WEB_PUBLIC_HOSTS: preserve(),
-    },
-  });
-  const webCarbon = service("web-carbon", {
-    source: github("hsb3/task-manager", { checkSuites: true, rootDirectory: "web-carbon" }),
-    build: { buildEnvironment: "V3", builder: "DOCKERFILE", dockerfilePath: "Dockerfile", watchPatterns: ["web-carbon/**"] },
-    healthcheck: "/",
-    replicas: { "us-east4-eqdc4a": 1 },
-    env: {
-      CARBON_PUBLIC_HOST: preserve(),
-      VITE_NEXT_TARGET: preserve(),
-    },
-  });
   const pocketbase = service("pocketbase", {
-    source: github("hsb3/task-manager", { checkSuites: true }),
+    source: github("hsb3/task-manager-backend", { checkSuites: true }),
     build: { buildEnvironment: "V3", builder: "RAILPACK", watchPatterns: ["Dockerfile", "pb_migrations/**", "pb_hooks/**"] },
     healthcheck: "/api/health",
     healthcheckTimeout: 120,
@@ -65,6 +41,6 @@ export default defineRailway(() => {
   });
 
   return project("task-manager", {
-    resources: [web, webCarbon, pocketbase, pocketbaseVolume, pbBackups, pbFiles],
+    resources: [pocketbase, pocketbaseVolume, pbBackups, pbFiles],
   });
 });

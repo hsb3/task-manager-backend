@@ -519,8 +519,7 @@ try {
   type Row = { id: string; title: string; ordinal: number; status: string; priority: string };
   async function project_order(project: string): Promise<Row[]> {
     // KEEP IN SYNC: project-order — ordinal ASC, created DESC, id ASC is also spelled in
-    // pb_hooks/ordinal.pb.js (the move hook), web/lib/proxy/handlers/project_items.ts (the list
-    // default sort) and web/components/resource/use-board-drop.ts (the stored-order comparator).
+    // pb_hooks/ordinal.pb.js (the move hook).
     const q = { filter: `project='${project}'`, sort: "ordinal,-created,id", perPage: 500 };
     const [, r] = await api("GET", `/api/collections/tasks/records?${urlencode(q)}`, su);
     return py_get(r, "items", []).map((i: any) => ({
@@ -741,8 +740,7 @@ try {
   );
   console.log(`  final: ${py_str(ordinals(await project_order(P10)))}`);
 
-  // The OLD client math, copied verbatim from web/components/resource/use-board-drop.ts
-  // positionFor (v14 base 575358d8): halve the gap, never renumber.
+  // The OLD client-side drop math (positionFor), reproduced here: halve the gap, never renumber.
   type OldRow = { id: string; position: number; created: number };
   const positionOf = (row: OldRow): number => row.position;
   function old_positionFor(cards: OldRow[], index: number, movingId: string): number {

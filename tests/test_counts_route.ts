@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * E2E proof of GET /api/tracker/project-items/counts (pb_hooks/counts.pb.js, wave v8d/21e6 phase 1):
- * group counts computed inside PocketBase in ONE query, instead of the proxy paging
+ * group counts computed inside PocketBase in ONE query, instead of a client paging
  * project_items 500 rows at a time and bucketing in JS.
  *
  * Proven against a live server:
@@ -179,7 +179,7 @@ function count_up<K>(m: Map<K, number>, k: K): void {
 }
 
 /**
- * What the proxy did before this route: page the view 500 rows at a time and bucket in JS.
+ * What a client does without this route: page the view 500 rows at a time and bucket in JS.
  * Kept as the SAME-ROOM baseline for section (4) — a route timing alone reads as the route's
  * own cost, when most of it is the view rule's membership joins (dpn2), paid per row by both.
  */

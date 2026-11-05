@@ -100,9 +100,10 @@ clean: ## [DESTRUCTIVE: generated files] remove the downloaded PocketBase, cache
 	find . -not -path './.git/*' -type d \( -name logs -o -name '*_cache' \) -prune -exec rm -rf {} +
 	find . -not -path './.git/*' -type f \( -name '*.log' -o -name '*.tsbuildinfo' \) -delete
 
-setup: pocketbase env ## install pinned runtimes and dependencies; preserve local config/data
+setup: pocketbase env ## install pinned runtimes and dependencies, activate the pre-commit hook; preserve local config/data
 	mise install
 	bun install --frozen-lockfile
+	git config core.hooksPath .githooks
 
 stop: ## [stops local processes] kill whatever listens on the dev port (8090)
 	@for p in $(PB_PORT); do \
@@ -153,8 +154,8 @@ next-migration-slot: ## print the next free pb_migrations timestamp (step 100; r
 	echo "$$next"
 
 # Generators must answer --check; check_historical_migrations judges only the STAGED diff, so it
-# takes --staged below; check_migration_citations resolves the migrations-v1 tag, which this
-# repository does not carry, so it cannot judge a v1: citation here.
+# takes --staged below; check_migration_citations judges a v1: citation against the vendored
+# scripts/migrations-v1.txt, since this repository does not carry the migrations-v1 tag.
 GENERATORS := $(sort $(wildcard scripts/gen_*.ts))
 CHECKERS   := $(sort $(filter-out scripts/check_historical_migrations.ts,$(wildcard scripts/check_*.ts)))
 

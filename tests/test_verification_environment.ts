@@ -84,6 +84,8 @@ function main(): void {
       PATH: `${path.join(root, "bin")}:${process.env.PATH}`,
       PB_BIN: "",
     };
+    // setup activates the pre-commit hook with `git config`, so the scratch must be a repo.
+    assert.ok(run(["git", "init", "-q"], root, env).returncode === 0);
     for (let i = 0; i < 2; i++) {
       const result = run(["make", "setup"], root, env);
       assert.ok(result.returncode === 0, result.stdout + result.stderr);

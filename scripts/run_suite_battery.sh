@@ -157,7 +157,7 @@ assert_copy_source "$HOOKS_DIR" || exit 1
 cp -R "$HOOKS_DIR" "$SCRATCH/pb_hooks" || fail "could not copy $HOOKS_DIR"
 HOOKS_DIR="$SCRATCH/pb_hooks"
 # Self-booting suites (tests/roomkit.ts hooks_dir) share this one copy instead of each
-# making its own; the model_diff gate below deliberately reads the real tree by path.
+# making its own.
 export PB_HOOKS_DIR="$HOOKS_DIR"
 
 # ── Ensure the pinned binary is present (reuse repo copy, else download) ───────
@@ -483,7 +483,7 @@ run_suite "test_fresh_workspace" bun tests/test_fresh_workspace.ts
 # ── K5 cycles — self-booting (own clean room on an 8100+ port, not the probe band) ──
 run_suite "test_cycles"          bun tests/test_cycles.ts
 
-# ── relations — self-booting (wave v6 lane B2/B3 coordination; own clean room) ──
+# ── relations — self-booting (own clean room) ──
 run_suite "test_relations"       bun tests/test_relations.ts
 
 # ── load smoke — self-booting (own clean room on 8098, the probe band); seeds a scaled dataset and measures the perf indexes ──

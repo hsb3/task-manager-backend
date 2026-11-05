@@ -44,6 +44,7 @@ The CLI's default source tree covers only `.railway/` and misses the imported to
 ## Notes
 
 - `railway config plan` is safe and does not change Railway.
+- Against the live project the plan proposes deleting the web services this file no longer declares and repointing the source repo: review it, and do not apply until those services are retired on purpose.
 - `railway config apply` previews changes and asks before applying unless you pass `--yes`.
 - Destructive changes in non-interactive or agent sessions require `railway config apply --confirm-destructive` after reviewing the plan.
 - Services already managed by `railway.json` must be migrated before `deploy/railway/railway.ts` can manage them.

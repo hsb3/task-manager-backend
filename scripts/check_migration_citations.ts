@@ -6,16 +6,17 @@
  * the current one, so a bare `NNNNNNNNNN_settings.js` in prose or a comment now names nothing a
  * reader can open. A citation must therefore say WHICH set it means:
  *
- *     v1:FILE   resolves with `git show migrations-v1:pb_migrations/FILE`
+ *     v1:FILE   names a file of the v1 set (the `migrations-v1` tag of hsb3/task-manager)
  *     v2:FILE   resolves at pb_migrations/FILE in the current tree
  *
- * `migrations-v1:pb_migrations/FILE` — the literal git-show argument — reads as v1 too, so a
- * copy-pasteable command is a legal citation. Two assertions follow, and only these:
+ * `migrations-v1:pb_migrations/FILE` — the literal git-show argument where the tag exists — reads
+ * as v1 too, so a copy-pasteable command is a legal citation. Two assertions follow, and only these:
  *
  *   1. a match carrying no version prefix is a bare citation and fails;
  *   2. a versioned citation must resolve — v2 against pb_migrations/ on disk, v1 against the
- *      tagged tree, read once with `git ls-tree -r --name-only migrations-v1 pb_migrations/`.
- *      A checkout without the tag fails closed, so a shallow clone cannot report green.
+ *      tagged tree (`git ls-tree -r --name-only migrations-v1 pb_migrations/`, read once) or,
+ *      when the tag is absent as it is in this repo, the vendored scripts/migrations-v1.txt.
+ *      A checkout with neither fails closed, so it cannot report green.
  *
  * The filename SHAPE is derived, never hand-copied: every pb_migrations/*.js basename must match
  * \d{10}_[a-z0-9_]+\.js at startup, and the run refuses if one does not — a moved shape would

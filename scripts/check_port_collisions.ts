@@ -30,14 +30,7 @@ const REPO = path.dirname(import.meta.dir);
 
 // Relative to --repo. Gate runners derive their trigger paths from --print-globs, never by
 // hand-copying this tuple, so a newly scanned family widens them for free.
-export const SCAN_GLOBS = [
-  "tests/*.ts",
-  "scripts/*.ts",
-  "web/e2e/**/*.ts",
-  "web-carbon/e2e/**/*.ts",
-  "web-carbon/e2e/**/*.mjs",
-  "web-carbon/playwright.config.ts",
-];
+export const SCAN_GLOBS = ["tests/*.ts", "scripts/*.ts"];
 
 // A port literal is 4-5 digits: narrower admits no real bind, wider matches years and byte counts.
 export const PORT_MIN = 1000;

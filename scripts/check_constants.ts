@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
  * CI / pre-commit check: shared constant lists (pooled-JSVM inline mirrors) must
- * stay in sync across every mirror site. Parses each copy out of pb_migrations/,
- * pb_hooks/ and web/ source text directly (no server, no DB) and cross-checks
+ * stay in sync across every mirror site. Parses each copy out of the generated schema/
+ * and pb_hooks/ source text directly (no server, no DB) and cross-checks
  * docs/constants.md against the canonical map held here, so the human doc and the
  * enforced map can't drift from each other.
  *

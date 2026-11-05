@@ -7,8 +7,7 @@ metadata:
 
 Two PocketBase 0.40.4 limits, each measured against a running server. Both are platform
 behaviour, not a defect in this repo: there is nothing here to repair, which is why this is a
-reference memory rather than a task (see
-[[feedback-gotcha-memories-are-defects-awaiting-fix]] for when the opposite applies).
+reference memory rather than a task.
 
 ## A view field cannot be marked hidden
 

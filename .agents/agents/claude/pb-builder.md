@@ -5,8 +5,6 @@ model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
-<!-- KEEP IN SYNC: the Codex TOML twin of this agent — same instructions, native TOML format; the agent-layout suite compares the two bodies. -->
-
 Backend builder for this PocketBase repo. Your brief names your owned files and
 acceptance criteria — implement exactly that; report (never touch) anything else.
 
@@ -21,11 +19,8 @@ Laws briefs most often drop (restated because being wrong is expensive):
 - A collection add/change carries IN THE SAME CHANGE: its app_docs record (data-seed
   migration), its schema/ file, `bun scripts/gen_openapi.ts` regen, model tree
   regen. CI enforces the coupling.
-- Secret-bearing settings ride env boot hooks, never migrations.
-- Pooled JSVM: hooks cannot share top-level functions across callbacks — inline per
-  site with `// KEEP IN SYNC:` markers; never strip an existing marker.
-- Rule status idiom: list filtered→200 empty · view/update/delete denied→404 ·
-  create denied→400 · null rule→403. `@request.body`, never `@request.data`.
+- Inline shared hook logic per site with `// KEEP IN SYNC:` markers; never strip an
+  existing marker.
 
 Clean room — every probe/test boots its own server; 8090 is off-limits:
 
@@ -35,16 +30,13 @@ Clean room — every probe/test boots its own server; 8090 is off-limits:
       --migrationsDir <scratch>/mig --hooksDir <scratch>/hooks
     ./pocketbase superuser upsert probe@example.com probe123456 --dir <scratch>/pb_data
 
-Your ports: 8094/8095/8098-8099 (probes) · 8100+ (suite self-boot). Never touch
-8090-8093 (dev + battery) or 8096-8097 (e2e).
+Your ports: 8094/8095/8098-8099 (probes) · 8100+ (suite self-boot), each plus
+`PB_PORT_OFFSET`. Never touch 8090-8093 (dev + battery).
 
 Test suites follow the house style (`.agents/rules/pocketbase.md`):
 clean room, fixtures by name, full role matrix, ✅/❌ per check, self-gating exit.
 
 Run gates alone and read `$?` — never chain `| tee` / `; tail` after a gate command.
-
-Comment discipline: a comment states only a constraint the code cannot show — one
-line, at the site it governs. File header = one line. Never narrate history.
 
 Git is READ-ONLY for you (status/diff/log/show). Never commit, push, or stage.
 Evidence = command + actual output in your report, never claims. Declare bounded

@@ -161,6 +161,20 @@ function copy_resolver(root: string): void {
           ],
         ]),
     );
+    for (const tool of ["mise", "git"]) {
+      write_exe(path.join(bin_dir, tool), `#!/bin/sh\nprintf '${tool}|%s\\n' "$*" >> "$CALLS"\n`);
+    }
+    unlink_missing_ok(log);
+    const setup = run(root, ["setup"], env);
+    check(
+      "setup installs the pinned runtimes and dependencies, then activates the pre-commit hook",
+      setup.returncode === 0 &&
+        same(calls(), [
+          ["mise", "install"],
+          ["bun", "install --frozen-lockfile"],
+          ["git", "config core.hooksPath .githooks"],
+        ]),
+    );
     fs.writeFileSync(log, "");
 
     // A PATH that can still run make and the row-count helpers, but offers no sqlite3.

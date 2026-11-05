@@ -9,7 +9,7 @@
  * constant, a port only mentioned in prose does not satisfy ports.md, and distinct ports are GREEN.
  * §7 covers what a line regex cannot see: an expression split across lines, an offset held under
  * another name, a shifted literal that lives only inside a string (a mention, not a bind), a
- * web/e2e TypeScript bind, and a leading comment naming a port its own file never declares. §6
+ * scripts/ bind colliding with a suite, and a leading comment naming a port its own file never declares. §6
  * runs the real checker against the shipped tree.
  *
  * No server, no ports bound. A demonstrated RED carries the checker's refusal glyph, and the
@@ -225,32 +225,12 @@ echo(r7c.stdout);
 check("exit code is 0 — prose cannot collide with a bind", r7c.returncode === 0);
 check("no refusal glyph", !r7c.stdout.includes(REFUSAL));
 
-for (const sibling_path of [
-  "web-carbon/e2e/support/room.ts",
-  "web-carbon/e2e/support/room.mjs",
-  "web-carbon/playwright.config.ts",
-]) {
-  const [repo, doc] = make_repo(
-    "carbon-collision",
-    {
-      "tests/test_carbon_peer.ts": suite(9098),
-      [sibling_path]: "const port = 9098 + PB_PORT_OFFSET;\n",
-    },
-    "",
-  );
-  const result = run(repo, doc);
-  check(
-    `Carbon collision refused at ${sibling_path}`,
-    result.returncode === 1 && result.stdout.includes(`${sibling_path}:1`),
-  );
-}
-
-console.log("── 7d. a web/e2e TypeScript bind collides with a TypeScript suite → RED ──");
+console.log("── 7d. a scripts/ bind collides with a tests/ suite → RED ──");
 const [repo7d, doc7d] = make_repo(
-  "web-e2e",
+  "script-bind",
   {
     "tests/test_p.ts": suite(9033),
-    "web/e2e/support/room.test.ts":
+    "scripts/room_peer.ts":
       "import { PB_PORT_OFFSET } from './ports';\n" + "const ROOM_PORT = 9033 + PB_PORT_OFFSET;\n",
   },
   "",
@@ -258,7 +238,7 @@ const [repo7d, doc7d] = make_repo(
 const r7d = run(repo7d, doc7d);
 echo(r7d.stdout);
 check("exit code is 1", r7d.returncode === 1);
-check("names the TypeScript site", r7d.stdout.includes("web/e2e/support/room.test.ts:2"));
+check("names the script site", r7d.stdout.includes("scripts/room_peer.ts:2"));
 
 console.log(
   "── 7e. a leading comment naming a port the file never binds → RED; naming the one it binds → GREEN ──",
@@ -285,7 +265,7 @@ console.log("── 7g. --print-globs is the gate runners' trigger derivation �
 const r7g = run_checker(["--print-globs"]);
 echo(r7g.stdout);
 check("exit code is 0", r7g.returncode === 0);
-check("lists the TypeScript family", r7g.stdout.includes("web/e2e/**/*.ts"));
+check("lists no frontend family", !r7g.stdout.includes("web"));
 check(
   "lists the suite and script families",
   r7g.stdout.includes("tests/*.ts") && r7g.stdout.includes("scripts/*.ts"),
@@ -298,18 +278,14 @@ const [repo7h, doc7h] = make_repo(
   "url-then-bind",
   {
     "tests/test_r.ts": suite(9036),
-    "web/e2e/support/url.test.ts":
-      'const u = "http://x.test";\n' + "const ROOM = 9036 + PB_PORT_OFFSET;\n",
+    "scripts/url_peer.ts": 'const u = "http://x.test";\n' + "const ROOM = 9036 + PB_PORT_OFFSET;\n",
   },
   "",
 );
 const r7h = run(repo7h, doc7h);
 echo(r7h.stdout);
 check("exit code is 1", r7h.returncode === 1);
-check(
-  "the bind after the url string is seen",
-  r7h.stdout.includes("web/e2e/support/url.test.ts:2"),
-);
+check("the bind after the url string is seen", r7h.stdout.includes("scripts/url_peer.ts:2"));
 
 console.log("── 6. the shipped tree passes with no arguments ──");
 const r6 = run_checker([], REPO_ROOT);

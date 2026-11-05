@@ -4,7 +4,7 @@
  *
  * PocketBase ships no OpenAPI export, so this derives the spec deterministically by
  * replaying pb_migrations/ into a throwaway data.db and reading `_collections`; the
- * spec feeds frontend TypeScript types via openapi-typescript. Access is governed by
+ * spec is what a client generates typed bindings from. Access is governed by
  * per-collection API rules at runtime, not encoded here.
  *
  * Usage: bun scripts/gen_openapi.ts [--check]

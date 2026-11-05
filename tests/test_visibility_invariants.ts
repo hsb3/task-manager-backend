@@ -638,7 +638,7 @@ try {
   });
   const su = roomkit.token_of(BASE_URL, SU_EMAIL, r);
 
-  // THIS ROOM only, never the shipped value in v1:pb_migrations/1785150000_settings.js: what this
+  // THIS ROOM only, never the shipped value in the settings baseline: what this
   // suite proves is who can read what, not how many requests a caller may make, and the
   // limiter has its own proof in tests/test_hardening.ts. A table-driven run at five tiers
   // crosses the shipped per-IP ceiling and a 429 would answer a read case with harness noise.
@@ -1156,7 +1156,7 @@ try {
               404,
             );
           }
-          // NOT ASSERTED: the /audit_log HTTP endpoint needs a running Next server; its enforcement point is task_activity's list/view rule, asserted directly above (web/lib/proxy/handlers/audit_log.ts:89 forwards the caller's own token).
+          // NOT ASSERTED: the /audit_log HTTP endpoint is a client-side route; its enforcement point is task_activity's list/view rule, asserted directly above.
         }
       }
     }

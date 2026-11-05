@@ -115,7 +115,7 @@ onRecordAuthWithOAuth2Request((e) => {
   // MULTI-row match links to nobody: picking one there is account takeover.
   //
   // ── INLINED FOLD — KEEP IN SYNC with pb_hooks/auth_identity.pb.js's `.split("+")[0].split(".").join("")` (create + update
-  // copies) and v1:1785159900_users_email_key.js's backfill; the pooled JSVM cannot share a
+  // copies); the pooled JSVM cannot share a
   // top-level helper. Owner ruling 2026-08-31: trim + lowercase always; gmail.com and
   // googlemail.com ONLY lose the local part's dots and its first '+' onwards.
   const canonical = String(e.oAuth2User.email).trim().toLowerCase();

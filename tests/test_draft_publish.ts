@@ -663,7 +663,7 @@ try {
     );
   }
 
-  // ══════════════ §7 comments on a draft: migration 1785181200 closes the leak ════════
+  // ══════════════ §7 comments on a draft: the comments rules close the leak ════════
   // COVERS: rule:comments.list, rule:comments.view, rule:comments.create, rule:comments.update, rule:comments.delete
   console.log(
     "\n── §7 comments on a draft decision/document are scoped to the item's own read set ──",

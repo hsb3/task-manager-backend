@@ -47,7 +47,7 @@ export const TENANT_ROOT = "workspaces";
 export const EQ_OPS = ["=", "?="];
 
 // An allowlist reason without one of these is unreviewable prose, so the gate refuses it.
-// `D<n>` is the v006 design-record decision id scripts/model/SCHEMA.md already cites.
+// `D<n>` is a decision id in the v006 design record.
 export const CITATION_RE =
   /PBTT-\p{Nd}+|TASK-\p{Nd}+|decision-\p{Nd}+|(?<![\p{L}\p{N}_])D\p{Nd}+(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])card [0-9a-z]{4}(?![\p{L}\p{N}_])/u;
 

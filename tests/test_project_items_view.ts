@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 /**
- * E2E proof of PBTT-526: the `project_items` view collection (pb_migrations/
- * v1:1785159700_project_items_view.js) — one read-only row per item across tasks, decisions,
+ * E2E proof of PBTT-526: the `project_items` view collection (see the
+ * project_items view in the collections baseline) — one read-only row per item across tasks, decisions,
  * documents and milestones, ordered and paginated by the server.
  *
  * Three things are proven against a live server:
  *
  * (1) RULE EQUIVALENCE — the security surface. The view's rules now carry the SAME state
  *     exclusion the four base collections carry (`trashed = "" && project_trashed = 0`,
- *     v1:pb_migrations/1785164900_project_items_trashed_clause.js, superseding PBTT-526's
+ *     superseding PBTT-526's
  *     caller-filters-it ruling). So the view is set-for-set the ids the BASE collections LIST,
  *     filtered or not, and a trashed row is absent from every listing at EVERY tier — owner
  *     included. By id, the viewRule's trash branch serves a trashed row to exactly whom GET
@@ -494,7 +494,7 @@ try {
   console.log(
     "\n── (2) rule equivalence: the view lists EXACTLY what the base collections list ──",
   );
-  // The filter the web proxy still sends. The rules now carry the same exclusion, so passing it
+  // The filter clients used to send. The rules now carry the same exclusion, so passing it
   // must change nothing — §2c pins that redundancy rather than assuming it.
   const DEFAULT_FILTER = 'trashed = "" && project_trashed = 0';
   const ROLES: [string, string | null][] = [
