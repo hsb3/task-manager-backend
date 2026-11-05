@@ -415,6 +415,20 @@ try {
   });
   check("schema_guards.pb.js: an unknown app_docs body key is refused 400", status, 400);
 
+  // api_keys.pb.js: its create hook returns a tmk_ key and its middleware authenticates it.
+  let minted: any;
+  [status, minted] = await api("POST", "/api/collections/api_keys/records", alice, {
+    name: "hookload probe",
+    scope: "read",
+  });
+  check(
+    "api_keys.pb.js: a key create returns a tmk_ key",
+    tup(status, /^tmk_/.test(minted.key ?? "")),
+    tup(200, true),
+  );
+  [status] = await api("GET", "/api/collections/workspaces/records", `tmk_${"A".repeat(40)}`);
+  check("api_keys.pb.js: an unknown tmk_ key is refused 401", status, 401);
+
   // invitations.pb.js: its invitee-list route is registered (a missing file 404s).
   let mine_body: any;
   [status, mine_body] = await api("GET", "/api/tracker/invitations/mine", alice);
@@ -427,6 +441,7 @@ try {
   console.log("\n── §3 every hook file is dispositioned ──");
   const probed = new Set([
     "activity.pb.js",
+    "api_keys.pb.js",
     "auth_identity.pb.js",
     "author.pb.js",
     "counts.pb.js",

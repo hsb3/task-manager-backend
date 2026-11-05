@@ -13,6 +13,8 @@ function rejectBlankName(e) {
   return e.next();
 }
 
+onRecordCreateRequest(rejectBlankName, "api_keys");
+onRecordUpdateRequest(rejectBlankName, "api_keys");
 onRecordCreateRequest(rejectBlankName, "app_docs");
 onRecordUpdateRequest(rejectBlankName, "app_docs");
 onRecordCreateRequest(rejectBlankName, "app_settings");

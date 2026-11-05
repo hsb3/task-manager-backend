@@ -1,4 +1,7 @@
 {
+  "api_keys": {
+    "id": "^[a-z0-9]+$"
+  },
   "app_docs": {
     "id": "^[a-z0-9]+$",
     "slug": "^((collection|concept|decision|hook|route):)?[a-z0-9]+([-_][a-z0-9]+)*$"

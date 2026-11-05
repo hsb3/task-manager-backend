@@ -88,6 +88,11 @@ const ACCEPTED_PAIRS = new Map<string, string>([
       "submitted value never reaches storage (decision:invitation-keyed-by-email)",
   ],
   [
+    pair_key("api_keys", "key_hash"),
+    "server-derived: api_keys.pb.js's create hook always overwrites it with the key's hash, " +
+      "and it is hidden, so PB drops it from a non-superuser body (decision:api-keys)",
+  ],
+  [
     pair_key("invitation_events", "email_key"),
     "null rules on every operation — only invitations.pb.js writes it, copied from the " +
       "invitation's already-folded key (decision:invitation-send-limit-and-decline-block)",
@@ -304,6 +309,11 @@ try {
   // so a collection with two guarded fields cannot collide on its own UNIQUE index.
   // `valid` overrides the happy-path value for a field whose schema/ pattern refuses free text.
   const RECIPES: Record<string, any> = {
+    api_keys: {
+      actor: "alice",
+      base: { scope: "read" },
+      patch: { revoked: true },
+    },
     app_docs: {
       actor: "su",
       base: {
@@ -443,6 +453,7 @@ try {
   );
 
   // ══════════════════ 1. CREATE + UPDATE, every derived path ═══════════════════
+  // COVERS: hook:names.pb.js#onRecordCreateRequest:api_keys, hook:names.pb.js#onRecordUpdateRequest:api_keys
   // COVERS: hook:names.pb.js#onRecordCreateRequest:app_docs, hook:names.pb.js#onRecordUpdateRequest:app_docs
   // COVERS: hook:names.pb.js#onRecordCreateRequest:app_settings, hook:names.pb.js#onRecordUpdateRequest:app_settings
   // COVERS: hook:names.pb.js#onRecordCreateRequest:comments, hook:names.pb.js#onRecordUpdateRequest:comments

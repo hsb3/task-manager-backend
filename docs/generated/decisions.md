@@ -42,6 +42,30 @@ The exception is the task assignee. Four paths admit the assignee of a task with
 - **Assignment is limited to members.** A validation hook in `pb_hooks/main.pb.js` refuses, with a 400, an assignee who is neither the workspace owner nor an active member of the task workspace, which a rule cannot express because an update rule denial answers 404. It checks only a changed assignee, so a task whose assignee is later suspended stays editable on other fields.
 - **Accepting an invitation never reactivates a suspended member**: an existing membership row is left as it is.
 
+## api-keys
+
+- **Slug:** `decision:api-keys`
+- **Title:** An agent or script authenticates with a personal API key that acts as its owner, can be read-only, and can never reach an auth or admin route.
+- **Ref:** `api_keys`
+
+Agents need a long-lived credential that is not a password and not a session token. Prior art: GitHub fine-grained personal access tokens and Linear personal API keys both act as their owner, are shown once at creation, are stored hashed, can be revoked or expire, and carry a scope. This app takes the same shape, with two scopes, read and write, and the owner as the only principal.
+
+- **Shown once, stored hashed.** The create response returns the key once; only its SHA-256 digest is stored, in the hidden key_hash field, so a database or backup leak yields no usable key. A lost key is replaced, never recovered.
+- **Acts as the owner.** A key request runs with the owner as the caller, so every collection rule is the rule PocketBase already enforces for that user and no rule is restated for keys. An owner who stops passing the authRule of users loses every key at once.
+- **Delete or revoke.** Revoking is one-way: revoked can be set to true and never back. Deleting a key also ends it. Either takes effect on the next request.
+- **Never an auth or admin credential.** A key cannot refresh or mint a session token, impersonate, change the account, run a batch, or reach the collections, settings, logs, backups or crons routes, and it can never manage keys, so a leaked key cannot outlive its revocation by minting a successor. The routes a key may use are an allowlist read from the matched route, so an encoded, doubled or recased path and a collection id in place of its name all resolve to the same answer.
+- **Read keys cannot write.** A read key may only read, subscribe to realtime, request a file token and export a workspace; every other method answers 403 api_key_scope.
+- **Open realtime streams survive revocation.** A realtime stream keeps the auth it subscribed with, as for any session token, so revoking a key stops new requests but does not close a stream already open with it. A client re-subscribing with the revoked key is refused.
+
+Accepted limits:
+
+- **A key can read the metadata of the keys of its owner.** Through `expand=api_keys_via_user` on users and through a realtime subscription to api_keys, a key sees name, scope, revoked and expires of its owner keys, never a key or a hash. Reading is not managing; closing it needs a marker on the request that a rule can see and that a realtime subscription cannot carry over.
+- **An invalid tmk_ key answers 401 before the rate limiter counts it.** A key carries about 238 bits of randomness and each attempt is one unique-index read, so guessing is not a practical attack.
+- **Write keys reach every non-admin tracker route**, including routes added later, and a new tracker route that only reads must be added to the read list by hand.
+- **A key survives a password change of its owner.** A key ends only by revoke, expiry or delete.
+
+`pb_hooks/api_keys.pb.js` implements it and `tests/test_api_keys.ts` proves it. See collection:api_keys and concept:api-keys.
+
 ## app-settings
 
 - **Slug:** `decision:app-settings`
