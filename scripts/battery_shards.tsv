@@ -36,6 +36,7 @@
 1	6	test_ordinal
 3	6	test_priority_vocab
 2	6	test_roles
+3	6	test_agent_probe
 4	5	test_auth_rules
 1	5	test_bulk_load_projects
 3	5	test_gen_decisions

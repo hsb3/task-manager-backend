@@ -556,6 +556,9 @@ run_suite "test_ordinal"            bun tests/test_ordinal.ts
 # ── platform: the HTTP status PocketBase itself answers each refusal shape with — self-booting.
 run_suite "test_pb_refusal_statuses" bun tests/test_pb_refusal_statuses.ts
 
+# ── agent probe: one normal member drives the API end to end, friction asserted as it behaves now — self-booting.
+run_suite "test_agent_probe"        bun tests/test_agent_probe.ts
+
 # ── operator tooling: the one-time project bulk loader (scripts/bulk_load_projects.ts) — self-booting.
 run_suite "test_bulk_load_projects" bun tests/test_bulk_load_projects.ts
 
