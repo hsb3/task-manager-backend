@@ -214,7 +214,7 @@ try {
   check("signup: exactly 1 self-membership", mem.totalItems, 1);
   // hook also seeds a default project so the board is never empty on first login.
   const signup_ws_id = truthy(ws.items) ? getitem(ws.items[0], "id") : "";
-  // shadow=false (%26%26 is && in a raw query string): decision-052 provisions an invisible
+  // shadow=false (%26%26 is && in a raw query string): decision:shadow-project provisions an invisible
   // container alongside the default project, and it sorts first.
   [s, proj] = await api(
     "GET",

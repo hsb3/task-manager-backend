@@ -210,7 +210,7 @@ const BOB_WORKSPACE = await find_id("workspaces", "name", "Bob's Workspace", su)
 const BOB_PROJECT = await find_id("projects", "name", "Mobile App", su);
 // Carol: no owner/member relationship to A or B — S10's foreign-project fixture.
 const CAROL_PROJECT = await find_id("projects", "name", "My Project", su);
-// decision-052: an item created with no project lands here. Only a superuser can resolve it —
+// decision:shadow-project: an item created with no project lands here. Only a superuser can resolve it —
 // the projects rules exclude it from list and view for every tenant role.
 [, _shadow] = await api(
   "GET",
@@ -408,7 +408,7 @@ check(
 );
 
 // status validates against the task's OWN workspace when there's no project;
-// assignee is left alone (decision-042: a bare create is Unassigned).
+// assignee is left alone (decision:tasks-have-no-default-assignee: a bare create is Unassigned).
 // COVERS: hook:scope.pb.js#onRecordCreateRequest:tasks, hook:main.pb.js#onRecordCreateRequest:tasks
 console.log("\n── S6: workspace-scoped task lifecycle (workspace=A, no project) ──");
 [s, made] = await api("POST", "/api/collections/tasks/records", alice, {
@@ -419,7 +419,7 @@ console.log("\n── S6: workspace-scoped task lifecycle (workspace=A, no proje
 check_in("S6: create a workspace-scoped task (workspace=A, no project) → 201", s, [200, 201]);
 const TASK_S6 = track("tasks", made["id"]);
 check(
-  "S6: created task lands in the workspace shadow project (decision-052)",
+  "S6: created task lands in the workspace shadow project (decision:shadow-project)",
   py_get(made, "project", ""),
   ALICE_SHADOW_PROJECT,
 );
@@ -508,7 +508,7 @@ const MIL_S8 = made["id"];
 check_in("S8 setup: create a decision in the same workspace submitting no project", s, [200, 201]);
 const WSDEC_S8 = track("decisions", made["id"]);
 check(
-  "S8 setup: it landed in the workspace shadow project, not project_s8 (decision-052)",
+  "S8 setup: it landed in the workspace shadow project, not project_s8 (decision:shadow-project)",
   made["project"],
   ALICE_SHADOW_PROJECT,
 );
@@ -793,7 +793,7 @@ check("S12: anon patches projects.workspace → 404 (update denied)", s, 404);
 [s] = await api("PATCH", `/api/collections/projects/records/${P_S12}`, carol, { workspace: WS_A2 });
 check("S12: non-member patches projects.workspace → 404 (update denied)", s, 404);
 [s] = await api("PATCH", `/api/collections/projects/records/${P_S12}`, bob, { workspace: WS_A2 });
-// decision-023 widened projects.updateRule to non-viewer members, so Bob now PASSES the rule
+// decision:project-write-access widened projects.updateRule to non-viewer members, so Bob now PASSES the rule
 // and the immutability hook (scope.pb.js) rejects the repoint → 400, not a rule-denial 404.
 // bob_tier is resolved by (workspace,user), because a row in ANY OTHER workspace reads 'member'.
 check(

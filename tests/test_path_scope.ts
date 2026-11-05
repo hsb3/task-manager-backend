@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * E2E proof of the path-scoped rules (decision-077): a request naming `?workspace=` reaches a
+ * E2E proof of the path-scoped rules (decision:backend-owns-business-rules): a request naming `?workspace=` reaches a
  * cycles / templates / saved_views / workspace_members / workspace_invitations / projects record only when
  * the record lives in that workspace, so a caller active in BOTH workspaces gets PB's own 404
  * for a foreign id and nothing is changed; naming the record's own workspace, or none at all,

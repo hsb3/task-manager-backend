@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// PBTT-422 / decision-043 — the two-layer identity assigners. The record id is the real key;
+// PBTT-422 / decision:item-display-keys — the two-layer identity assigners. The record id is the real key;
 // these hooks own the DISPLAY label: a per-project prefix (projects.key) plus one shared number
 // sequence across all four item types (projects.item_seq).
 //
@@ -11,7 +11,7 @@
 // the house idiom (see main.pb.js's validateTaskStatusWs) — nothing is CALLED across callbacks.
 
 function assignProjectKey(e) {
-  // A shadow project (decision-052) takes no prefix: it must never squat one a member may
+  // A shadow project (decision:shadow-project) takes no prefix: it must never squat one a member may
   // later choose, and its items stay keyless the way project-less items were.
   if (e.record.get("shadow")) {
     e.record.set("key", "");
@@ -40,7 +40,7 @@ function assignProjectKey(e) {
     }
   };
   if (submitted) {
-    // A prefix the creator chose is never silently altered (decision-043) — a collision is
+    // A prefix the creator chose is never silently altered (decision:item-display-keys) — a collision is
     // refused so the message reaches them instead of a surprise suffix.
     if (taken(submitted)) {
       throw new BadRequestError(
@@ -69,7 +69,7 @@ function assignProjectKey(e) {
 }
 onRecordCreate(assignProjectKey, "projects");
 
-// Fixed after create (decision-043): every item already wearing the prefix would be orphaned
+// Fixed after create (decision:item-display-keys): every item already wearing the prefix would be orphaned
 // from its project's label if it could change.
 function lockProjectKey(e) {
   const original = e.record.original().get("key");
@@ -189,7 +189,7 @@ onRecordAfterCreateSuccess(assignItemKey, "decisions");
 onRecordAfterCreateSuccess(assignItemKey, "documents");
 onRecordAfterCreateSuccess(assignItemKey, "milestones");
 
-// The key follows the item (decision-043): moving an item to another project leaves its label
+// The key follows the item (decision:item-display-keys): moving an item to another project leaves its label
 // alone, so this guard is also what stops a move from re-keying it into the new project's range.
 // Lenient on an EMPTY original: this universal tier also fires on a server-side save that labels
 // an unkeyed item, and PB aborts the boot on a migration a hook refuses.

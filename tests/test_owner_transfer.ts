@@ -326,7 +326,7 @@ await su_add_member(ALICE_WORKSPACE, dana_id, "admin", "active", "Dana");
 const [dana] = await login(dana_email);
 
 const [ivan_id, ivan_email] = await su_create_user("Ivan");
-// decision-073: `invited` retires from workspace_members — a pending invite is a
+// decision:invitation-keyed-by-email: `invited` retires from workspace_members — a pending invite is a
 // workspace_invitations row, and Ivan holds NO membership row until he accepts one.
 let [s] = await api("POST", "/api/collections/workspace_invitations/records", su, {
   workspace: ALICE_WORKSPACE,
@@ -578,7 +578,7 @@ check(
 console.log("\n── §4b THE TRANSFER ABOVE IS ON THE RECORD: one audit row, one notice each ──");
 const audit = await ownership_audit(ALICE_WORKSPACE, su);
 // `operator` is read on this row too: an owner-initiated transfer must leave it EMPTY, or the
-// reader would name a person who never touched it (decision-056).
+// reader would name a person who never touched it (decision:superuser-actions-name-operator).
 check(
   "audit: ONE workspace-anchored row naming the actor, the outgoing owner and the incoming one",
   audit.map((a) =>
@@ -1115,7 +1115,7 @@ check(
   await roster_rows(OLLIE_WS, su_id, su),
   [],
 );
-// decision-056 — a superuser caller id belongs to _superusers, so it can never fill `actor` (a
+// decision:superuser-actions-name-operator — a superuser caller id belongs to _superusers, so it can never fill `actor` (a
 // users relation); the identity rides `operator` instead, and the two are mutually exclusive:
 // a row carrying neither would be an unattributed handover.
 check(

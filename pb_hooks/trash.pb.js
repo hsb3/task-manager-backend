@@ -657,11 +657,11 @@ onRecordAfterUpdateSuccess((e) => {
       var ws = new Record(wsCol);
       ws.set("name", "My Workspace");
       ws.set("owner", ownerId);
-      // decision-028: left EMPTY on purpose — the main.pb.js seeder fills the default vocab,
+      // decision:default-priority-vocabulary: left EMPTY on purpose — the main.pb.js seeder fills the default vocab,
       // so the four values exist at exactly ONE site instead of four drifting copies.
       ws.set("priorities", []);
       e.app.save(ws);
-      // G1 (#74) + decision-028: default vocab (5 statuses + 3 core labels + priorities) is
+      // G1 (#74) + decision:default-priority-vocabulary: default vocab (5 statuses + 3 core labels + priorities) is
       // seeded by the single onRecordAfterCreateSuccess("workspaces") seeder in main.pb.js —
       // which fires on THIS programmatic save too — so NO inline seeding here.
       var mem = new Record(memCol);

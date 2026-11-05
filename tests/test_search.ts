@@ -421,7 +421,7 @@ try {
   for (const coll of ["tasks", "documents", "decisions", "milestones"]) {
     check(`${coll} hit carries its project id`, proj_of.get(proj_made[coll]), ALICE_PROJECT);
   }
-  // A create hook homes an unprojected task in the workspace's shadow project (decision-052),
+  // A create hook homes an unprojected task in the workspace's shadow project (decision:shadow-project),
   // so the hit carries that project's id — the same id project_items reported.
   const [, shadow_rec] = await api("GET", `/api/collections/projects/records/${loose.project}`, su);
   check(
@@ -731,7 +731,7 @@ try {
   }
 
   console.log("\n── (7d cont.): a PENDING admin invitation, no membership row, confers nothing ──");
-  // decision-073: workspace_members.createRule is null (only R3 mints one); a pending invitee
+  // decision:invitation-keyed-by-email: workspace_members.createRule is null (only R3 mints one); a pending invitee
   // holds NO membership row at all until she accepts.
   [s] = await api("DELETE", `/api/collections/workspace_members/records/${mem_id}`, su);
   check("(fixture) carol's admin membership removed", s, 204);

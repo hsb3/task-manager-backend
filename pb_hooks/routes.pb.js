@@ -72,7 +72,7 @@ routerAdd(
       // KEEP IN SYNC: the documents/decisions/milestones listRule draft branch and the
       // export route's canSeeDrafts — search is cross-workspace, so it resolves the
       // owner/admin test per ROW instead of once per workspace.
-      // decision-052: the per-workspace container is unreadable through the collection
+      // decision:shadow-project: the per-workspace container is unreadable through the collection
       // rules, so this reader must drop it too. Only the projects arm has the column.
       if (opts.notShadow) trash += " AND " + coll + ".shadow = 0";
       let draft = "";
@@ -774,7 +774,7 @@ routerAdd(
   $apis.requireAuth(),
 );
 
-// GET /api/tracker/admin/pending-users — accounts that cannot sign in yet (decision-014).
+// GET /api/tracker/admin/pending-users — accounts that cannot sign in yet (decision:signup-approval).
 // Approval is APP-level, never the per-workspace admin tier: every signup auto-provisions its
 // own workspace and owns it, so a workspace-role gate would hand this to everyone who signs up.
 routerAdd(
@@ -875,7 +875,7 @@ routerAdd(
 
 // POST /api/tracker/workspaces/{id}/resolve-member-email — invites an address to this workspace
 // by minting a workspace_invitations row for ANY address; it never reads users, so the answer
-// cannot vary with whether the address has an account (decision-073).
+// cannot vary with whether the address has an account (decision:invitation-keyed-by-email).
 routerAdd(
   "POST",
   "/api/tracker/workspaces/{id}/resolve-member-email",
@@ -1077,7 +1077,7 @@ routerAdd(
     // A narrowing selection filters project-bearing rows to `project ∈ selected OR project = ''` —
     // the empty-project (workspace-level) rows stay because they are always readable and the
     // exported tasks reference them; other projects' rows drop. Never widens beyond readable.
-    // decision-052 replaced the empty-project sentinel with the workspace container, so a
+    // decision:shadow-project replaced the empty-project sentinel with the workspace container, so a
     // narrowing selection has to keep its rows the way `project = ''` used to.
     let containerId = "";
     try {
@@ -1526,7 +1526,7 @@ routerAdd(
   "/api/tracker/workspaces/trash",
   (e) => {
     const uid = e.auth.id;
-    // OWNER OR ACTIVE ADMIN (decision-050 R2), resolved in ONE query through the back-relation
+    // OWNER OR ACTIVE ADMIN (decision:workspace-trash-cascades R2), resolved in ONE query through the back-relation
     // rather than a membership lookup per row. A member, a viewer, a suspended admin and a
     // non-member all match zero rows and get the SAME empty 200, so the route confirms no
     // existence. 500 is a declared bound, far above any realistic count of trashed workspaces;

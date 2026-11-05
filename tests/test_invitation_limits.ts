@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-/**decision-075: the per-inviter daily invitation limit and decline suppression.
+/**decision:invitation-send-limit-and-decline-block: the per-inviter daily invitation limit and decline suppression.
 
 1  Every invitation an account sends is claimed from `app_settings.invitation_mint_limit_per_day`
    (default 50) over a rolling 24 hours, across every workspace it invites to, through the
@@ -582,4 +582,6 @@ if (failures) {
   console.log(`❌ ${failures} FAILED`);
   throw new roomkit.SystemExit(1);
 }
-console.log("✅ all invitation-limit (decision-075) proofs passed");
+console.log(
+  "✅ all invitation-limit (decision:invitation-send-limit-and-decline-block) proofs passed",
+);

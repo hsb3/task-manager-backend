@@ -1,6 +1,6 @@
 # Deploy (context, session-owned)
 
-This repo deploys one Railway service (decision-009/decision-011): `pocketbase` (API +
+This repo deploys one Railway service `pocketbase` (API +
 `/_/` dashboard, watch patterns `Dockerfile, pb_migrations/**, pb_hooks/**`, domain
 `admin.tasks-pocketbase.functionform.ai`). Pushes to `main` are CI-gated; the service
 deploys only when its watch patterns are touched. A refused boot migration makes `migrate up` and `serve` exit 1 and `serve` never binds

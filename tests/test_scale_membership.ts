@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * pb1e AC2 / dpn2 AC1 — prove a member's reads on project_items stay bounded, AND stay
- * correctly scoped, as UNRELATED workspaces grow, now that decision-069 replaced every
+ * correctly scoped, as UNRELATED workspaces grow, now that decision:project-items-membership-denormalised replaced every
  * @collection.workspaces / @collection.workspace_members join in the list and view rules with
  * the denormalised workspace_owner / active_members / active_admins columns matched by = and ~.
  *
@@ -23,12 +23,12 @@
  *
  * Two principals deliberately: alice is the workspace OWNER, so `workspace_owner =
  * @request.auth.id` decides her read before the LIKE leg is ever reached. bob is a non-owner
- * active member, so only `active_members ~ @request.auth.id` — decision-069's novel mechanism,
+ * active member, so only `active_members ~ @request.auth.id` — decision:project-items-membership-denormalised's novel mechanism,
  * and the one whose cost is in question — can admit him.
  *
  * Budget, derived in THIS run and never a constant: for each principal and request kind the
  * 3-workspace step is sampled SAMPLES times, its median taken, and every later step's own median
- * must stay within BUDGET_MULTIPLIER x that median. That multiplier is decision-069's accepted
+ * must stay within BUDGET_MULTIPLIER x that median. That multiplier is decision:project-items-membership-denormalised's accepted
  * bar, owner-accepted 2026-09-20 on pb1e — "each of the list page, the counts-shaped read and the
  * counts route stays within 3x that same option's own 3-workspace median for that request
  * kind" — not a choice made here — plus this host's own measured per-request noise. That floor
@@ -38,7 +38,7 @@
  * request whose cost depends on neither the rule nor the fixture, so unlike a spread drawn from
  * the judged samples it cannot be inflated by the very outlier it is meant to absorb.
  *
- * Bound: the workspace axis alone, to decision-069's S4 fixture. The projects/tasks axis (that
+ * Bound: the workspace axis alone, to decision:project-items-membership-denormalised's S4 fixture. The projects/tasks axis (that
  * decision's P2 fixture) is measured elsewhere. The room's rate limiter is disabled before
  * seeding: it is server-memory state that would refuse the seeding burst, not the per-request
  * visibility cost under measurement.
@@ -98,7 +98,7 @@ function float_of(s: string): number {
 }
 
 const N_ITEMS = 5000;
-// The last step is decision-069's S4 fixture, which the accepted bar binds this work to.
+// The last step is decision:project-items-membership-denormalised's S4 fixture, which the accepted bar binds this work to.
 const STEPS = (process.env.PB_SCALE_STEPS ?? "3,253,503,1003,1506").split(",").map(py_int);
 const SAMPLES = 5;
 const BUDGET_MULTIPLIER = 3;

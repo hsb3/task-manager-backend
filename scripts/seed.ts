@@ -328,7 +328,7 @@ async function main(): Promise<void> {
       status: status_id("Website Redesign", "todo"),
       project: projects["Website Redesign"],
       parent: tasks["Design homepage"],
-      // Explicitly Alice's: decision-042 removed create-time defaulting.
+      // Explicitly Alice's: decision:tasks-have-no-default-assignee removed create-time defaulting.
       assignee: users.Alice,
       ordinal: 0.5 + i * 0.1,
       acceptanceCriteria: [{ text: "reviewed", done: false }],

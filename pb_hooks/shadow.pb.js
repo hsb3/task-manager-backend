@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// decision-052 — every workspace owns one invisible shadow project, and an item with no project lands in it.
+// decision:shadow-project — every workspace owns one invisible shadow project, and an item with no project lands in it.
 
 // Universal after-create tier, so the workspace created by ANY path is covered: the three
 // programmatic provision blocks (main.pb.js users-create, main.pb.js last-workspace,

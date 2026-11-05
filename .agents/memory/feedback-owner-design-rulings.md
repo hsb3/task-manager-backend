@@ -25,6 +25,5 @@ account's workspace; ruling 2 followed a question about whether to retain a colu
 retiring its use.
 
 **How to apply:** before adding any lookup keyed on something a user typed, check whether an
-opaque id would do. Before leaving a field in place "for now", delete it. Recorded in-repo as
-decision-017 with the full rationale and TASK-093 as the execution — but the rulings are
+opaque id would do. Before leaving a field in place "for now", delete it. Executed as TASK-093 — but the rulings are
 broader than that one task, so check them against any schema or addressing change.

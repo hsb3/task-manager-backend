@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * E2E proof that POST /api/tracker/workspaces/{id}/resolve-member-email is an INVITATION, not an
- * email-to-user-id oracle, and that the slice of `workspace_invitations.createRule` (decision-073;
+ * email-to-user-id oracle, and that the slice of `workspace_invitations.createRule` (decision:invitation-keyed-by-email;
  * a membership row is now minted only by the accept route) it has to mirror really is mirrored.
  *
  * The route used to answer `{user_id}` to any caller who owned or actively administered the
@@ -27,7 +27,7 @@
  * (2) THE RULE MIRROR, DIFFERENTIALLY — the route cannot ask PocketBase to evaluate the createRule
  *     for it ($app.canAccessRecord re-queries the PERSISTED row by id, so an unsaved record
  *     resolves against nothing and every rule, including a trivially true one, reads false), so the
- *     admin branch's `@request.body.role = "member"` conjunct is mirrored in the route (decision-073
+ *     admin branch's `@request.body.role = "member"` conjunct is mirrored in the route (decision:invitation-keyed-by-email
  *     moved the createRule this mirrors from workspace_members onto workspace_invitations — a
  *     membership row is now minted only by the accept route, never by a direct create). The 21-cell
  *     matrix is 7 minting principals (owner, active admin, suspended admin, an admin-invitee who
@@ -47,7 +47,7 @@
  *     FILTER matching, so a filtered lookup returns an empty 200 for every caller, including one
  *     filtering for their OWN address.
  *
- * Closed by decision-073 (tests/test_invitations.ts's AC3 probe): the inviter's OWN roster
+ * Closed by decision:invitation-keyed-by-email (tests/test_invitations.ts's AC3 probe): the inviter's OWN roster
  * (workspace_members?expand=user) no longer gains a row for a registered address either — every
  * invite lands in workspace_invitations regardless of account existence, and the roster stays
  * byte-identical before/after. Read the uniformity below as a property of the ROUTE.
@@ -324,7 +324,7 @@ try {
     return [getitem(made, "id"), email];
   }
 
-  // Superuser-direct fixture setup: decision-073 made workspace_members.createRule
+  // Superuser-direct fixture setup: decision:invitation-keyed-by-email made workspace_members.createRule
   // `null` (a membership row is minted only by the accept route), so a normal user token
   // can no longer create one at all — fixtures here only need the RESULT.
   async function admit(
@@ -402,7 +402,7 @@ try {
   check("…and is anchored: a shorter run is not an id", pb_findall(target_id.slice(0, -1)), []);
   check("…nor is a longer one", pb_findall(target_id + "0" + " " + target_id + "x"), []);
 
-  // workspace_invitations rows for `email` — decision-073 keys an invitation on the
+  // workspace_invitations rows for `email` — decision:invitation-keyed-by-email keys an invitation on the
   // address, never a user id, and the route mints ONLY this collection, never
   // workspace_members directly.
   async function rows_for(ws_id: string, email: string): Promise<any[]> {
@@ -470,7 +470,7 @@ try {
 
   // Three more shapes a caller can send, each answering like the baseline — and each one
   // asserted to have LANDED the row it should, because a uniformity that holds because
-  // nothing ever happens proves nothing about the route. Since decision-073, EVERY address
+  // nothing ever happens proves nothing about the route. Since decision:invitation-keyed-by-email, EVERY address
   // (registered or not) lands a workspace_invitations row — there is no longer a
   // registered-vs-unregistered fork at the database layer at all.
   async function clear_stranger(): Promise<void> {

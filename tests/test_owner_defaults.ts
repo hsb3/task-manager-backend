@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * decision-077 owner/author defaulting: a create that omits `owner` (projects, workspaces,
+ * decision:backend-owns-business-rules owner/author defaulting: a create that omits `owner` (projects, workspaces,
  * saved_views) or `author` (comments) is stamped with the authenticated caller by PocketBase
  * itself (pb_hooks/owner.pb.js, pb_hooks/author.pb.js), so a client need not resolve and send
  * it. Authority never widens: a caller naming SOMEONE ELSE as owner is refused by the

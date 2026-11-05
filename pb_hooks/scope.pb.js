@@ -21,7 +21,7 @@ onRecordCreateRequest((e) => {
   return e.next();
 }, "tasks");
 
-// milestones used to default their project from workspace.default_project here; decision-052
+// milestones used to default their project from workspace.default_project here; decision:shadow-project
 // gave every item type one placement (pb_hooks/shadow.pb.js) and this one disagreed with it.
 
 // ── MISMATCH guard (D1) — project.workspace must equal record.workspace ─────
@@ -313,7 +313,7 @@ onRecordUpdate((e) => {
   return e.next();
 }, "saved_views");
 
-// decision-052 — a personal default project may not be the workspace container; nothing else
+// decision:shadow-project — a personal default project may not be the workspace container; nothing else
 // validates this relation, so the whole guard is the shadow refusal.
 // KEEP IN SYNC: the same refusal in the labels/templates/saved_views guards above and in
 // validateDefaultProject (pb_hooks/main.pb.js).

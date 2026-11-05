@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * E2E proof of the in-app account-approval path (TASK-017.21, decision-014): an
+ * E2E proof of the in-app account-approval path (TASK-017.21, decision:signup-approval): an
  * app administrator lists accounts awaiting approval and approves one, after which
  * that account's login flips 403 -> 200; every non-app-admin caller — including a
  * workspace OWNER of their own auto-provisioned workspace — gets 404 on both routes,
@@ -358,7 +358,7 @@ try {
   check("(2) approved account drops off the waiting list", pending_ids(body).includes(a_id), false);
 
   // ══════════ (3) approval is APP-level: no workspace role confers it ══════════
-  console.log("\n── (3) decision-014: workspace owner/admin/member are all denied ──");
+  console.log("\n── (3) decision:signup-approval: workspace owner/admin/member are all denied ──");
   [s, body] = await api("GET", LIST_URL, bob);
   check(
     "(3) workspace OWNER+ADMIN (bob) GET pending list → 404",

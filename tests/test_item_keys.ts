@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * PBTT-422 / decision-043 — prove the two-layer item identity: the record id stays the only
+ * PBTT-422 / decision:item-display-keys — prove the two-layer item identity: the record id stays the only
  * real key, and the DISPLAY label is a per-project prefix plus ONE number sequence shared by
  * tasks, decisions, documents and milestones.
  *
@@ -197,7 +197,7 @@ async function find_workspace_id(su_token: string, owner_id: string): Promise<st
 }
 
 async function find_project(su_token: string, workspace_id: string): Promise<any> {
-  // shadow=false: the workspace shadow project (decision-052) is created BEFORE the default
+  // shadow=false: the workspace shadow project (decision:shadow-project) is created BEFORE the default
   // one and would otherwise be picked here — it deliberately carries no prefix.
   const qs = urlencode({ filter: `workspace='${workspace_id}' && shadow=false`, perPage: 1 });
   const [, r] = await api("GET", `/api/collections/projects/records?${qs}`, su_token);
@@ -422,7 +422,7 @@ try {
   check("a client-submitted key is ignored, not honoured", (squat2.key ?? null) !== "MYP-1", true);
 
   // ── §6 an item with no project carries no key ────────────────────────────
-  // decision-052: such an item now lands in the workspace shadow project, which takes no
+  // decision:shadow-project: such an item now lands in the workspace shadow project, which takes no
   // prefix of its own — so the keyless bound below is unchanged.
   console.log("\n── §6 declared bound: an item created with no project has no prefix to wear ──");
   let loose: any;

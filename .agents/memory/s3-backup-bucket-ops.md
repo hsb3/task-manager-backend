@@ -25,7 +25,7 @@ Operating the Railway backups bucket (endpoint t3.storageapi.dev):
   DELETE with a literal `@` in the URL path → 403 `SignatureDoesNotMatch` (looks like
   a permissions error, isn't). Percent-encode it (`%40auto_...`) → 204. GET/list are
   unaffected.
-- Bucket policy is ruled in decision-010: backups-only, never operational file storage.
+- Bucket policy is ruled in decision:backups-recovery: backups-only, never operational file storage.
   Since 2026-08-17 (PBTT-390) file uploads have their OWN bucket, `pb-files` (real S3 name
   `pb-files-zvho2lorp9pzwabv`), wired to `settings.s3` by `pb_hooks/files.pb.js` from
   `PB_FILES_S3_*` — same curl/CLI recipes apply to it.

@@ -5,8 +5,8 @@
  * workspaces.viewRule carries the `trashed = ""` clause its listRule already had, so a trashed
  * workspace is invisible on every collection read surface. GET /api/tracker/workspaces/trash (a
  * custom route, so it BYPASSES collection rules) enumerates it for the owner AND for an ACTIVE
- * ADMIN (decision-050 R2), and restore is a plain owner-or-active-admin PATCH under the untouched
- * updateRule. Section 9 proves decision-050 R1: the trash CASCADES — every item, view, derived row
+ * ADMIN (decision:workspace-trash-cascades R2), and restore is a plain owner-or-active-admin PATCH under the untouched
+ * updateRule. Section 9 proves decision:workspace-trash-cascades R1: the trash CASCADES — every item, view, derived row
  * and custom route under the workspace answers as an unknown id until the workspace is restored,
  * which the rules DERIVE from `workspace.trashed` rather than stamping anything per item.
  *
@@ -400,7 +400,7 @@ try {
 
   const [s_adam] = await trash_route(adam);
   check(
-    "Adam (active ADMIN) → 200 WITH it (decision-050 R2)",
+    "Adam (active ADMIN) → 200 WITH it (decision:workspace-trash-cascades R2)",
     tup(await adam_tier.now(), s_adam, await trash_ids(adam)),
     tup("admin", 200, [WS]),
   );
@@ -522,7 +522,7 @@ try {
   );
   check("…and it is still trashed for Olive's route", await trash_ids(olive), [WS]);
 
-  // An ACTIVE ADMIN enumerates and restores a workspace he cannot VIEW: decision-050 R2
+  // An ACTIVE ADMIN enumerates and restores a workspace he cannot VIEW: decision:workspace-trash-cascades R2
   // widened the route to owner-or-active-admin, matching the updateRule restore already used,
   // while workspaces.viewRule still hides the record itself at every tier.
   check(
@@ -909,7 +909,7 @@ try {
   await sam_tier.done();
   await owns.done();
 
-  // ══════════ (9) decision-050 R1 — the trash CASCADES to everything inside ═══
+  // ══════════ (9) decision:workspace-trash-cascades R1 — the trash CASCADES to everything inside ═══
   // COVERS: route:GET /api/tracker/search
   // COVERS: route:GET /api/tracker/summary
   // The suite's existing cast is REUSED here: PocketBase caps password logins at 10/60s per

@@ -28,7 +28,7 @@ import {
 } from "./_py.ts";
 
 // projects.key, verbatim from schema/projects.json — matched AS GIVEN, never normalized to
-// it, because decision-043 forbids silently altering a prefix the operator chose.
+// it, because decision:item-display-keys forbids silently altering a prefix the operator chose.
 const KEY_PATTERN = "^[A-Z][A-Z0-9]{0,7}$";
 // Python's `$` also matches before one trailing newline.
 const KEY_RE = new RegExp(KEY_PATTERN.slice(0, -1) + "\\n?$");

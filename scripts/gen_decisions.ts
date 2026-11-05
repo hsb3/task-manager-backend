@@ -76,7 +76,7 @@ export function fetch_decisions(): Record<string, string>[] {
 }
 
 // The whole slug, not just its prefix: matching only the namespace still let `decision:`,
-// `decision: spaced` and `decision:a:b` through as headings.
+// `decision: spaced` and a doubled namespace such as `a:b` after the prefix through as headings.
 const DECISION_SLUG = /^decision:([a-z0-9]+([-_][a-z0-9]+)*)$/;
 const ATX_HEADING = /^( {0,3})(#{1,6})(?=[ \t]|$)/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;

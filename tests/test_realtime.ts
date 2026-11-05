@@ -32,7 +32,7 @@ Tasks have no draft concept, so a task broadcast always reaches every member. Th
 trash-SET envelope inlined in trash.pb.js carries the same branch and is proven here on the same
 socket, since a soft-trash DELETE is the one broadcast that never rides this file's hooks.
 
-Presence is deliberately NOT covered — decision-007 rules it OUT of v1 (parked DRAFT-015).
+Presence is deliberately NOT covered — it is out of scope for v1 (parked DRAFT-015).
 
 Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, scripts/seed.ts fixtures.
 Port 8107 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md).

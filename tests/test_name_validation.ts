@@ -80,17 +80,17 @@ const ACCEPTED_PAIRS = new Map<string, string>([
   [
     pair_key("workspace_invitations", "email"),
     "refused when blank by invitations.pb.js's OWN create hook (400 'Email must be a " +
-      "non-empty string.'), not by names.pb.js's shared guard (decision-073)",
+      "non-empty string.'), not by names.pb.js's shared guard (decision:invitation-keyed-by-email)",
   ],
   [
     pair_key("workspace_invitations", "email_key"),
     "server-derived: the same create hook always overwrites it from `email`, so a " +
-      "submitted value never reaches storage (decision-073)",
+      "submitted value never reaches storage (decision:invitation-keyed-by-email)",
   ],
   [
     pair_key("invitation_events", "email_key"),
     "null rules on every operation — only invitations.pb.js writes it, copied from the " +
-      "invitation's already-folded key (decision-075)",
+      "invitation's already-folded key (decision:invitation-send-limit-and-decline-block)",
   ],
 ]);
 
@@ -697,7 +697,7 @@ try {
       "app_docs slug shape",
       "app_docs",
       "slug",
-      ["collection:app_docs", "decision:trash-window-w3"],
+      ["collection:app_docs", "decision:soft-delete-trash"],
     ],
   ] as [string, string, string, string[]][]) {
     // `(?!)` never matches, so a missing pattern fails the survey loudly instead of

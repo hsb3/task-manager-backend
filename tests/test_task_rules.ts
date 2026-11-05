@@ -86,7 +86,7 @@ function check(label: string, got: any, expected: any): void {
   console.log(`  ${tag}  ${label.padEnd(52)} → ${py_str(got)} (want ${py_str(expected)})`);
 }
 
-// decision-073: workspace_members.createRule is null — only a superuser (or the R3 accept
+// decision:invitation-keyed-by-email: workspace_members.createRule is null — only a superuser (or the R3 accept
 // route) mints a membership row now, so fixture setup below creates directly as superuser.
 const SU_EMAIL = process.env.PB_SUPERUSER_EMAIL ?? "ci@example.test";
 const SU_PASSWORD = process.env.PB_SUPERUSER_PASSWORD ?? "ci-battery-dummy-pw-000";
@@ -182,7 +182,7 @@ check(
 check("Alice (project owner) purges the trashed task (204)", s, 204);
 
 // ── ANON WRITE GUARD (TASK-049) ───────────────────────────────────────────────
-// decision-042: a bare create is Unassigned, so the read-back is the guard that these probes
+// decision:tasks-have-no-default-assignee: a bare create is Unassigned, so the read-back is the guard that these probes
 // are not passing on an assignee branch nothing here submitted.
 async function unassigned_task(title: string): Promise<string> {
   const [s, made] = await api("POST", "/api/collections/tasks/records", alice, {

@@ -74,7 +74,7 @@ const WORD = String.raw`[\p{L}\p{N}_]`;
 
 export const SENTENCE_BREAK = new RegExp(`(?<=[.!?])[${SPACE}]+`, "u");
 export const CITATION = new RegExp(
-  `(?<!${WORD})(PBTT-\\p{Nd}+|TASK-\\p{Nd}+|decision-\\p{Nd}+|card [0-9a-z]{4})(?!${WORD})`,
+  `(?<!${WORD})(PBTT-\\p{Nd}+|TASK-\\p{Nd}+|decision-\\p{Nd}+|decision:[a-z0-9]+(?:[-_][a-z0-9]+)*|card [0-9a-z]{4})(?!${WORD})`,
   "u",
 );
 
@@ -206,7 +206,7 @@ export function allowlist_problems(allowlist: Map<string, string>): string[] {
     } else if (!CITATION.test(reason)) {
       problems.push(
         `${parts[0]} / ${parts[1]}: reason cites no card or decision ` +
-          `(PBTT-n, TASK-n, decision-n, card <ref>): ${py_repr(reason)}`,
+          `(PBTT-n, TASK-n, decision-n, decision:<slug>, card <ref>): ${py_repr(reason)}`,
       );
     }
   }

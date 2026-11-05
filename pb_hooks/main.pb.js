@@ -4,7 +4,7 @@
 // The old free-text status lived in workspaces.statuses JSON; G1 turned it into a
 // relation → the `statuses` collection (pbc_300200002) and added a `completedAt`
 // timestamp. These hooks replace the old workspace-JSON status validator. The item
-// display number moved to pb_hooks/keys.pb.js (PBTT-422, decision-043) — one shared
+// display number moved to pb_hooks/keys.pb.js (PBTT-422, decision:item-display-keys) — one shared
 // per-PROJECT sequence, so the per-workspace counter this file used to own is gone.
 // Pooled-JSVM law: everything INLINED per
 // site (no shared top-level helper called from inside a callback); a top-level fn
@@ -250,7 +250,7 @@ onRecordUpdateRequest((e) => {
 // a 404, not the 400 the AC demands. So a validation hook throws BadRequestError
 // (→ 400 on both create and update): read `assignee`; if set, walk project →
 // workspace and look up a workspace_members row for (workspace, assignee). If none
-// exists, reject. decision-042: an item created without an assignee is Unassigned —
+// exists, reject. decision:tasks-have-no-default-assignee: an item created without an assignee is Unassigned —
 // nothing fills the field, so an empty assignee is simply never validated.
 function validateTaskAssignee(e) {
   const assignee = e.record.get("assignee");
@@ -489,11 +489,11 @@ onRecordAfterCreateSuccess((e) => {
       const ws = new Record(wsCol);
       ws.set("name", "My Workspace");
       ws.set("owner", e.record.id);
-      // decision-028: left EMPTY on purpose — the seeder below fills the default vocab,
+      // decision:default-priority-vocabulary: left EMPTY on purpose — the seeder below fills the default vocab,
       // so the four values exist at exactly ONE site instead of four drifting copies.
       ws.set("priorities", []);
       e.app.save(ws);
-      // G1 (#74) + decision-028: default vocab (5 statuses + 3 core labels + priorities) is
+      // G1 (#74) + decision:default-priority-vocabulary: default vocab (5 statuses + 3 core labels + priorities) is
       // seeded by the single onRecordAfterCreateSuccess("workspaces") seeder above — which
       // fires on THIS programmatic e.app.save(ws) too — so NO inline seeding here.
       const mem = new Record(memCol);
@@ -722,11 +722,11 @@ onRecordAfterDeleteSuccess((e) => {
       const ws = new Record(wsCol);
       ws.set("name", "My Workspace");
       ws.set("owner", owner.id);
-      // decision-028: left EMPTY on purpose — the seeder below fills the default vocab,
+      // decision:default-priority-vocabulary: left EMPTY on purpose — the seeder below fills the default vocab,
       // so the four values exist at exactly ONE site instead of four drifting copies.
       ws.set("priorities", []);
       e.app.save(ws);
-      // G1 (#74) + decision-028: default vocab (5 statuses + 3 core labels + priorities) is
+      // G1 (#74) + decision:default-priority-vocabulary: default vocab (5 statuses + 3 core labels + priorities) is
       // seeded by the single onRecordAfterCreateSuccess("workspaces") seeder above — which
       // fires on THIS programmatic e.app.save(ws) too — so NO inline seeding here.
       const mem = new Record(memCol);
@@ -930,8 +930,8 @@ onRecordAfterCreateSuccess((e) => {
         );
     }
   }
-  // TASK-153/decision-028 — priorities carry their OWN emptiness check: the statuses guard
-  // above is not a proxy for them (a pre-decision-028 row can have statuses and no vocab).
+  // TASK-153/decision:default-priority-vocabulary — priorities carry their OWN emptiness check: the statuses guard
+  // above is not a proxy for them (a pre-decision:default-priority-vocabulary row can have statuses and no vocab).
   try {
     // .get("priorities") is a JsonRaw wrapper, not a native array (see main.pb.js:107-109).
     const _raw = e.record.get("priorities");
@@ -945,7 +945,7 @@ onRecordAfterCreateSuccess((e) => {
       }
     }
     if (!Array.isArray(_vocab) || _vocab.length === 0) {
-      // KEEP IN SYNC (default priority vocab): the app_docs record decision:decision-028 states these four names, listed in docs/constants.md where `urgent` heads them.
+      // KEEP IN SYNC (default priority vocab): the app_docs record decision:default-priority-vocabulary states these four names, listed in docs/constants.md where `urgent` heads them.
       const _defaultPriorityNames = ["urgent", "high", "medium", "low"];
       e.record.set(
         "priorities",

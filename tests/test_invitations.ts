@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * R1-R6 of decision-073's invitation system: an invitation is a `workspace_invitations` row
+ * R1-R6 of decision:invitation-keyed-by-email's invitation system: an invitation is a `workspace_invitations` row
  * keyed by the invitee's folded email, independent of whether an account exists for it yet.
  *
  * R1  POST /api/tracker/workspaces/{id}/resolve-member-email — mints/idempotently re-mints

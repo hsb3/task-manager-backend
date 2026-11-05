@@ -543,7 +543,7 @@ try {
     true,
   );
 
-  // A task created with no project lands in the workspace shadow project (decision-052), which
+  // A task created with no project lands in the workspace shadow project (decision:shadow-project), which
   // is never trashed on its own — so this exercises the `task.project.trashed = ""` arm and
   // proves a workspace-level task's trail stays readable.
   let ptask: any;

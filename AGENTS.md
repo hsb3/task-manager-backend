@@ -84,7 +84,7 @@ passes green against a stranger's database. Bands + recipes: `.agents/rules/port
 - User-facing copy (hook refusal/validation messages, mail text a client shows) describes behaviour, never mechanism.
 - Product/API design questions: look to prior art first (functionally this app converges on
   **Linear**) — cite the tool's behaviour in the decision record, then still make the call
-  explicitly (owner ruling 2026-08-08, worked example decision-021).
+  explicitly (owner ruling 2026-08-08).
 
 <CRITICAL_INSTRUCTION>
 
@@ -100,7 +100,7 @@ Root claims, closes and edits; managers comment and create; workers hold no boar
 - Decision records carry `decision`, close on acceptance and are immutable from then on: changing course is a NEW decision superseding the old via `--related`, never an edit or reopen.
 - **File follow-up work immediately** as a board card referencing the discovering card/PR (a
   `draft` card when unscoped). Filing needs no approval; starting does. **But a finding folds
-  before it fans out** (decision-057): fix every site of the shape you are fixing; a small
+  before it fans out**: fix every site of the shape you are fixing; a small
   out-of-scope patch goes in your report for root to land. One card per unit of work.
 - **Re-validate a stale card's premise before starting**: run the command that would falsify it
   against the CURRENT tree and quote the output; if falsified, the deviation is the deliverable.

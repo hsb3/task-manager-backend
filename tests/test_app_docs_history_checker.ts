@@ -166,7 +166,18 @@ check(
   hist.allowlist_problems(allow(KEY, "we decided this was fine")).length,
   1,
 );
-for (const token of ["PBTT-543", "TASK-061", "decision-021", "card nw9w"]) {
+check(
+  "a bare decision: with no slug is rejected",
+  hist.allowlist_problems(allow(KEY, "deliberate rewrite, see decision: above")).length,
+  1,
+);
+for (const token of [
+  "PBTT-543",
+  "TASK-061",
+  "decision-21",
+  "decision:soft-delete-trash",
+  "card nw9w",
+]) {
   check(
     `a reason citing ${token} is accepted`,
     hist.allowlist_problems(allow(KEY, `deliberate rewrite, see ${token}`)),

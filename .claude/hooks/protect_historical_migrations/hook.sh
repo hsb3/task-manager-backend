@@ -30,7 +30,7 @@ git -C "$dir" cat-file -e "$ref:$rel" 2>/dev/null || exit 0
 # (lefthook.yml's pre-commit --staged mode is the other caller) — never re-inline it here.
 root=$(git -C "$dir" rev-parse --show-toplevel)
 # The checker prints the WHOLE actionable message, because it alone knows which state
-# (armed / decision-069 suspension / expired) it is in — nothing is appended here.
+# (armed / decision:project-items-membership-denormalised suspension / expired) it is in — nothing is appended here.
 # It runs in the edited file's repo, so the state is that repo's and not the agent's cwd.
 if verdict=$(printf '%s' "$input" | (cd "$root" && bun scripts/check_historical_migrations.ts --tool-input) 2>/dev/null); then
   # stdout on exit 0: the harness may swallow stderr, and a suspended allow must be announced.

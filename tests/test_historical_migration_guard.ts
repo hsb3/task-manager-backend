@@ -34,7 +34,7 @@ function install_checker(dir: string, src: string): string {
 }
 
 /**
- * A copy of the checker with BASELINE_REBUILD_SUSPENSION pinned: decision-069's suspension
+ * A copy of the checker with BASELINE_REBUILD_SUSPENSION pinned: decision:project-items-membership-denormalised's suspension
  * is a source edit by design, so reaching a state under test means rewriting the constant.
  */
 function checker_with_constant(value: string | null): string {
@@ -351,7 +351,9 @@ check(
   true,
 );
 
-console.log("\n-- (m) decision-069 suspension: SUSPENDED / EXPIRED / ARMED across both modes --");
+console.log(
+  "\n-- (m) decision:project-items-membership-denormalised suspension: SUSPENDED / EXPIRED / ARMED across both modes --",
+);
 const [sus_repo, sus_hist] = make_repo(SUSPENDED, true);
 const behaviour_edit = {
   tool_name: "Edit",
@@ -370,17 +372,29 @@ console.log("   SUSPENDED (marker still on the ref): both modes allow, hook.sh f
 proc = run_hook(behaviour_edit, sus_repo);
 check("hook.sh: behaviour Edit exits 0", proc.returncode, 0);
 // stdout, not stderr: the harness may swallow stderr on a success, and this allow is not silent.
-check("hook.sh: announces the allow on stdout", proc.stdout.includes("decision-069"), true);
+check(
+  "hook.sh: announces the allow on stdout",
+  proc.stdout.includes("decision:project-items-membership-denormalised"),
+  true,
+);
 proc = run_checker(["--tool-input"], JSON.stringify(behaviour_edit), sus_repo, SUSPENDED);
 check("--tool-input: behaviour Edit exits 0", proc.returncode, 0);
-check("banner names decision-069", proc.stdout.includes("decision-069"), true);
+check(
+  "banner names decision:project-items-membership-denormalised",
+  proc.stdout.includes("decision:project-items-membership-denormalised"),
+  true,
+);
 check("banner names card dzdh", proc.stdout.includes("dzdh"), true);
 check("banner is one line", splitlines(py_strip(proc.stdout)).length, 1);
 fs.rmSync(sus_hist);
 stage_all(sus_repo);
 proc = run_checker(["--staged"], null, sus_repo, SUSPENDED);
 check("--staged: deleting a historical migration exits 0", proc.returncode, 0);
-check("banner names decision-069", proc.stdout.includes("decision-069"), true);
+check(
+  "banner names decision:project-items-membership-denormalised",
+  proc.stdout.includes("decision:project-items-membership-denormalised"),
+  true,
+);
 hard_reset(sus_repo);
 
 console.log("   EXPIRED (the rebuild dropped the marker from the ref): both modes refuse");
@@ -422,12 +436,16 @@ fs.writeFileSync(noref_hist, comment_change);
 stage_all(noref_repo);
 proc = run_checker(["--staged"], null, noref_repo, SUSPENDED);
 check("--staged exits 0", proc.returncode, 0);
-check("banner is the SUSPENDED one", proc.stdout.includes("decision-069"), true);
+check(
+  "banner is the SUSPENDED one",
+  proc.stdout.includes("decision:project-items-membership-denormalised"),
+  true,
+);
 check("not the EXPIRED one", proc.stdout.includes("the baseline rebuild has landed"), false);
 hard_reset(noref_repo);
 
 console.log("\n-- (n) the SHIPPED constant, read live against this repo --");
-// decision-069: SUSPENDED is the long green window and EXPIRED is the alarm, red only between
+// decision:project-items-membership-denormalised: SUSPENDED is the long green window and EXPIRED is the alarm, red only between
 // the rebuild landing on the comparison ref and the re-arm PR setting the constant to null.
 const live_state = shipped.suspension_state(shipped.marker_on_ref(REPO_ROOT));
 check(

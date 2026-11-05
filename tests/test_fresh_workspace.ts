@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * E2E proof of decision-028: a workspace nobody configured is immediately usable — a fresh
+ * E2E proof of decision:default-priority-vocabulary: a workspace nobody configured is immediately usable — a fresh
  * signup's auto-provisioned workspace, and a second workspace created straight through the API,
  * both come back with the default priority vocabulary (plus the statuses/labels seeded since G1),
  * and a task can carry a priority with zero manual setup.
@@ -175,7 +175,9 @@ try {
   const ws_id = ws.id ?? null;
 
   // ══════════════════ 2. the seeded vocabularies ══════════════════════════════
-  console.log("\n── (2) decision-028: the fresh workspace's vocabularies are seeded ──");
+  console.log(
+    "\n── (2) decision:default-priority-vocabulary: the fresh workspace's vocabularies are seeded ──",
+  );
   check("priorities default", names_of(ws.priorities), DEFAULT_PRIORITIES);
   const statuses = await find_by_filter("statuses", `workspace='${ws_id}'`, token);
   check("statuses seeded", statuses.length, 5);

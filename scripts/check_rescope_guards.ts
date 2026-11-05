@@ -49,7 +49,7 @@ export const EQ_OPS = ["=", "?="];
 // An allowlist reason without one of these is unreviewable prose, so the gate refuses it.
 // `D<n>` is a decision id in the v006 design record.
 export const CITATION_RE =
-  /PBTT-\p{Nd}+|TASK-\p{Nd}+|decision-\p{Nd}+|(?<![\p{L}\p{N}_])D\p{Nd}+(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])card [0-9a-z]{4}(?![\p{L}\p{N}_])/u;
+  /PBTT-\p{Nd}+|TASK-\p{Nd}+|decision-\p{Nd}+|decision:[a-z0-9]+(?:[-_][a-z0-9]+)*(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])D\p{Nd}+(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])card [0-9a-z]{4}(?![\p{L}\p{N}_])/u;
 
 export type AllowEntry = Record<string, unknown>;
 
@@ -262,7 +262,7 @@ export function check_allowlist_proof(entry: AllowEntry): string | null {
   if (!py_strip(why)) return "reason is empty";
   if (!CITATION_RE.test(why)) {
     return (
-      "reason cites no card/decision (need PBTT-n, TASK-n, decision-n or `card abcd`): " +
+      "reason cites no card/decision (need PBTT-n, TASK-n, decision-n, decision:<slug> or `card abcd`): " +
       py_repr(why)
     );
   }
