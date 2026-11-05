@@ -3,12 +3,12 @@
  * CI / pre-commit check: fail any permission branch granting through `workspace_members`
  * without pinning `status` to "active" in that same branch.
  *
- * A suspended membership must confer nothing (PBTT-431, decision-039); since decision-073 a
+ * A suspended membership must confer nothing (PBTT-431, decision:active-membership-grants-access); since decision:invitation-keyed-by-email a
  * membership row is only ever active or suspended. Derived, never a hand-copied site list: collection rules come from the
  * generated `schema/`; hooks contribute both their `workspace_members` filter strings and the
  * `FROM|JOIN workspace_members` predicates they build by concatenation; a view collection
  * contributes the membership subselects its `viewQuery` denormalises onto the row, which is
- * where decision-069 moved the pin. Static — no server, no DB. Public API (tests import it):
+ * where decision:project-items-membership-denormalised moved the pin. Static — no server, no DB. Public API (tests import it):
  * branches, scan_rules, scan_hooks, flatten_strings, sql_window, sql_sites, view_columns,
  * view_member_columns, column_grant, ALLOWLIST_RULES, ALLOWLIST_HOOKS.
  */
@@ -84,11 +84,12 @@ export const ASSIGN_RE = new RegExp(
     `(?<value>"(?:[^"\\\\]|\\\\[^\\n])*"|'(?:[^'\\\\]|\\\\[^\\n])*')`,
   "gu",
 );
-// PBTT-N / TASK-N / decision-N, or a 4-char kata ref (must mix a letter and a digit, so
-// neither an English word nor a bare year passes as a citation).
+// PBTT-N / TASK-N / decision-N / decision:<slug>, or a 4-char kata ref (must mix a letter and
+// a digit, so neither an English word nor a bare year passes as a citation).
 export const CITATION_RE = new RegExp(
   `${NOT_AFTER_W}PBTT-\\p{Nd}+${NOT_BEFORE_W}|${NOT_AFTER_W}TASK-\\p{Nd}+${NOT_BEFORE_W}` +
     `|${NOT_AFTER_W}decision-\\p{Nd}+${NOT_BEFORE_W}` +
+    `|${NOT_AFTER_W}decision:[a-z0-9]+(?:[-_][a-z0-9]+)*${NOT_BEFORE_W}` +
     `|${NOT_AFTER_W}(?=[a-z0-9]{4}${NOT_BEFORE_W})(?=[a-z]*\\p{Nd})(?=[0-9]*[a-z])[a-z0-9]{4}${NOT_BEFORE_W}`,
   "u",
 );
@@ -96,7 +97,7 @@ export const CITATION_RE = new RegExp(
 /** A tuple-keyed dict's key: the JSON of the tuple (`JSON.parse` gives the tuple back). */
 export type Allowlist = Map<string, string>;
 
-// Empty since decision-073 retired the invitee's view of the workspace record.
+// Empty since decision:invitation-keyed-by-email retired the invitee's view of the workspace record.
 export const ALLOWLIST_RULES: Allowlist = new Map();
 // Keyed on [file, callee, resolved filter] — a line number goes stale on any edit above the
 // site, turning an unrelated change red and training readers to bump numbers reflexively.
@@ -121,7 +122,7 @@ export const ALLOWLIST_HOOKS: Allowlist = new Map([
     "not a grant: POST /api/tracker/invitations/{id}/accept asks whether the invitee already " +
       "holds a membership row in ANY status, so it can leave that row unchanged instead of " +
       "creating a second; an active-only pin would miss a suspended row, and the create would then " +
-      "fail on the (workspace, user) unique index instead of answering 200 (decision-073)",
+      "fail on the (workspace, user) unique index instead of answering 200 (decision:invitation-keyed-by-email, card 729j)",
   ],
   [
     JSON.stringify(["routes.pb.js", "fetchScoped", "<unresolved filter: fetchScoped(...)>"]),
@@ -1045,7 +1046,9 @@ gate.
 
   for (const [key, reason] of uncited) {
     print(`❌ uncited allowlist entry ${key_repr(key)}: ${reason}`);
-    print("     every exception must cite PBTT-N / TASK-N / decision-N / a kata ref");
+    print(
+      "     every exception must cite PBTT-N / TASK-N / decision-N / decision:<slug> / a kata ref",
+    );
   }
 
   print(`allowlisted exceptions (${rules.allowed.length + hooks.allowed.length}):`);

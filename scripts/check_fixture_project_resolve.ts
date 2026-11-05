@@ -2,7 +2,7 @@
 /**
  * CI / pre-commit check: flags the eew9 (PR #657) fixture class before it can regrow.
  *
- * Since decision-052, a superuser's unfiltered `projects/records` read returns the
+ * Since decision:shadow-project, a superuser's unfiltered `projects/records` read returns the
  * workspace's invisible shadow container alongside its ordinary projects. A fixture that
  * picks "a project in this workspace" positionally (`filter=workspace='<ws>'&perPage=1`, or
  * indexing `items[0]` off an unfiltered read) can land on that container, and the
@@ -72,7 +72,7 @@ export const RESERVED_NAME_RE = /(?:"name"|\bname)\s*:\s*"Workspace items"/;
 export const POSITIONAL_REASON =
   "resolves a project positionally with no shadow guard nearby — a superuser's " +
   "unfiltered read can land element 0 on the workspace's invisible container " +
-  "(decision-052); add `&& shadow=false` (or `=true` if the container IS the fixture) " +
+  "(decision:shadow-project); add `&& shadow=false` (or `=true` if the container IS the fixture) " +
   "to the filter";
 export const RESERVED_NAME_REASON =
   'fixture named "Workspace items" collides with the shadow project\'s own reserved ' +

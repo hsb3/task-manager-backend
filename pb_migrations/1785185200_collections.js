@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// The one baseline collection set (decision-069): project_items resolves tenancy through
+// The one baseline collection set (decision:project-items-membership-denormalised): project_items resolves tenancy through
 // workspace_owner, active_members and active_admins instead of collection joins.
 // group_concat's `,` separator plus a leading and trailing comma bounds every element on
 // both sides, and a real 15-char lowercase alnum id holds no comma, so a `~` probe can

@@ -302,7 +302,7 @@ try {
     priority: P("low"),
   });
   check("Alice creates project-less task with the id of 'low' → 200", s, 200);
-  // decision-052: a create with no project lands in the workspace shadow project, which only
+  // decision:shadow-project: a create with no project lands in the workspace shadow project, which only
   // a superuser can resolve — the projects rules hide it from every tenant role.
   const [, _shadow] = await api(
     "GET",

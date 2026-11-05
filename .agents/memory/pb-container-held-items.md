@@ -1,6 +1,6 @@
 ---
 name: pb-container-held-items
-description: "An item submitted without a project lands in its workspace's hidden shadow project (decision-052), whose projects rules end in shadow = false, so expand=project comes back EMPTY on an item that has one"
+description: "An item submitted without a project lands in its workspace's hidden shadow project (decision:shadow-project), whose projects rules end in shadow = false, so expand=project comes back EMPTY on an item that has one"
 metadata:
   type: project
 ---

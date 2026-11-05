@@ -40,8 +40,8 @@ are independent of each other):
 3. **Resend.** An API key from the Resend dashboard; a sender on a domain verified there if mail
    must reach anyone but the Resend account owner.
 4. **GitHub OAuth app.** Create it with the authorization callback URL of the client app that
-   runs the flow, which is the client's own route, not PocketBase's `/api/oauth2-redirect`
-   (decision-011's correction). The app issues the client id and secret.
+   runs the flow, which is the client's own route, not PocketBase's `/api/oauth2-redirect`.
+   The app issues the client id and secret.
 5. **`pocketbase` variables, all before its first boot.**
 
    | variable | what it does | value comes from |
@@ -222,7 +222,7 @@ environments unless marked.
 ## PocketBase in production
 
 - **Clients reach realtime directly on this service's public domain** (the direct-SSE realtime
-  channel, decision-004), so that domain MUST serve `/api/realtime` to clients outside Railway.
+  channel), so that domain MUST serve `/api/realtime` to clients outside Railway.
 
 - **A prod deploy's stdout is banner-only** — hook and migration logger output goes to the
   `_logs` DB, so `Applied <migration>` lines never appear in the deploy log. Prove a migration

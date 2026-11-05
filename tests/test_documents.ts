@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**E2E proof of the wave-23 rules matrix for `documents` (#60):
 list/view/create/update owner-or-member, delete owner-only.
-`tasks.draft` (#59) was dropped (decision-047 tent) — tasks carry no
+`tasks.draft` (#59) was dropped (decision:cycle-rollover tent) — tasks carry no
 draft concept.
 
 Seed contract (scripts/seed.ts): Alice owns "Alice's Workspace" + project

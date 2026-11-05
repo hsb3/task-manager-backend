@@ -24,7 +24,7 @@
  * and the workspace-trashed search, export and summary surfaces are proven at seven tiers in
  * tests/test_workspace_trash.ts rather than re-asserted here.
  *
- * The last block is the one WRITE claim here: decision-053 freezes a trashed workspace's
+ * The last block is the one WRITE claim here: decision:workspace-configuration-freeze freezes a trashed workspace's
  * configuration, so the two tiers that may write it in a live workspace — the owner and an
  * active admin — are refused create, update and delete on every configuration collection.
  *
@@ -123,7 +123,7 @@ const CREATE_RULES: Record<string, string | null> = {};
 // collection -> its updateRule as the ROOM reports it, filled alongside CREATE_RULES.
 const UPDATE_RULES: Record<string, string | null> = {};
 
-// decision-073 nulled workspace_members.createRule (only R3 mints a row now), so
+// decision:invitation-keyed-by-email nulled workspace_members.createRule (only R3 mints a row now), so
 // is_configuration() stops counting it as configuration by the create-rule proxy — but its
 // listRule's restoring-tier carve-out is UNCHANGED (measured: it lands in ROW_CASES below via
 // claims_row_hidden, not via is_configuration): an active admin still reads a member row once
@@ -294,7 +294,7 @@ function is_configuration(collection: string): boolean {
   );
 }
 
-// The tiers that keep READING a trashed workspace's configuration under decision-053, because
+// The tiers that keep READING a trashed workspace's configuration under decision:workspace-configuration-freeze, because
 // they are the ones who can restore it. Derived from the tier table rather than named, so a tier
 // added or restated there cannot leave a stale carve-out behind.
 const RESTORING_TIERS = new Set(
@@ -304,7 +304,7 @@ const RESTORING_TIERS = new Set(
 function is_containment(collection: string, target: string): boolean {
   /** True when trashing `target` must change what `collection`'s rows say to a reader.
    *
-   * decision-053 freezes configuration with the WORKSPACE holding it and with nothing else: a
+   * decision:workspace-configuration-freeze freezes configuration with the WORKSPACE holding it and with nothing else: a
    * trashed project does not retire the workspace vocabulary rows that happen to name it.
    * Everything else keeps the older test — content, meaning a subject or a row with no workspace
    * anchor of its own — so a hook-written class anchored on a workspace makes no promise here;
@@ -313,7 +313,7 @@ function is_containment(collection: string, target: string): boolean {
 }
 
 function keeps_reading(collection: string, target: string, tier: string): boolean {
-  /** True when `tier` still reads the row after `target` is trashed (decision-053). */
+  /** True when `tier` still reads the row after `target` is trashed (decision:workspace-configuration-freeze). */
   const configured = is_configuration(collection) || READ_CARVEOUT_EXTRA.has(collection);
   return (
     configured &&
@@ -662,7 +662,7 @@ try {
   const RELATION_CASES = derive_relation_cases(ID_TO_NAME);
 
   // PocketBase pins users.id's shape and project_items' LIKE rules depend on it; nothing here
-  // can widen it, so this fires only if an upgrade moves that default (decision-069, mhg8).
+  // can widen it, so this fires only if an upgrade moves that default (decision:project-items-membership-denormalised, mhg8).
   let users_id: any = null;
   for (const c of colls.items || []) {
     if (c.name !== "users") continue;
@@ -1302,7 +1302,7 @@ try {
   //     thing under test, so DELETING the clause silently retires the case instead of failing.
   //   · schema-derived: every cascadeDelete edge into a trashable target is a containment edge
   //     and MUST make that promise. Deleting the clause fails `rowhide-promise` here.
-  // Configuration is the one edge whose expectation is not a flat disappearance: decision-053
+  // Configuration is the one edge whose expectation is not a flat disappearance: decision:workspace-configuration-freeze
   // keeps a trashed workspace's settings readable to the tier that can restore it, so the tiers
   // in RESTORING_TIERS assert the row is STILL there and every other tier asserts it is gone.
   // Surfaces are bounded to list + view (plus the restore round trip). The dependent
@@ -1352,7 +1352,7 @@ try {
     let why: string;
     if (is_configuration(coll)) {
       why =
-        `${coll} is workspace-anchored configuration, which decision-053 freezes with ` +
+        `${coll} is workspace-anchored configuration, which decision:workspace-configuration-freeze freezes with ` +
         `its WORKSPACE alone`;
     } else if (!is_content(coll)) {
       why =
@@ -1468,14 +1468,14 @@ try {
   }
 
   // ── the WRITE freeze: a trashed workspace accepts no configuration write ────────────────
-  // decision-053's other half, and the reason the read carve-out above is safe. BOUNDED to the
+  // decision:workspace-configuration-freeze's other half, and the reason the read carve-out above is safe. BOUNDED to the
   // tiers that CAN write configuration in a LIVE workspace — the owner and an active admin:
   // only their refusal is falsifiable, because the live control is what separates a frozen
   // write from a body the collection would have refused anyway. A member, a viewer and a
   // suspended member are refused on both sides of the trash, and their READS are asserted per
   // tier in the block above. Bounded to create/update/delete on the collection API.
   console.log(
-    "\n── decision-053: a trashed workspace freezes the configuration a restore lands in ──",
+    "\n── decision:workspace-configuration-freeze: a trashed workspace freezes the configuration a restore lands in ──",
   );
   const CONFIGURATION = Object.keys(SCHEMA)
     .filter((c) => is_configuration(c))
@@ -1513,7 +1513,7 @@ try {
     });
     check(
       `freeze-excluded:${coll}`,
-      `no caller creates a ${coll} row, so decision-053 has no write here to freeze`,
+      `no caller creates a ${coll} row, so decision:workspace-configuration-freeze has no write here to freeze`,
       s,
       403,
     );
@@ -1524,7 +1524,7 @@ try {
   function write_overrides(coll: string, writer_id: string): Record<string, any> {
     /** The values a type-default body cannot invent: what each collection's guards demand.
      *
-     * workspace_members carries no branch here: decision-073 nulled its createRule (only R3
+     * workspace_members carries no branch here: decision:invitation-keyed-by-email nulled its createRule (only R3
      * mints a row), so it left CONFIGURATION and this function never runs against it. */
     const out: Record<string, any> = { workspace: FREEZE_WS };
     if (field_named(coll, "owner")) {
@@ -1573,7 +1573,7 @@ try {
     /** Every writer against every configuration collection, one check per pair. */
     const [create_x, update_x, delete_x] = expected;
     for (const coll of CONFIGURATION) {
-      // workspace_invitations has no update surface at all (decision-073: R1 mints, R5
+      // workspace_invitations has no update surface at all (decision:invitation-keyed-by-email: R1 mints, R5
       // deletes, no PATCH route or rule) — a null updateRule is ALWAYS 403 for a
       // non-superuser, live or frozen alike (the null-rule idiom, not a trash effect).
       const want_update = (UPDATE_RULES[coll] ?? null) !== null ? update_x : 403;

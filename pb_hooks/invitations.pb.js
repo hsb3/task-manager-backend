@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// workspace_invitations: the server-side fold on create, and the invitee's list/accept/decline routes (decision-073).
+// workspace_invitations: the server-side fold on create, and the invitee's list/accept/decline routes (decision:invitation-keyed-by-email).
 
 // Universal, not *Request: the invite route's programmatic save and a direct collection create
 // must reach the same key, and the (workspace, email_key) unique index is the backstop.
@@ -383,7 +383,7 @@ routerAdd(
   $apis.requireAuth("users"),
 );
 
-// Every collection read of an invitation carries the backend-computed expiry (decision-077); the collection rules stay the only authorization.
+// Every collection read of an invitation carries the backend-computed expiry (decision:backend-owns-business-rules); the collection rules stay the only authorization.
 onRecordEnrich((e) => {
   // ── INLINED EXPIRY DAYS (enrich copy) — KEEP IN SYNC: pb_hooks/invitation_expiry.pb.js `invitation_expiry_days` ──
   let days = 7;

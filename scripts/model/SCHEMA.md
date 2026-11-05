@@ -25,7 +25,7 @@ asymmetry), Oso ReBAC patterns.
 dashboard `/_/`), and two catch-alls the next section defines: `custom(<verbatim>)` for an
 unnamed grant, `custom-compound(<reduced>)` for a composition of named ones.
 
-`active-workspace-member` is the post-PBTT-431 (decision-039) membership grant: the
+`active-workspace-member` is the post-PBTT-431 (decision:active-membership-grants-access) membership grant: the
 same-row pair `…workspace_members_via_workspace.user ?= @request.auth.id &&
 …workspace_members_via_workspace.status ?= "active"`, both conjuncts on the same
 field-path prefix, so a suspended/invited row confers nothing. The bare

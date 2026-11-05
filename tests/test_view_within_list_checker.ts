@@ -275,7 +275,7 @@ try {
   fs.rmSync(scratch_dir, { recursive: true });
 }
 
-// decision-073 made workspaces.viewRule equal its listRule; card q46b leaves project_items' trash
+// decision:invitation-keyed-by-email made workspaces.viewRule equal its listRule; card q46b leaves project_items' trash
 // branch as the only shipped exception, and the synthetic cases below add to it.
 const SHIPPED_ALLOW = new Map(vwl.ALLOWLIST);
 const ALLOWED_COLLECTIONS = sorted([...SHIPPED_ALLOW.keys()].map((k) => JSON.parse(k)[0]));

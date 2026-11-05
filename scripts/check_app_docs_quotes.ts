@@ -52,68 +52,8 @@ export class Alias {
   ) {}
 }
 
-const _DRAFT_PLACEHOLDER =
-  "draft = false || author = @request.auth.id || workspace.owner = @request.auth.id";
-const _ADMIN_PREDICATE =
-  "workspace_members_via_workspace.user ?= @request.auth.id " +
-  '&& workspace_members_via_workspace.role ?= "admin"';
-const _SELF_LEAVE = "user = @request.auth.id";
-const _BODY_OWNER_GUARD = "@request.body.owner = @request.auth.id";
-const _BOARD_DECISION_WHY =
-  "verbatim board decision record (card p1qr): immutable once accepted, so it quotes the rule " +
-  "as ruled and pins no live host";
-
 export const REGISTRY = new Map<string, (Rule | Prose | Alias)[]>([
-  [
-    "decboard0000014",
-    [
-      new Prose(
-        "id = @request.auth.id && @request.body.approved:isset = false",
-        _BOARD_DECISION_WHY,
-      ),
-      new Prose("verified = true && approved = true", _BOARD_DECISION_WHY),
-    ],
-  ],
-  ["decboard0000018", [new Prose('@request.auth.id != ""', _BOARD_DECISION_WHY)]],
-  [
-    "decboard0000023",
-    [
-      new Prose("owner = @request.auth.id", _BOARD_DECISION_WHY),
-      new Prose("owner = @request.auth.id", _BOARD_DECISION_WHY),
-    ],
-  ],
-  ["decboard0000040", [new Prose("@request.body.role:isset = false", _BOARD_DECISION_WHY)]],
   ["z6vik0zsp8v6sfa", [new Rule("app_settings.listRule")]],
-  [
-    "b2hi91tbm9h80tx",
-    [
-      new Prose(
-        _DRAFT_PLACEHOLDER,
-        "draft-privacy clause abbreviated with an <admin member> placeholder",
-        "decisions.listRule",
-      ),
-    ],
-  ],
-  [
-    "o6b9tapmrhfb482",
-    [
-      new Prose(
-        _DRAFT_PLACEHOLDER,
-        "draft-privacy clause abbreviated with an <admin member> placeholder",
-        "documents.listRule",
-      ),
-    ],
-  ],
-  [
-    "5fj7r3965k7obxi",
-    [
-      new Prose(
-        _DRAFT_PLACEHOLDER,
-        "draft-privacy clause abbreviated with an <admin member> placeholder",
-        "milestones.listRule",
-      ),
-    ],
-  ],
   [
     "g2ntf1col2docs3",
     [
@@ -123,21 +63,11 @@ export const REGISTRY = new Map<string, (Rule | Prose | Alias)[]>([
   ],
   ["8g6448cc7r5ql8h", [new Rule("projects.createRule")]],
   [
-    "g3svw1col2docs3",
-    [
-      new Prose(
-        _BODY_OWNER_GUARD,
-        "body-owner guard named alone; the live createRule also carries the membership clause",
-        "saved_views.createRule",
-      ),
-    ],
-  ],
-  [
     "g2sub1col2docs3",
     [
       new Rule("task_subscribers.deleteRule"),
       new Prose(
-        _SELF_LEAVE,
+        "user = @request.auth.id",
         "self-subscribe clause of createRule, textually identical to the whole deleteRule",
         "task_subscribers.createRule",
       ),
@@ -154,69 +84,15 @@ export const REGISTRY = new Map<string, (Rule | Prose | Alias)[]>([
     ],
   ],
   [
-    "9c1v6gwnu5scu17",
+    "dec069o2bdenorm",
     [
       new Prose(
-        _SELF_LEAVE,
-        "self-leave branch of the live deleteRule, quoted alone",
-        "workspace_members.deleteRule",
-      ),
-      new Prose(
-        "workspace.owner != @request.auth.id",
-        "owner-cannot-self-leave branch of the live deleteRule, quoted alone",
-        "workspace_members.deleteRule",
+        "active_members ~ @request.auth.id",
+        "membership branch of the view rule, quoted alone",
+        "project_items.listRule",
       ),
     ],
   ],
-  ["tx7ka2z2p2zc6gj", [new Rule("app_settings.listRule")]],
-  [
-    "ibitdtvttsl06g0",
-    [new Rule("decisions.createRule"), new Alias("milestones.createRule", "decisions.createRule")],
-  ],
-  [
-    "a72gm06kuii1s9w",
-    [
-      new Prose(
-        "owner = @request.auth.id",
-        "historical v001-v002 projects rule; superseded in m14",
-      ),
-    ],
-  ],
-  [
-    "n8n6f4nc2bwnre6",
-    [
-      new Rule("projects.createRule"),
-      new Prose(
-        "owner = @request.auth.id",
-        "historical pre-W1 projects.createRule the decision replaced",
-      ),
-    ],
-  ],
-  ["dec069o2bdenorm", [new Prose("active_members ~ @request.auth.id", _BOARD_DECISION_WHY)]],
-  ["dec070invitwait", [new Prose('status ?= "active"', _BOARD_DECISION_WHY)]],
-  ["8ya4xm7edxttyuz", [new Rule("project_stats.listRule")]],
-  [
-    "vjl4z5mc7b11ga2",
-    [
-      new Prose(
-        _ADMIN_PREDICATE,
-        "admin back-relation predicate quoted as a fragment, not a whole rule",
-        "workspaces.updateRule",
-      ),
-    ],
-  ],
-  [
-    "g3dec1views0001",
-    [
-      new Prose(
-        _BODY_OWNER_GUARD,
-        "body-owner guard named alone; the live createRule also carries the membership clause",
-        "saved_views.createRule",
-      ),
-    ],
-  ],
-  ["ifnrzn0lt9qdi41", [new Rule("users.createRule"), new Rule("users.authRule")]],
-  ["82khh111olkehro", [new Rule("user_settings.listRule")]],
 ]);
 
 // --- span extraction ------------------------------------------------------------------

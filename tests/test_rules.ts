@@ -164,11 +164,11 @@ check("Alice updates Bob's project", s, 404);
 [s] = await api("DELETE", `/api/collections/projects/records/${BOB_PROJECT}`, alice);
 check("Alice deletes Bob's project", s, 404);
 
-// decision-023 (safety wave): UPDATE widens to any NON-VIEWER member (a member-created
+// decision:project-write-access (safety wave): UPDATE widens to any NON-VIEWER member (a member-created
 // project was un-editable by its creator); DELETE stays owner/admin; `owner` is now
 // purely informational. (rule:projects.update / rule:projects.delete already COVERED above.)
 console.log(
-  "\n── UPDATE widened to non-viewer members; DELETE stays owner/admin (decision-023) ──",
+  "\n── UPDATE widened to non-viewer members; DELETE stays owner/admin (decision:project-write-access) ──",
 );
 const PROJ = "/api/collections/projects/records";
 const bob_member = await tierkit.actor_at_tier(ALICE_WORKSPACE, bob_id, "member", alice, "Bob");
@@ -186,9 +186,9 @@ const BOB_CREATED = r.id ?? null;
 [s] = await api("PATCH", `${PROJ}/${BOB_CREATED}`, bob, {
   name: "Bob edits the project he created",
 });
-check("Bob (member/creator) updates his project (200, decision-023)", s, 200);
+check("Bob (member/creator) updates his project (200, decision:project-write-access)", s, 200);
 [s] = await api("PATCH", `${PROJ}/${ALICE_PROJECT}`, bob, { description: "member edit" });
-check("Bob (member) updates Alice's project (200, decision-023)", s, 200);
+check("Bob (member) updates Alice's project (200, decision:project-write-access)", s, 200);
 
 // Non-member: denied (run BEFORE Carol joins the workspace). The row COUNT rides the
 // expectation — a stray membership would make this same 404 prove the viewer tier instead.
@@ -199,7 +199,7 @@ check(
   tup(0, 404),
 );
 
-// workspace_members.createRule is null (decision-073): only superuser/system (the accept
+// workspace_members.createRule is null (decision:invitation-keyed-by-email): only superuser/system (the accept
 // route) creates a membership row — an owner direct-create is refused outright.
 [s] = await api("POST", "/api/collections/workspace_members/records", alice, {
   workspace: ALICE_WORKSPACE,

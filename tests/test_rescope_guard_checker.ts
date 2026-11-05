@@ -178,6 +178,18 @@ check(
   null,
 );
 check(
+  "a decision:<slug> satisfies it",
+  rescope.check_allowlist_proof({ why: "ruled in decision:workspace-tenancy: not a tenant edge" }),
+  null,
+);
+check(
+  "a bare decision: with no slug does not",
+  (rescope.check_allowlist_proof({ why: "ruled in decision: above" }) || "").startsWith(
+    "reason cites no card/decision",
+  ),
+  true,
+);
+check(
   "a 4-char kata ref satisfies it",
   rescope.check_allowlist_proof({ why: "ruled on card 9fkw: not a tenant edge" }),
   null,

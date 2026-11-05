@@ -236,7 +236,7 @@ const [wendy_email, wendy_id] = await make_user(su, "Wendy Settings");
 created_user_ids.push(wendy_id);
 const [wendy] = await login(wendy_email);
 const WENDY_WORKSPACE = await find_id("workspaces", "owner", wendy_id, su);
-// shadow=false: decision-052 provisions an invisible container project FIRST, so an
+// shadow=false: decision:shadow-project provisions an invisible container project FIRST, so an
 // unfiltered find-first here resolves it instead of the visible default project — and the
 // container is deliberately not choosable as a default_project.
 const _wendy_projects =

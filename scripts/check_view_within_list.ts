@@ -38,7 +38,7 @@ export const VIEW_SUFFIX = ".view.json";
 export const SUPERUSER_ONLY = "<superuser-only>";
 
 // Key JSON([collection, canonical clause]) -> the ruling that makes a reported case correct.
-// decision-073 dropped the invited-member viewRule branch this used to allowlist (workspaces'
+// decision:invitation-keyed-by-email dropped the invited-member viewRule branch this used to allowlist (workspaces'
 // view and list rules are now identical). project_items' trash branch is the one case today.
 const TRASH_BRANCH_RULING =
   "card q46b: project_items' viewRule ORs a trash branch so one GET resolves an item's type, live or trashed, admitting exactly whom GET /api/tracker/trash shows the row to";

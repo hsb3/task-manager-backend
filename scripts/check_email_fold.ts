@@ -11,7 +11,7 @@
  * domains, and making one copy diverge from its siblings. So each copy's fold CORE is
  * extracted, normalised (comments stripped, whitespace collapsed) and required to be
  * textually IDENTICAL to the reference copy. The reference is the single copy in
- * pb_hooks/oauth.pb.js. It used to be the users.email_key backfill migration, chosen because a historical migration cannot drift — decision-069 rebuilt pb_migrations/ as one
+ * pb_hooks/oauth.pb.js. It used to be the users.email_key backfill migration, chosen because a historical migration cannot drift — decision:project-items-membership-denormalised rebuilt pb_migrations/ as one
  * baseline set and a backfill has no place in it, since every database now boots fresh from the
  * current set. Which copy is named the reference decides only WHOSE spelling the others must
  * match, never whether they match: any copy drifting alone still fails, whichever one is pinned.

@@ -495,7 +495,7 @@ try {
     );
   }
   const before = digest_unread(jones_id);
-  // decision-072 exempts only a superuser from the one-way guard, so that is the only way left
+  // decision:draft-private-publish-one-way exempts only a superuser from the one-way guard, so that is the only way left
   // to reach the redrafted state this block proves the inbox exclusion against.
   [s] = await api("PATCH", `/api/collections/documents/records/${py_str(VDOC)}`, bram, {
     draft: true,
@@ -727,7 +727,7 @@ try {
     status: "suspended",
   });
   check("Eve holds a suspended membership row in the workspace", s, 200);
-  // decision-073: a pending invitee holds NO membership row — a pending workspace_invitations
+  // decision:invitation-keyed-by-email: a pending invitee holds NO membership row — a pending workspace_invitations
   // row for Finn's address instead (workspace_members.createRule is null; only R3 mints one).
   [s] = await api("POST", "/api/collections/workspace_invitations/records", su, {
     workspace: WS,

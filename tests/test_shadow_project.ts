@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * decision-052: every workspace owns one invisible shadow project, and an item created with
+ * decision:shadow-project: every workspace owns one invisible shadow project, and an item created with
  * no project lands in it.
  *
  *   §1 a plain member creates an item with no project and it reads back in the shadow project
@@ -290,7 +290,7 @@ async function create_projectless(
 }
 
 console.log(
-  `════════ test_shadow_project.ts — decision-052 shadow project (room on :${PORT}) ════════`,
+  `════════ test_shadow_project.ts — decision:shadow-project shadow project (room on :${PORT}) ════════`,
 );
 const room = new Room(PORT);
 try {
@@ -461,7 +461,7 @@ try {
   });
   check("a create carrying neither project nor workspace is still refused, unchanged", status, 400);
 
-  // decision-052 must survive an UPDATE, not only a create.
+  // decision:shadow-project must survive an UPDATE, not only a create.
   console.log("\n── §1 clearing an item's project re-lands it in the shadow project ──");
   for (const [coll, title_field] of PARITY_ITEMS) {
     const body: Record<string, any> = {
@@ -488,7 +488,7 @@ try {
     );
   }
 
-  // decision-052 — the container is a placement, never a choice.
+  // decision:shadow-project — the container is a placement, never a choice.
   console.log("\n── §1 the container cannot be named by a client, and nothing may point at it ──");
   // COVERS: hook:shadow.pb.js#onRecordCreateRequest:tasks, hook:shadow.pb.js#onRecordCreateRequest:decisions
   // COVERS: hook:shadow.pb.js#onRecordCreateRequest:documents, hook:shadow.pb.js#onRecordCreateRequest:milestones
@@ -883,7 +883,7 @@ try {
   );
   check("the shadow project row is UNCHANGED by the workspace trash", after[0], before[0]);
   check("the normal project row is unchanged too — same treatment", after[1], before[1]);
-  // decision-050 hides a trashed workspace's contents by rule traversal, so the container
+  // decision:workspace-trash-cascades hides a trashed workspace's contents by rule traversal, so the container
   // disappears with the workspace without anything being stamped on it.
   check(
     "Eve lists NO project of the trashed workspace, shadow or ordinary",
@@ -1092,7 +1092,7 @@ try {
     "",
   );
   check(
-    "it keeps ordinal 0, the same as a project-less item before decision-052",
+    "it keeps ordinal 0, the same as a project-less item before decision:shadow-project",
     fault_task.ordinal ?? null,
     0,
   );

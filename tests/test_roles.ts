@@ -296,7 +296,7 @@ check_in("setup: Ivan assigned a project-less task in Alice's workspace", s, [20
 const IVAN_PL_TASK = ivan_task["id"];
 
 [s, ivan_task_read] = await api("GET", `/api/collections/tasks/records/${IVAN_PL_TASK}`, alice);
-// decision-052: a create with no project lands in the workspace shadow project, which only a
+// decision:shadow-project: a create with no project lands in the workspace shadow project, which only a
 // superuser can resolve — the projects rules hide it from every tenant role.
 [, _shadow] = await api(
   "GET",
@@ -386,7 +386,7 @@ check("cleanup: Bob's role reverted to member", s, 200);
 bob_member = await tierkit.actor_at_tier(ALICE_WORKSPACE, bob_id, "member", alice, "Bob");
 
 // COVERS: rule:workspace_members.create, rule:workspace_members.delete
-// decision-073: createRule is null — only superuser/system (the accept route) mints a
+// decision:invitation-keyed-by-email: createRule is null — only superuser/system (the accept route) mints a
 // membership row; direct create by an admin is now refused outright. deleteRule is
 // untouched, so admin roster-removal still works.
 console.log(
@@ -435,7 +435,7 @@ const BOB_PROJECT = bob_proj["id"];
 
 // COVERS: rule:projects.update, rule:projects.delete
 console.log(
-  "\n── PROJECT EDIT/DELETE: member edits (decision-023); delete stays owner/admin (OQ-1) ──",
+  "\n── PROJECT EDIT/DELETE: member edits (decision:project-write-access); delete stays owner/admin (OQ-1) ──",
 );
 [s, admin_proj] = await api("POST", "/api/collections/projects/records", alice, {
   name: "role-test: admin edit/delete project",
@@ -452,7 +452,7 @@ check("project edit/delete: admin (Carol) edits a project she doesn't own", s, 2
   name: "member-edited",
 });
 check(
-  "project edit/delete: plain member (Bob) edit allowed (decision-023)",
+  "project edit/delete: plain member (Bob) edit allowed (decision:project-write-access)",
   tup(await bob_member.now(), s),
   tup("member", 200),
 );

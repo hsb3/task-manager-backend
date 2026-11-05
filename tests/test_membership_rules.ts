@@ -180,7 +180,7 @@ let bob_member = await tierkit.actor_at_tier(ALICE_WORKSPACE!, bob_id, "member",
 console.log(
   "\n── MEMBER MANAGEMENT: createRule is null — NO user token may create a membership ──",
 );
-// createRule is null now for every caller, owner included (decision-073): the only way in is
+// createRule is null now for every caller, owner included (decision:invitation-keyed-by-email): the only way in is
 // the invite+accept join flow (tests/test_invitations.ts) or a superuser/system create. A null
 // rule refuses with 403 before field validation ever runs — the rule idiom's "no rule at all"
 // case, distinct from an explicit rule evaluating false (400).
@@ -532,7 +532,7 @@ if (ws2.id) {
 }
 
 // TASK-008.06/.07: workspace_members gains a read-only `viewer` role + a `status`
-// select (membership lifecycle: active/suspended only — decision-073 retires "invited" from
+// select (membership lifecycle: active/suspended only — decision:invitation-keyed-by-email retires "invited" from
 // this collection to workspace_invitations). Each
 // block below is self-contained (its own setup + cleanup) and restores Carol to a
 // non-member at the end, preserving the invariant the rest of this suite relies on.
@@ -1034,13 +1034,13 @@ for (const [tag, ids] of [
 }
 check("cleanup: every draft-privacy fixture purged", draft_left, []);
 
-// PBTT-359/365/INVITE-BY-EMAIL retired from this file (decision-073): resolve-member-email
+// PBTT-359/365/INVITE-BY-EMAIL retired from this file (decision:invitation-keyed-by-email): resolve-member-email
 // now mints a workspace_invitations row, never a workspace_members row, and the role/status
 // authorization matrix (owner vs active/suspended admin, pending-invitation-confers-nothing,
 // hidden-email regression) is the FULL oracle in tests/test_invite_mirror.ts and
 // tests/test_invitations.ts — this file keeps only the membership-RULE proofs above/below.
 
-// PBTT-431 (decision-039): a membership whose status is not "active" loses READ as well as
+// PBTT-431 (decision:active-membership-grants-access): a membership whose status is not "active" loses READ as well as
 // WRITE — full revocation, Linear-style. Everything below runs in a workspace of its OWN so the
 // seeded fixtures the rest of this suite depends on stay untouched. tierkit refuses a non-active
 // tier by design, so each cell brackets its block by reading the stored (role, status) back at
@@ -1190,7 +1190,7 @@ async function standing(row_id: string): Promise<any> {
   return tup(row.role, row.status);
 }
 
-// Status moves only active<->suspended by PATCH (decision-073: the join flow no longer PATCHes
+// Status moves only active<->suspended by PATCH (decision:invitation-keyed-by-email: the join flow no longer PATCHes
 // this collection at all), so any other move re-mints the row as superuser; callers keep the id.
 async function set_standing(
   row_id: string,
@@ -1399,7 +1399,7 @@ const WRITE_TARGETS: [
     new Set(),
     new Set(["admin"]),
   ],
-  // createRule is null (decision-073): no tier, however privileged, may create a membership
+  // createRule is null (decision:invitation-keyed-by-email): no tier, however privileged, may create a membership
   // directly — the create half is the null-rule 403 path regardless of role/status; the update
   // half still exercises the unchanged admin-role update rule.
   [
@@ -1619,7 +1619,7 @@ check(
 );
 
 // TRAP 2: the ruling names every non-active status, not just the obvious one — but a PENDING
-// invitation (decision-073's replacement for the retired "invited" membership status) is not a
+// invitation (decision:invitation-keyed-by-email's replacement for the retired "invited" membership status) is not a
 // membership row at all, so it must read EXACTLY like a non-member, workspace view included (the
 // old invited-member viewRule carve-out is gone too; R2 carries workspace_name instead).
 console.log(
@@ -1700,8 +1700,8 @@ check(
 [s] = await api("DELETE", `${GM}/${victim_row}`, alice);
 check("cleanup: membership delete target removed", s, 204);
 
-// PBTT-428 (decision-040, the admin-mints-only-member role pin) and PBTT-464 (the
-// mint-only-"invited"-status pin) are RETIRED: createRule is null (decision-073), so no tier —
+// PBTT-428 (decision:role-tiers, the admin-mints-only-member role pin) and PBTT-464 (the
+// mint-only-"invited"-status pin) are RETIRED: createRule is null (decision:invitation-keyed-by-email), so no tier —
 // not even an ACTIVE admin or the OWNER — may create a membership row directly any more, for
 // any role or status. That single fact is already proven for owner and non-owner alike in
 // MEMBER MANAGEMENT above and inside the write matrix's null-rule cell; the join-flow
@@ -1759,7 +1759,7 @@ check(
 [s] = await api("DELETE", `/api/collections/tasks/records/${member_purge}`, alice);
 check("cleanup: member purge probe purged by the owner", s, 204);
 
-// PBTT-461 (decision-039): saved_views.update/delete used to grant on `owner = @request.auth.id`
+// PBTT-461 (decision:active-membership-grants-access): saved_views.update/delete used to grant on `owner = @request.auth.id`
 // alone, so a suspended member kept editing and deleting a view they already 404'd on reading.
 // Workspace ownership stays the one ungated branch, so Alice is the control that keeps a 404 here
 // from meaning "the rule is simply shut".
@@ -1985,7 +1985,7 @@ check(
   204,
 );
 
-// S-MEMBERS: status moves only active<->suspended (decision-073 retires "invited" and the
+// S-MEMBERS: status moves only active<->suspended (decision:invitation-keyed-by-email retires "invited" and the
 // invitee's own-accept PATCH clause from this collection entirely — the join flow is now R1
 // mint + R3 accept, the full oracle in tests/test_invitations.ts). This block keeps only the
 // membership-RULE proofs that still apply to an EXISTING active/suspended row, plus one proof

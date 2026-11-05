@@ -520,7 +520,7 @@ try {
   });
   check("Alice creates a PROJECT-LESS task (workspace set, no project)", s, 200);
   const PLT = ptask.id;
-  // decision-052: a create with no project lands in the workspace shadow project, which only
+  // decision:shadow-project: a create with no project lands in the workspace shadow project, which only
   // a superuser can resolve — the projects rules hide it from every tenant role.
   const [, _shadow] = await api(
     "GET",
@@ -1451,7 +1451,7 @@ try {
     const [s_c] = await api("GET", `/api/collections/comments/records/${comment_id}`, tok);
     const [s_t] = await api("GET", `/api/collections/tasks/records/${task_id}`, tok);
     check(`${label} can no longer read the comment → 404`, s_c, 404);
-    // Since decision-050 (g7kg) tasks.listRule carries the workspace.trashed clause too, so a
+    // Since decision:workspace-trash-cascades (g7kg) tasks.listRule carries the workspace.trashed clause too, so a
     // trashed workspace hides the comment, its preview and the task itself.
     check(`${label} reads the task → ${task_status}`, s_t, task_status);
     const previews = (await inbox_of(tok)).map((x) => x.comment_preview);
@@ -1799,7 +1799,7 @@ try {
   // resolves to a member by the time the body is edited, and that edit must notify.
   console.log("\n── (14) edit replay guard: what was already sent, not what would resolve now ──");
   const ivy_id = await make_user("Ivy", "ivy@example.com");
-  // decision-073: a pending invitee holds NO membership row — a pending workspace_invitations
+  // decision:invitation-keyed-by-email: a pending invitee holds NO membership row — a pending workspace_invitations
   // row for Ivy's address instead (workspace_members.createRule is null; only R3 mints one).
   let ivy_inv: any;
   [s, ivy_inv] = await api("POST", "/api/collections/workspace_invitations/records", su, {

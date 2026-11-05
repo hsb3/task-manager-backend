@@ -27,7 +27,7 @@ pocketbase plugin's field notes; what follows is what this repo's hooks add.
   for its universal writer.
 - A migration CANNOT change a field's type in place — applies without error, changes NOTHING.
   Recipe: add new field → copy rows → detach any view referencing the old column → remove old +
-  rename (worked example collapsed by decision-069's baseline rebuild —
+  rename (worked example collapsed by decision:project-items-membership-denormalised's baseline rebuild —
   `v1:1785152200_tasks_vocab.js`, readable at the v1 tag in `hsb3/task-manager`).
 - A migration citation is written `v1:FILE` (checked against the vendored
   v1 name list `scripts/migrations-v1.txt`, since the v1 tag lives only in `hsb3/task-manager`) or

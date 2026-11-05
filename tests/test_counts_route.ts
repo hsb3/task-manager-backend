@@ -421,7 +421,7 @@ try {
   await add_member(admin_id, "admin");
   await add_member(member1_id, "member");
   await add_member(member2_id, "member");
-  // decision-073: `invited` retires from workspace_members — a pending invite is its own
+  // decision:invitation-keyed-by-email: `invited` retires from workspace_members — a pending invite is its own
   // workspace_invitations row, and the invitee holds NO membership row until accepted.
   [s] = await api("POST", "/api/collections/workspace_invitations/records", su, {
     workspace: WS,

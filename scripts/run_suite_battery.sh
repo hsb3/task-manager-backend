@@ -521,9 +521,9 @@ run_suite "test_scale_membership"   bun tests/test_scale_membership.ts
 # ── S-INVITE: the invite route is not an email oracle, and its createRule mirror is differential.
 run_suite "test_invite_mirror"      bun tests/test_invite_mirror.ts
 
-# ── I-INVITE: R1-R6 of decision-073's workspace_invitations flow, incl. every refusal path.
+# ── I-INVITE: R1-R6 of decision:invitation-keyed-by-email's workspace_invitations flow, incl. every refusal path.
 run_suite "test_invitations"        bun tests/test_invitations.ts
-# ── I-INVITE: decision-075 — the per-inviter daily invitation limit and decline suppression.
+# ── I-INVITE: decision:invitation-send-limit-and-decline-block — the per-inviter daily invitation limit and decline suppression.
 run_suite "test_invitation_limits"  bun tests/test_invitation_limits.ts
 
 # ── security: tenant-anchor relations are immutable on update — self-booting (own clean room).
@@ -532,7 +532,7 @@ run_suite "test_rescope_guard"      bun tests/test_rescope_guard.ts
 # ── security: trashed/draft records stay invisible on every read surface, cases derived from schema/.
 run_suite "test_visibility_invariants" bun tests/test_visibility_invariants.ts
 
-# ── decision-072: a draft reaches only its author, the owner and an active admin, and Publish is one-way.
+# ── decision:draft-private-publish-one-way: a draft reaches only its author, the owner and an active admin, and Publish is one-way.
 run_suite "test_draft_publish"   bun tests/test_draft_publish.ts
 
 # ── security: a trashed workspace is unreadable but owner-enumerable and owner-restorable — self-booting.
@@ -562,7 +562,7 @@ run_suite "test_bulk_load_projects" bun tests/test_bulk_load_projects.ts
 # ── ops: a refused boot names the cron VARIABLE, and a refusing migration exits non-zero and never binds — self-booting.
 run_suite "test_boot_refusals"      bun tests/test_boot_refusals.ts
 
-# ── decision-052: the per-workspace shadow project is invisible and holds every project-less item.
+# ── decision:shadow-project: the per-workspace shadow project is invisible and holds every project-less item.
 run_suite "test_shadow_project"     bun tests/test_shadow_project.ts
 
 # ── ops: every pb_hooks file is LOADED in a booted room (PB serves on with one absent).

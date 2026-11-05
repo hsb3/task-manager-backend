@@ -1,16 +1,14 @@
 #!/usr/bin/env bun
 /**
- * Gate: every `decision-NNN` cited in a repo file resolves against the accepted frontier.
+ * Gate: every `decision:<slug>` cited in a repo file names a registered decision, and no
+ * numbered `decision-NNN` citation survives outside docs/generated/.
  *
  * Scans git-tracked files plus untracked, non-ignored ones (a new file cites before it is
  * added); `--staged` (the pre-commit hook) scans the index instead, register included, so the
- * verdict is about what the commit records. The register (docs/generated/decisions.md) mirrors
- * ACCEPTED decisions only, and accepted numbers are contiguous from 001, so the highest `- **Title:** decision-NNN:` row
- * marks the frontier: a citation at or below it with no row is the real bug (a hole in an
- * accepted range); a citation above it names a decision still open for ratification and is
- * reported, not failed, so the frontier can never hide it silently. An empty register fails
- * every citation instead of treating every number as "above" a frontier that does not exist.
- * Needs no server and no kata daemon.
+ * verdict is about what the commit records. The register (docs/generated/decisions.md) holds one
+ * `- **Slug:**` row per decision record; an empty register fails every slug citation. A slug
+ * preceded by a word character or `.` is PocketBase rule text (`@request.body.decision:isset`),
+ * not a citation. Needs no server and no kata daemon.
  *
  * Usage: bun scripts/check_decision_citations.ts [--repo DIR] [--register FILE] [--staged]
  */
@@ -20,9 +18,22 @@ import { parse_args } from "./_argparse.ts";
 import { py_int, py_strip, read_text } from "./_py.ts";
 
 export const REPO = path.dirname(path.dirname(path.resolve(import.meta.path)));
-export const CITATION = /(?<![\p{L}\p{N}_])decision-(\p{Nd}{3})(?![\p{L}\p{N}_])/giu;
+export const NUMBERED = /(?<![\p{L}\p{N}_])decision-(\p{Nd}{3})(?![\p{L}\p{N}_])/giu;
+// KEEP IN SYNC: scripts/gen_decisions.ts DECISION_SLUG name part `[a-z0-9]+([-_][a-z0-9]+)*`
+const NAME = "[a-z0-9]+([-_][a-z0-9]+)*";
+export const SLUG = new RegExp(`(?<![\\p{L}\\p{N}_.])decision:(${NAME})(?![\\p{L}\\p{N}_-])`, "gu");
 // `^` per line: after "\n" only (JS's `m` flag would also break on \r and U+2028/9).
-export const REGISTER_TITLE = /(?<![^\n])- \*\*Title:\*\* decision-(\p{Nd}{3}):/gu;
+export const REGISTER_SLUG = new RegExp(
+  `(?<![^\\n])- \\*\\*Slug:\\*\\* \`decision:(${NAME})\``,
+  "gu",
+);
+export const GENERATED = "docs/generated/";
+// Fixture files that hold probe slugs on purpose; nothing else is exempt.
+export const EXEMPT = new Set([
+  "tests/test_gen_decisions.ts", // renderer probes: unregistered and malformed slugs
+  "tests/test_name_validation.ts", // slug-shape probes: unregistered and malformed slugs
+  "tests/test_decision_citations_checker.ts", // this gate's own planted citations
+]);
 
 export function git(repo: string, ...argv: string[]): [number, string, string] {
   // Bytes, decoded by hand: text mode would turn a lone CR into a record break.
@@ -53,6 +64,8 @@ export function* citing_lines(repo: string, staged: boolean): Generator<[string,
     "-i",
     "-e",
     "decision-",
+    "-e",
+    "decision:",
     "--",
     ".",
   );
@@ -81,19 +94,17 @@ export function* citing_lines(repo: string, staged: boolean): Generator<[string,
 const HELP = `usage: check_decision_citations.ts [-h] [--repo REPO] [--register REGISTER]
                                    [--staged]
 
-Gate: every \`decision-NNN\` cited in a repo file resolves against the accepted
-frontier. Scans git-tracked files plus untracked, non-ignored ones (a new file
-cites before it is added); \`--staged\` (the pre-commit hook) scans the index
-instead, register included, so the verdict is about what the commit records.
-The register (docs/generated/decisions.md) mirrors ACCEPTED decisions only,
-and accepted numbers are contiguous from 001, so the highest \`- **Title:**
-decision-NNN:\` row marks the frontier: a citation at or below it with no row
-is the real bug (a hole in an accepted range); a citation above it names a
-decision still open for ratification and is reported, not failed, so the
-frontier can never hide it silently. An empty register fails every citation
-instead of treating every number as "above" a frontier that does not exist.
-Needs no server and no kata daemon. Usage: bun
-scripts/check_decision_citations.ts [--repo DIR] [--register FILE] [--staged]
+Gate: every \`decision:<slug>\` cited in a repo file names a registered
+decision, and no numbered \`decision-NNN\` citation survives outside
+docs/generated/. Scans git-tracked files plus untracked, non-ignored ones (a
+new file cites before it is added); \`--staged\` (the pre-commit hook) scans the
+index instead, register included, so the verdict is about what the commit
+records. The register (docs/generated/decisions.md) holds one \`- **Slug:**\`
+row per decision record; an empty register fails every slug citation. A slug
+preceded by a word character or \`.\` is PocketBase rule text
+(\`@request.body.decision:isset\`), not a citation. Needs no server and no kata
+daemon. Usage: bun scripts/check_decision_citations.ts [--repo DIR] [--register
+FILE] [--staged]
 
 options:
   -h, --help           show this help message and exit
@@ -122,47 +133,36 @@ export function main(): number {
     : path.join(repo, "docs", "generated", "decisions.md");
 
   const registered = new Set(
-    [...read_register(repo, register_path, staged).matchAll(REGISTER_TITLE)].map((m) => m[1]!),
+    [...read_register(repo, register_path, staged).matchAll(REGISTER_SLUG)].map((m) => m[1]!),
   );
-  const frontier = registered.size ? Math.max(...[...registered].map(py_int)) : null;
+  const empty = registered.size ? "" : " (register is empty)";
 
   const misses: string[] = [];
-  const proposals: string[] = [];
   let cited = 0;
   for (const [rel, lineno, line] of citing_lines(repo, staged)) {
-    for (const m of line.matchAll(CITATION)) {
-      const num = m[1]!;
+    if (EXEMPT.has(rel)) continue;
+    for (const m of line.matchAll(SLUG)) {
       cited += 1;
-      if (frontier === null) {
-        misses.push(`${rel}:${lineno}: decision-${num} has no register row (register is empty)`);
-      } else if (py_int(num) > frontier) {
-        proposals.push(
-          `${rel}:${lineno}: decision-${num} (above accepted frontier decision-${String(frontier).padStart(3, "0")})`,
-        );
-      } else if (!registered.has(num)) {
-        misses.push(`${rel}:${lineno}: decision-${num} has no register row`);
+      if (!registered.has(m[1]!)) {
+        misses.push(`${rel}:${lineno}: decision:${m[1]} names no registered decision${empty}`);
       }
+    }
+    if (rel.startsWith(GENERATED)) continue;
+    for (const m of line.matchAll(NUMBERED)) {
+      misses.push(`${rel}:${lineno}: ${m[0]} is a numbered citation; cite decision:<slug>`);
     }
   }
 
   if (misses.length) {
-    console.log(`❌ check_decision_citations: ${misses.length} citation(s) with no register row`);
+    console.log(`❌ check_decision_citations: ${misses.length} unresolved citation(s)`);
     for (const miss of misses) {
       console.log(`  - ${miss}`);
     }
     console.log(
-      "   Cite only an accepted decision; seed its app_docs record, then: " +
-        "bun scripts/gen_decisions.ts",
+      "   Cite a decision by its app_docs slug decision:<slug>; a new decision needs its " +
+        "app_docs record seeded, then: bun scripts/gen_decisions.ts",
     );
     return 1;
-  }
-  if (proposals.length) {
-    console.log(
-      `ℹ️  check_decision_citations: ${proposals.length} citation(s) of a not-yet-accepted decision`,
-    );
-    for (const proposal of proposals) {
-      console.log(`  - ${proposal}`);
-    }
   }
   console.log(
     `✅ check_decision_citations: ${cited} citation(s), all ${registered.size} registered ` +

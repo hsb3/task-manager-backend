@@ -80,12 +80,12 @@ onRecordUpdateRequest((e) => {
   e.next();
 }, "comments");
 
-// decision-072: Publish is one-way — publishing already sent mention notifications that
+// decision:draft-private-publish-one-way: Publish is one-way — publishing already sent mention notifications that
 // nothing can retract, so going back would leave a member holding an invisible notification
 // row for an item they can no longer open. Withdrawal is Trash.
 // KEEP IN SYNC: publish-one-way block (decisions / documents / milestones).
 onRecordUpdateRequest((e) => {
-  // decision-072 refuses this direction for every authenticated caller, including one writing
+  // decision:draft-private-publish-one-way refuses this direction for every authenticated caller, including one writing
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
   const su = e.auth && e.auth.isSuperuser();
@@ -102,7 +102,7 @@ onRecordUpdateRequest((e) => {
 }, "decisions");
 
 onRecordUpdateRequest((e) => {
-  // decision-072 refuses this direction for every authenticated caller, including one writing
+  // decision:draft-private-publish-one-way refuses this direction for every authenticated caller, including one writing
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
   const su = e.auth && e.auth.isSuperuser();
@@ -119,7 +119,7 @@ onRecordUpdateRequest((e) => {
 }, "documents");
 
 onRecordUpdateRequest((e) => {
-  // decision-072 refuses this direction for every authenticated caller, including one writing
+  // decision:draft-private-publish-one-way refuses this direction for every authenticated caller, including one writing
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
   const su = e.auth && e.auth.isSuperuser();

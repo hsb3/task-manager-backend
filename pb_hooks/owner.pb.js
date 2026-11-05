@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// projects/workspaces/saved_views: owner is stamped from the caller at create (decision-077), so
+// projects/workspaces/saved_views: owner is stamped from the caller at create (decision:backend-owns-business-rules), so
 // no client has to resolve and send it. The createRule refuses a submitted owner naming anyone
 // else (v2:1785185200_collections.js); this hook fills the omitted one.
 

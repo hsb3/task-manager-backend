@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * decision-072: a draft is private to its author, the workspace owner and active admins, and Publish is one-way.
+ * decision:draft-private-publish-one-way: a draft is private to its author, the workspace owner and active admins, and Publish is one-way.
  *
  * Two claims, one room.
  *
@@ -60,7 +60,7 @@ const PASSWORD = "test123456";
 
 const SUBJECTS = ["decisions", "documents", "milestones"];
 
-// The exact string decision-072 §4 refuses with, as PocketBase puts it on the wire.
+// The exact string decision:draft-private-publish-one-way §4 refuses with, as PocketBase puts it on the wire.
 const REFUSAL = "A published item cannot be returned to draft. Move it to trash instead.";
 
 // caller -> (membership role, membership status) in the subject workspace; None is no row at
@@ -83,7 +83,7 @@ const WHO: Record<string, string> = {
   invited: "Ivy",
   stranger: "Nate",
 };
-// decision-072 §2 — the whole read set for a draft, and nobody else.
+// decision:draft-private-publish-one-way §2 — the whole read set for a draft, and nobody else.
 const CAN_READ_DRAFT = new Set(["author", "owner", "admin"]);
 // Everyone the workspace lets read a PUBLISHED item: the draft negatives' positive control.
 const CAN_READ_PUBLISHED = new Set(["author", "owner", "admin", "member", "viewer"]);
@@ -246,7 +246,7 @@ try {
 
   for (const [caller, [role, status]] of Object.entries(CALLERS)) {
     if (role === null) continue;
-    // workspace_members.status is active|suspended only (decision-073); created directly at
+    // workspace_members.status is active|suspended only (decision:invitation-keyed-by-email); created directly at
     // the target status — pb_hooks/membership_status.pb.js only moves active<->suspended.
     let row: any;
     [s, row] = await api("POST", "/api/collections/workspace_members/records", su, {
@@ -263,7 +263,7 @@ try {
   }
 
   // Ivy holds a PENDING invitation for the whole read matrix below, not a membership row —
-  // decision-073 retired self-accept; R3 (§4) is the only path from invitation to membership.
+  // decision:invitation-keyed-by-email retired self-accept; R3 (§4) is the only path from invitation to membership.
   let ivy_inv: any;
   [s, ivy_inv] = await api("POST", "/api/collections/workspace_invitations/records", su, {
     workspace: WS,
@@ -563,7 +563,9 @@ try {
 
   // ══════════════ §6 Publish is one-way ═══════════════════════════════════════════════
   // COVERS: hook:author.pb.js#onRecordUpdateRequest:decisions, hook:author.pb.js#onRecordUpdateRequest:documents, hook:author.pb.js#onRecordUpdateRequest:milestones
-  console.log("\n── §6 decision-072 §4: the published-to-draft direction is refused ──");
+  console.log(
+    "\n── §6 decision:draft-private-publish-one-way §4: the published-to-draft direction is refused ──",
+  );
   for (const coll of SUBJECTS) {
     const tf = title_field(coll);
     let made: any;
@@ -628,7 +630,7 @@ try {
       tup(200, false),
     );
 
-    // decision-072 §4 refuses the whole write, so an edit bundled into it rolls back too.
+    // decision:draft-private-publish-one-way §4 refuses the whole write, so an edit bundled into it rolls back too.
     [s] = await api("PATCH", `/api/collections/${coll}/records/${rid}`, TOKEN.author!, {
       [tf]: `DP ${coll} smuggled`,
       draft: true,
@@ -653,7 +655,7 @@ try {
       tup(200, false),
     );
 
-    // decision-072 §4 exempts only a superuser, because seeding and import are superuser
+    // decision:draft-private-publish-one-way §4 exempts only a superuser, because seeding and import are superuser
     // writes; every other caller is refused, direct collection writes included.
     [s] = await api("PATCH", `/api/collections/${coll}/records/${rid}`, su, { draft: true });
     check(
@@ -694,7 +696,7 @@ try {
       password: PASSWORD,
     });
     if (status === "pending") {
-      // decision-073: a pending invitee holds NO membership row at all.
+      // decision:invitation-keyed-by-email: a pending invitee holds NO membership row at all.
       const [s] = await api("POST", "/api/collections/workspace_invitations/records", su, {
         workspace: WS,
         email: email,

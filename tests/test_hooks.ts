@@ -109,7 +109,7 @@ const BOB_TODO_STATUS = await status_id(BOB_WORKSPACE, "todo", bob);
 let s: number;
 let r: any;
 
-// decision-042: nothing fills a task's assignee at create — an item created without one is
+// decision:tasks-have-no-default-assignee: nothing fills a task's assignee at create — an item created without one is
 // Unassigned, and only an explicit write puts a person on it.
 // COVERS: hook:main.pb.js#onRecordCreateRequest:tasks
 console.log("\n── SEMANTICS: a bare task create stays UNASSIGNED ──");

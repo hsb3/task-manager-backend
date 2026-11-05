@@ -171,7 +171,7 @@ check("its null viewRule is not scanned", vscan.rules_scanned, 1);
 console.log("\n── (b2) a view's pin lives in its viewQuery subselect, not in the rule ──");
 const PINNED = " AND m.status = 'active'";
 
-/** decision-069's shape: the roster denormalised onto the row by a correlated subselect. */
+/** decision:project-items-membership-denormalised's shape: the roster denormalised onto the row by a correlated subselect. */
 function member_query(pin: string, column = "members", alias = "m"): string {
   return (
     "SELECT u.id AS id, CAST(u.assignee AS TEXT) AS assignee, " +
@@ -570,7 +570,9 @@ check(
 for (const [text, want] of [
   ["cited PBTT-431", true],
   ["cited TASK-061", true],
-  ["cited decision-039", true],
+  ["cited decision-39", true],
+  ["cited decision:active-membership-grants-access", true],
+  ["decision: with no slug", false],
   ["owner ruling pz18", true],
   ["card 5ad2 says so", true],
   ["kata ref c9mm", true],
@@ -588,9 +590,9 @@ check(
 );
 
 console.log(
-  "\n── (d2) decision-073: the invitee-view exemption is GONE — the shipped rule pins directly ──",
+  "\n── (d2) decision:invitation-keyed-by-email: the invitee-view exemption is GONE — the shipped rule pins directly ──",
 );
-// `invited` retired from workspace_members.status (decision-073): workspaces.viewRule no longer
+// `invited` retired from workspace_members.status (decision:invitation-keyed-by-email): workspaces.viewRule no longer
 // carries the (active || invited) disjunct that needed its own allowlist entry — it now pins
 // status = "active" in the SAME conjunct as the user grant, which the scanner already accepts
 // with no exemption. ALLOWLIST_RULES is empty for exactly this reason.

@@ -705,7 +705,7 @@ try {
   check("(fixture) Alice creates a project-less task", s, 200);
   const PL_TASK = pltask.id ?? null;
   [s, r] = await api("GET", `/api/collections/tasks/records/${PL_TASK}`, alice);
-  // decision-052: a create with no project lands in the workspace shadow project, which only
+  // decision:shadow-project: a create with no project lands in the workspace shadow project, which only
   // a superuser can resolve — the projects rules hide it from every tenant role.
   const [, _shadow] = await api(
     "GET",
@@ -1808,7 +1808,7 @@ try {
       await s_target(rel, pid, `S-${rel}-live-c`),
     ]);
   }
-  // Since decision-052 a parent submitted with no project lands in the workspace's invisible
+  // Since decision:shadow-project a parent submitted with no project lands in the workspace's invisible
   // container, a live project no tenant can read: this parent proves the traversal still
   // reaches a thread whose project the writer cannot see.
   const [, shadow] = await api(
