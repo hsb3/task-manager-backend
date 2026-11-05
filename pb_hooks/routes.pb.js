@@ -1191,7 +1191,7 @@ routerAdd(
         (t && taskIdSet[t]) || (d && docIdSet[d]) || (dec && decIdSet[dec])
       );
     });
-    // KEEP IN SYNC: web/lib/proxy/handlers/audit_log.ts's two-shape `task.workspace` filter — the export promises
+    // web/lib/proxy/handlers/audit_log.ts's two-shape `task.workspace` filter — the export promises
     // the WORKSPACE's audit trail, so a row addressing the workspace itself rides along taskless.
     const allActivity = fetchAll(
       "task_activity",

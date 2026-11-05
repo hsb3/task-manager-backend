@@ -6,7 +6,7 @@ if [ ! -d "$verification_root/node_modules" ]; then
   echo "❌ Verification environment missing — run mise trust && make setup" >&2
   return 1
 fi
-for verification_tool in bun node; do
+for verification_tool in bun; do
   verification_pin=$(sed -n "s/^$verification_tool = \"\(.*\)\"/\1/p" mise.toml)
   verification_found=$($verification_tool --version 2>/dev/null)
   verification_found=${verification_found#v}
@@ -18,12 +18,11 @@ for verification_tool in bun node; do
     verification_found=${verification_found#v}
   fi
   if [ "$verification_found" != "$verification_pin" ]; then
-    case $verification_tool in bun) verification_name=Bun ;; *) verification_name=Node ;; esac
-    echo "❌ $verification_name $verification_pin required — run mise trust && make setup" >&2
+    echo "❌ Bun $verification_pin required — run mise trust && make setup" >&2
     return 1
   fi
 done
-# The prepared tree is root node_modules at package.json's devDependencies pins (npm ci).
+# The prepared tree is root node_modules at package.json's devDependencies pins (bun install).
 bun -e '
 const pins = (await Bun.file("package.json").json()).devDependencies ?? {};
 for (const [name, pin] of Object.entries(pins)) {

@@ -13,7 +13,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  by_code_point,
   decode_text,
   print,
   py_repr,
@@ -125,11 +124,6 @@ function build_fixture(): void {
       "const REPO = repo_root(import.meta.path);\n" +
       'const OUTPUT = path.join(REPO, "docs", "generated", "coverage.md");\n',
   );
-  write("web/scripts/gen-gamma.mjs", 'const OUT_JSON = "docs/gamma.json";\n');
-  write(
-    "web/openapi-ts.config.ts",
-    'export default defineConfig({\n  output: {\n    path: "./lib/delta",\n  },\n});\n',
-  );
 }
 
 print("── 1. every discovered generator shape contributes its own declared output ──");
@@ -145,10 +139,8 @@ check("patterns derived from every generator shape, plus the self-entry", attrib
   "docs/alpha.md merge=binary",
   "docs/beta.html merge=binary",
   "docs/closure.html merge=binary",
-  "docs/gamma.json merge=binary",
   "docs/generated/coverage.md merge=binary",
   "scripts/model/current/** merge=binary",
-  "web/lib/delta/** merge=binary",
 ]);
 check("--check is green right after a write", run("--check").returncode, 0);
 
@@ -216,14 +208,9 @@ const lines = splitlines(read_text(path.join(REPO_ROOT, ".gitattributes"))).filt
 );
 check("the shipped file carries patterns", lines.length > 0, true);
 check(
-  "the HERE-anchored and build*.ts generators are covered",
-  lines
-    .filter(
-      (ln) =>
-        ln.startsWith("scripts/model/current/") || ln.startsWith("docs/generated/status.html"),
-    )
-    .sort(by_code_point),
-  ["docs/generated/status.html merge=binary", "scripts/model/current/** merge=binary"],
+  "the HERE-anchored generator is covered",
+  lines.filter((ln) => ln.startsWith("scripts/model/current/")),
+  ["scripts/model/current/** merge=binary"],
 );
 
 const unmatched: string[] = [];

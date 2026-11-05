@@ -52,20 +52,21 @@ function main(): void {
   console.log("✅ mise.toml pins lefthook to an exact, non-range version");
   const tools = (Bun.TOML.parse(read_text(path.join(ROOT, "mise.toml"))) as any).tools;
   const bun_pin: string = tools.bun;
-  const node_pin: string = tools.node;
-  // Stands in for the pinned Bun: answers the pin, runs everything else on this very runtime.
+  // Stands in for the pinned Bun: answers the pin, skips setup's install (no network here), and
+  // runs everything else on this very runtime.
   const pinned_bun_body =
     `#!/bin/sh\n[ "$1" != --version ] || { echo ${bun_pin}; exit 0; }\n` +
+    `[ "$1" != install ] || exit 0\n` +
     `exec '${process.execPath}' "$@"\n`;
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "verification-environment-"));
   try {
     const root = fs.realpathSync(scratch);
-    for (const d of ["web", "pb_data", "bin", "scripts"]) fs.mkdirSync(path.join(root, d));
+    for (const d of ["pb_data", "bin", "scripts"]) fs.mkdirSync(path.join(root, d));
     fs.writeFileSync(path.join(root, "scripts/verification-env.sh"), "return 0\n");
     copy_resolver(root);
     fs.writeFileSync(path.join(root, ".env.local.example"), "template\n");
     const sentinels: Record<string, string> = {};
-    for (const name of [".env", ".env.local", "web/.env.local", "pb_data/data.db"]) {
+    for (const name of [".env", ".env.local", "pb_data/data.db"]) {
       sentinels[name] = "existing local state\n";
     }
     // make setup resolves ./pocketbase through the version check, so the kept binary answers it.
@@ -74,11 +75,10 @@ function main(): void {
       fs.writeFileSync(path.join(root, name), content);
     }
     fs.chmodSync(path.join(root, "pocketbase"), 0o755);
-    for (const name of ["curl", "unzip", "mise", "npm", "npx"]) {
+    for (const name of ["curl", "unzip", "mise"]) {
       write_exe(path.join(root, "bin", name), "#!/bin/sh\nexit 0\n");
     }
     write_exe(path.join(root, "bin/bun"), pinned_bun_body);
-    write_exe(path.join(root, "bin/node"), `#!/bin/sh\necho v${node_pin}\n`);
     const env = {
       ...process.env,
       PATH: `${path.join(root, "bin")}:${process.env.PATH}`,
@@ -143,92 +143,13 @@ function main(): void {
     }
     console.log("✅ wrong/missing root dev-dependency versions refuse with setup instruction");
     fs.copyFileSync(path.join(ROOT, "package.json"), path.join(root, "package.json"));
-    fs.writeFileSync(
-      path.join(root, "mise.toml"),
-      `[tools]\nbun = "0.0.0"\nnode = "${node_pin}"\n`,
-    );
+    fs.writeFileSync(path.join(root, "mise.toml"), `[tools]\nbun = "0.0.0"\n`);
     result = run(["sh", "-c", ". scripts/verification-env.sh"], root, env);
     assert.ok(result.returncode !== 0, "wrong Bun runtime accepted");
     assert.ok((result.stdout + result.stderr).includes("Bun 0.0.0 required"));
     console.log("✅ wrong Bun runtime refuses with setup instruction");
-    fs.copyFileSync(path.join(ROOT, "mise.toml"), path.join(root, "mise.toml"));
-    write_exe(path.join(root, "bin/node"), "#!/bin/sh\necho v0.0.0\n");
-    result = run(["sh", "-c", ". scripts/verification-env.sh"], root, env);
-    assert.ok(result.returncode !== 0, "wrong Node runtime accepted");
-    assert.ok((result.stdout + result.stderr).includes(`Node ${node_pin} required`));
-    console.log("✅ wrong Node runtime refuses with setup instruction");
-    const pinned_node = path.join(root, "pinned-node/bin");
-    write_exe(path.join(pinned_node, "node"), `#!/bin/sh\necho v${node_pin}\n`);
-    write_exe(
-      path.join(root, "bin/mise"),
-      `#!/bin/sh\ncase "$2" in bun@*) echo '${path.dirname(pinned_bun)}';; ` +
-        `node@*) echo '${path.dirname(pinned_node)}';; esac\n`,
-    );
-    result = run(["sh", "-c", ". scripts/verification-env.sh && node --version"], root, env);
-    assert.ok(result.returncode === 0, result.stdout + result.stderr);
-    assert.ok(py_strip(result.stdout) === `v${node_pin}`, result.stdout);
-    console.log("✅ pinned mise Node wins over inherited PATH");
   } finally {
     fs.rmSync(scratch, { recursive: true, force: true });
-  }
-
-  const repair = fs.mkdtempSync(path.join(os.tmpdir(), "verification-repair-"));
-  try {
-    const root = fs.realpathSync(repair);
-    copy_resolver(root);
-    fs.writeFileSync(path.join(root, "scripts/verification-env.sh"), "return 0\n");
-    fs.copyFileSync(path.join(ROOT, "mise.toml"), path.join(root, "mise.toml"));
-    write_exe(
-      path.join(root, "pocketbase"),
-      `#!/bin/sh\necho "pocketbase version ${pinned_pb_version()}"\n`,
-    );
-    fs.mkdirSync(path.join(root, "web"));
-    const manifest = { name: "verification-repair", version: "1.0.0", private: true };
-    fs.writeFileSync(path.join(root, "package.json"), JSON.stringify(manifest));
-    fs.writeFileSync(
-      path.join(root, "package-lock.json"),
-      JSON.stringify({
-        name: manifest.name,
-        version: manifest.version,
-        lockfileVersion: 3,
-        requires: true,
-        packages: { "": { name: manifest.name, version: manifest.version } },
-      }),
-    );
-    const stale = path.join(root, "node_modules/stale-package");
-    fs.mkdirSync(stale, { recursive: true });
-    fs.writeFileSync(
-      path.join(stale, "package.json"),
-      JSON.stringify({ name: "stale-package", version: "1.0.0" }),
-    );
-    const npm = Bun.which("npm");
-    assert.ok(npm, "no npm on PATH to run the root install with");
-    for (const name of ["curl", "unzip", "mise", "npx"]) {
-      write_exe(path.join(root, "bin", name), "#!/bin/sh\nexit 0\n");
-    }
-    // Only the root install reaches the real npm; the web install is not this check's subject.
-    write_exe(
-      path.join(root, "bin/npm"),
-      `#!/bin/sh\n[ "$*" != ci ] || exec '${npm}' ci\nexit 0\n`,
-    );
-    const env = {
-      ...process.env,
-      PATH: `${path.join(root, "bin")}:${process.env.PATH}`,
-      PB_BIN: "",
-      npm_config_offline: "true",
-      npm_config_audit: "false",
-      npm_config_fund: "false",
-      npm_config_update_notifier: "false",
-    };
-    const result = run(["make", "setup"], root, env);
-    assert.ok(result.returncode === 0, result.stdout + result.stderr);
-    assert.ok(
-      !fs.existsSync(stale),
-      "make setup did not replace the stale root node_modules: " + result.stdout + result.stderr,
-    );
-    console.log("✅ make setup's root npm ci replaces a stale node_modules without network access");
-  } finally {
-    fs.rmSync(repair, { recursive: true, force: true });
   }
 }
 

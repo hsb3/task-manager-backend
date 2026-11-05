@@ -51,7 +51,7 @@ test_saved_views · 8133 = test_stale_write · 8134 = test_subscribers_notificat
 = test_productivity_flow · 8136 = test_user_settings_font · 8137 = test_vocab_upsert ·
 8138 = test_fresh_workspace · 8139 = test_rescope_guard · 8140 = test_priority_vocab ·
 8141 = test_inspire · 8142 = test_notifications_trash_cascade · 8143 = test_counts_route · 8144 =
-test_invite_mirror · 8145 = test_mutation_proof · 8149 = test_invitations · 8150 = test_invitation_limits · 8151 = test_workspace_save_tx · 8152 = test_workspace_proxy_save · 8165 = test_path_scope · 8166 = test_owner_defaults · 8146 =
+test_invite_mirror · 8145 = test_mutation_proof · 8149 = test_invitations · 8150 = test_invitation_limits · 8151 = test_workspace_save_tx · 8165 = test_path_scope · 8166 = test_owner_defaults · 8146 =
 `web/e2e/support/clean-room.test.ts`, the vitest clean-room suite, which is a vitest room
 rather than a battery suite and so is not listed in the self-boot band above · 8147 =
 test_pb_refusal_statuses · 8148 = test_draft_publish ·

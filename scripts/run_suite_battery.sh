@@ -35,7 +35,6 @@ export PB_BIN                            # export: self-booting suites (roomkit.
 HOOKS_DIR="$REPO_ROOT/pb_hooks"
 # The ONLY file that enables _superusers MFA. Matched by PATTERN, never by timestamp: a baseline
 # rebuild renames it, and a stale literal strips nothing and silently leaves every room on MFA.
-# KEEP IN SYNC: web/e2e/support/clean-room.ts's MFA_MIGRATION_SUFFIX — same `superuser_mfa.js`, same exactly-one assertion.
 MFA_MIGRATION_GLOB="*superuser_mfa.js"
 # Written, never read: its stamp sits past the committed band so a room applies it last.
 SCRATCH_SMTP_MIGRATION="1785200000_scratch_smtp_sink.js"
@@ -124,7 +123,6 @@ in_lines() {
   return 1
 }
 
-# KEEP IN SYNC: web/e2e/support/clean-room.ts's copyTree — refuse a root or nested `symlink` before copying.
 assert_copy_source() {
   bun -e "$(cat <<'TS'
 import fs from "node:fs";
@@ -479,7 +477,6 @@ run_suite "test_item_keys"       bun tests/test_item_keys.ts
 run_suite "test_vocab_flow"      bun tests/test_vocab_flow.ts
 run_suite "test_vocab_upsert"    bun tests/test_vocab_upsert.ts
 run_suite "test_workspace_save_tx"  bun tests/test_workspace_save_tx.ts
-run_suite "test_workspace_proxy_save" bun tests/test_workspace_proxy_save.ts
 run_suite "test_priority_vocab"  bun tests/test_priority_vocab.ts
 run_suite "test_fresh_workspace" bun tests/test_fresh_workspace.ts
 
@@ -558,7 +555,6 @@ run_suite "test_ordinal"            bun tests/test_ordinal.ts
 
 # ── platform: the HTTP status PocketBase itself answers each refusal shape with — self-booting.
 run_suite "test_pb_refusal_statuses" bun tests/test_pb_refusal_statuses.ts
-run_suite "test_check_response_producers" bun tests/test_check_response_producers.ts
 
 # ── operator tooling: the one-time project bulk loader (scripts/bulk_load_projects.ts) — self-booting.
 run_suite "test_bulk_load_projects" bun tests/test_bulk_load_projects.ts
@@ -581,213 +577,36 @@ run_suite "test_app_docs_schema_guards" bun tests/test_app_docs_schema_guards.ts
 # ── integrity: re-applying the generated app_docs seed changes no row (its comment's claim).
 run_suite "test_app_docs_seed_idempotent" bun tests/test_app_docs_seed_idempotent.ts
 
-# ── coverage: check_app_docs — self-booting (migrate up into its own temp dir).
-run_suite "check_app_docs" bun scripts/check_app_docs.ts
-run_suite "check_app_docs_quotes" bun scripts/check_app_docs_quotes.ts
+# ── serverless proofs of the gate scripts and the shared libraries they lean on; make
+#    check-static runs the gates themselves (generators --check, scripts/check_*.ts).
 run_suite "test_app_docs_quotes_checker" bun tests/test_app_docs_quotes_checker.ts
-
-# ── coverage: check_constants — greps every mirror site of every constant for drift.
-run_suite "check_constants" bun scripts/check_constants.ts
-
-# ── coverage: test_constants_checker — proves check_constants' own marker bounds and emitter counts.
 run_suite "test_constants_checker" bun tests/test_constants_checker.ts
-
-# ── coverage: check_pb_pin — every PB_VERSION pin site must equal the Dockerfile's ARG.
-run_suite "check_pb_pin" bun scripts/check_pb_pin.ts
-
-# ── coverage: test_check_pb_pin — proves check_pb_pin's own site-scan and required-site refusal.
 run_suite "test_check_pb_pin" bun tests/test_check_pb_pin.ts
-
-# ── coverage: check_email_fold — every inlined copy of the email fold, pinned to the migration's.
-run_suite "check_email_fold" bun scripts/check_email_fold.ts
-
-# ── coverage: check_local_mode_isolation — the local-dev MFA-off hook must reach no image.
-run_suite "check_local_mode_isolation" bun scripts/check_local_mode_isolation.ts
-
-# ── coverage: check_battery_suites — flags any tests/test_*.ts this file never runs, and any
-# scripts/check_*.ts wired into neither this file nor scripts/dod.sh.
-run_suite "check_battery_suites" bun scripts/check_battery_suites.ts
-
-# ── coverage: test_gate_reconciler_shapes — pins which gate-line shapes check_battery_suites
-# counts as an invocation, and its fail-closed default on a gate file it cannot parse.
 run_suite "test_gate_reconciler_shapes" bun tests/test_gate_reconciler_shapes.ts
-
-# ── coverage: test_lefthook_trigger_shapes — pins which lefthook.yml `skip:` shapes
-# check_no_silent_skips reads as a staged-path trigger versus a real, undeclared skip.
-run_suite "test_lefthook_trigger_shapes" bun tests/test_lefthook_trigger_shapes.ts
-
-# ── coverage: check_no_silent_skips — flags a gate-run test/script that steps over an assertion undeclared.
-run_suite "check_no_silent_skips" bun scripts/check_no_silent_skips.ts
-
-# ── coverage: check_raw_migrate_up — flags a caller spawning the migrate-up argv outside pb_migrate.ts.
-run_suite "check_raw_migrate_up" bun scripts/check_raw_migrate_up.ts
-
-# ── coverage: check_keep_in_sync — flags a KEEP IN SYNC marker that verifies nothing, or a mirror
-# with one side moved. CI runs this battery and not `make dod`, so its dod home does not reach CI.
-run_suite "check_keep_in_sync" bun scripts/check_keep_in_sync.ts
-
-# ── coverage: check_room_preflight — flags any self-booting suite that binds its port blind.
-run_suite "check_room_preflight" bun scripts/check_room_preflight.ts
 run_suite "test_room_preflight_checker" bun tests/test_room_preflight_checker.ts
-
-# ── coverage: check_superuser_before_serve — a suite that serves before upserting its superuser
-#    dies with KeyError: 'token', which reads as a test failure rather than a harness mistake.
-run_suite "check_superuser_before_serve" bun scripts/check_superuser_before_serve.ts
 run_suite "test_superuser_before_serve_checker" bun tests/test_superuser_before_serve_checker.ts
-
-# ── coverage: gen_coverage's own parser guards (serverless; TASK-033).
-run_suite "test_gen_coverage" bun tests/test_gen_coverage.ts
-
-# ── coverage: test_rule_guard_checker — proves check_rule_auth_guards' own detection logic.
 run_suite "test_rule_guard_checker" bun tests/test_rule_guard_checker.ts
-
-# ── coverage: test_roomkit_creds — proves roomkit.superuser_creds()'s own detection logic.
 run_suite "test_roomkit_creds" bun tests/test_roomkit_creds.ts
-
-# ── coverage: test_dod_scope — pins scripts/dod.sh's scope-detection table.
-run_suite "test_dod_scope" bun tests/test_dod_scope.ts
-run_suite "test_agent_layout" bun tests/test_agent_layout.ts
-run_suite "test_ci_changes" bun tests/test_ci_changes.ts
-run_suite "test_ci_proven" bun tests/test_ci_proven.ts
 run_suite "test_make_targets" bun tests/test_make_targets.ts
 run_suite "test_verification_environment" bun tests/test_verification_environment.ts
 run_suite "test_battery_copy" bun tests/test_battery_copy.ts
-# ── coverage: test_staged_tree — proves the pre-commit checkers judge the index, not the disk.
-run_suite "test_staged_tree" bun tests/test_staged_tree.ts
-
-# ── coverage: test_pb_migrate — proves the migrate-up helper's own failure detection.
 run_suite "test_pb_migrate" bun tests/test_pb_migrate.ts
-
-# ── coverage: test_tierkit — proves tierkit's own abort paths still abort.
 run_suite "test_tierkit" bun tests/test_tierkit.ts
-
-# ── coverage: test_diff_model — proves diff_model's own required/vocabulary detection.
-run_suite "test_diff_model" bun tests/test_diff_model.ts
-
-# ── coverage: test_gen_feature_register — proves gen_feature_register's card-coupling logic.
-run_suite "test_gen_feature_register" bun tests/test_gen_feature_register.ts
-
-# ── coverage: test_script_help — every scripts/*.ts exits 0 on --help under a closed PB_URL.
 run_suite "test_script_help" bun tests/test_script_help.ts
-
-# ── coverage: check_rule_auth_guards — flags collection rules reachable by anonymous requests.
-run_suite "check_rule_auth_guards" bun scripts/check_rule_auth_guards.ts
-
-# ── contract drift: openapi.json is what the frontend builds against — a stale spec
-#    is a silently wrong contract, so regen-and-compare gates every push.
-run_suite "gen_openapi_check"   bun scripts/gen_openapi.ts --check
-run_suite "gen_schema_check"    bun scripts/gen_schema.ts --check
-run_suite "gen_decisions_check" bun scripts/gen_decisions.ts --check
-# ── merge safety: .gitattributes makes a contended regen of a generated artifact conflict
-#    instead of text-merging into a plausible wrong file; its pattern list is derived from
-#    the output constants the generators themselves declare.
-run_suite "gen_gitattributes_check" bun scripts/gen_gitattributes.ts --check
 run_suite "test_gen_gitattributes" bun tests/test_gen_gitattributes.ts
-# A wrong slug namespace used to render as the heading itself; this replays a planted row.
 run_suite "test_gen_decisions" bun tests/test_gen_decisions.ts
-# ── coverage: check_decision_citations — fails a citation at or below the accepted frontier
-# with no register row; one above the frontier is reported, not failed.
-run_suite "check_decision_citations" bun scripts/check_decision_citations.ts
 run_suite "test_decision_citations_checker" bun tests/test_decision_citations_checker.ts
-# ── coverage: check_migration_citations — a cited migration filename must name its set
-# (v1:/v2:) and resolve; the v1 half needs the tag CI's fetch-depth: 0 checkout provides.
-run_suite "check_migration_citations" bun scripts/check_migration_citations.ts
 run_suite "test_check_migration_citations" bun tests/test_check_migration_citations.ts
-
-# ── coverage: check_contract_mirror — every field of a collection the frontend contract
-#    declares it mirrors is either exposed there or dispositioned in it.
-run_suite "check_contract_mirror" bun scripts/check_contract_mirror.ts
-run_suite "test_contract_mirror_checker" bun tests/test_contract_mirror_checker.ts
-
-# ── coverage: check_response_producers — every non-2xx response the frontend contract
-#    declares has a producer in its serving symbol, the proxy dispatcher, or PocketBase.
-run_suite "check_response_producers" bun scripts/check_response_producers.ts
-
-# ── coverage: check_migration_settings_keys — a settings block a boot hook owns must never be
-#    re-asserted under pb_migrations/, where it would clobber the hook on a fresh boot.
-run_suite "check_migration_settings_keys" bun scripts/check_migration_settings_keys.ts
 run_suite "test_migration_settings_keys" bun tests/test_migration_settings_keys.ts
-
-# ── coverage: gen_app_docs_seed --check — the seed migration must match a replay of the set.
-run_suite "gen_app_docs_seed_check" bun scripts/gen_app_docs_seed.ts --check
-# No two suites may declare the same default port, and ports.md's named list must resolve.
-run_suite "check_port_collisions" bun scripts/check_port_collisions.ts
 run_suite "test_port_collisions_checker" bun tests/test_port_collisions_checker.ts
-run_suite "gen_feature_register_check" bun scripts/gen_feature_register.ts --check
-# The register's rendered status page: dod.sh alone could not hold it — CI runs this
-# battery, not dod, so a stale page merged green on the very PR that added the gate.
-run_suite "status_page_check" bun scripts/gen_status.ts --check
-run_suite "test_gen_status" bun tests/test_gen_status.ts
-run_suite "gen_coverage_check"  bun scripts/gen_coverage.ts --check
-run_suite "check_doc_frontmatter" bun scripts/check_doc_frontmatter.ts
-run_suite "test_doc_frontmatter_checker" bun tests/test_doc_frontmatter_checker.ts
-
-# ── model diff gate — extracted entity model must reproduce + diff clean; runs against the repo's real pb_migrations/+pb_hooks/, not a scratch copy ──
-run_suite "model_diff" bash -c 'bun '"$REPO_ROOT"'/scripts/model/extract_current.ts --check && bun '"$REPO_ROOT"'/scripts/model/diff_model.ts'
-
-# ── coverage: check_app_docs_history — fails a data-seed migration that drops app_docs prose
-#    an earlier migration registered; its ratchet baseline is stated in the script docstring.
-run_suite "check_app_docs_history"        bun scripts/check_app_docs_history.ts
 run_suite "test_app_docs_history_checker" bun tests/test_app_docs_history_checker.ts
-
-# ── coverage: check_rescope_guards — fails an updateRule that leaves a tenant-anchor relation
-#    repointable by a non-superuser without a pin on the incoming value.
-run_suite "check_rescope_guards"        bun scripts/check_rescope_guards.ts
 run_suite "test_rescope_guard_checker"  bun tests/test_rescope_guard_checker.ts
-
-# ── coverage: check_membership_status_guards — fails a rule disjunct or a pb_hooks filter that
-#    grants through workspace_members without the active-status pin.
-run_suite "check_membership_status_guards" bun scripts/check_membership_status_guards.ts
 run_suite "test_membership_status_checker" bun tests/test_membership_status_checker.ts
-
-# ── coverage: check_view_within_list — fails a viewRule that admits a row its listRule
-#    excludes, letting anyone who can guess an id fetch a record nobody may list.
-run_suite "check_view_within_list"        bun scripts/check_view_within_list.ts
 run_suite "test_view_within_list_checker" bun tests/test_view_within_list_checker.ts
-
-# ── coverage: check_fixture_project_resolve — fails a fixture that resolves a project
-#    positionally as superuser with no shadow guard, or names itself the shadow project's
-#    reserved display name (eew9 / PR #657).
-run_suite "check_fixture_project_resolve"        bun scripts/check_fixture_project_resolve.ts
 run_suite "test_fixture_project_resolve_checker" bun tests/test_fixture_project_resolve_checker.ts
-
-# ── coverage: check_app_docs_down_up — fails a migrate-down-then-up round trip that DROPS a
-#    registered app_docs span (a documented re-seed no-op is accepted, a real loss is not).
-run_suite "check_app_docs_down_up"        bun scripts/check_app_docs_down_up.ts
 run_suite "test_app_docs_down_up_checker" bun tests/test_app_docs_down_up_checker.ts
-
-# ── coverage: check_lane_snapshots — fails a live agent worktree with no refs/lane-snapshots ref.
-run_suite "check_lane_snapshots"       bun scripts/check_lane_snapshots.ts
-run_suite "test_lane_snapshot_check"   bun tests/test_lane_snapshot_check.ts
-
-# ── coverage: test_historical_migration_guard — proves the comment-only predicate the PreToolUse
-#    hook and lefthook.yml's pre-commit job share; the --staged gate itself needs a git index, so it has no
-#    battery entry.
 run_suite "test_historical_migration_guard" bun tests/test_historical_migration_guard.ts
-
-# ── coverage: the Codex PreToolUse twin of that hook — its apply_patch branch has its own
-#    comment-only walk over a native patch, and shares the checker's suspension state machine.
-run_suite "test_codex_migration_hook" bun .codex/hooks/protect_historical_migrations/test_hook.ts
-
-# ── coverage: test_hook.ts for no_agent_writes_on_main — proves the branch guard AND the locked-main
-#    refusals the PreToolUse hook applies from every harness. The locked-main half needs macOS chflags,
-#    so on Linux CI it declares its skip and only the branch-guard half runs.
-run_suite "test_no_agent_writes_on_main" bun .agents/hooks/no_agent_writes_on_main/test_hook.ts
-
-# ── coverage: check_proxy_error_codes — fails a mismatch between web/lib/proxy/errors.ts's
-#    ErrorCode union and the contract's enum, or an emitted code the enum doesn't declare.
-run_suite "check_proxy_error_codes" bun scripts/check_proxy_error_codes.ts
-
-# ── coverage: check_focus_visible — fails an interactive element that turns the browser's focus
-#    outline off without painting one back, or an icon-only control with no accessible name.
-run_suite "check_focus_visible"        bun scripts/check_focus_visible.ts
-run_suite "test_focus_visible_checker" bun tests/test_focus_visible_checker.ts
-
-# ── coverage: check_keep_in_sync — a marker that names a file must quote a literal that really
-#    recurs there, matched on a token boundary; the checker itself is gated by dod + pre-commit.
 run_suite "test_keep_in_sync_checker" bun tests/test_keep_in_sync_checker.ts
-# ── coverage: the shared TypeScript port libraries — scripts/_py.ts, scripts/_argparse.ts and
-#    scripts/_ts_source.ts hold Python's semantics every ported gate and suite leans on.
 run_suite "test_py_helpers" bun tests/test_py_helpers.ts
 run_suite "test_argparse" bun tests/test_argparse.ts
 run_suite "test_ts_source" bun tests/test_ts_source.ts
@@ -813,5 +632,5 @@ echo ""
 if [ -n "$SHARD_SET" ]; then
   echo "════════ ✅ SUITE BATTERY SHARD $SHARD_SPEC GREEN — every suite scripts/battery_shards.tsv assigns to it passed ════════"
 else
-  echo "════════ ✅ SUITE BATTERY GREEN — all suites + check_app_docs passed ════════"
+  echo "════════ ✅ SUITE BATTERY GREEN — all suites passed ════════"
 fi

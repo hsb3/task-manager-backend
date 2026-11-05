@@ -1,11 +1,11 @@
 {
   "name": "task-manager-infra",
   "private": true,
-  "description": "Root manifest: the Railway IaC SDK (deploy/railway/railway.ts) and the Bun/TypeScript gate (typecheck + prettier) for scripts/, tests/ and hooks; the app's own manifest is web/package.json.",
+  "description": "Root manifest: the Railway IaC SDK (deploy/railway/railway.ts) and the Bun/TypeScript gate (typecheck + prettier) for scripts/ and tests/.",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "format:check": "prettier --check \"scripts/**/*.ts\" \"tests/**/*.ts\" \".agents/hooks/**/*.ts\" \".codex/hooks/**/*.ts\" \"web-carbon/e2e/support/docker-subnet.ts\" --no-error-on-unmatched-pattern",
-    "format": "prettier --write \"scripts/**/*.ts\" \"tests/**/*.ts\" \".agents/hooks/**/*.ts\" \".codex/hooks/**/*.ts\" \"web-carbon/e2e/support/docker-subnet.ts\" --no-error-on-unmatched-pattern"
+    "format:check": "prettier --check \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\"",
+    "format": "prettier --write \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\""
   },
   "devDependencies": {
     "@types/bun": "1.4.3",

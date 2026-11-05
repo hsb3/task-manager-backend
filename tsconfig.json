@@ -14,9 +14,6 @@
   },
   "include": [
     "scripts/**/*.ts",
-    "tests/**/*.ts",
-    ".agents/hooks/**/*.ts",
-    ".codex/hooks/**/*.ts",
-    "web-carbon/e2e/support/docker-subnet.ts"
+    "tests/**/*.ts"
   ]
 }
