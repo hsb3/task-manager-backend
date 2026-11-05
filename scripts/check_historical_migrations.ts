@@ -25,7 +25,7 @@ import { decode_text, print, py_strip, run_checked, splitlines } from "./_py.ts"
 
 export const COMMENT_PREFIXES = ["//", "/*", "*", "*/", "#"];
 
-// Names the marker migration of a one-event guard suspension, or None (armed). decision-069
+// Names the marker migration of a one-event guard suspension, or None (armed). decision:project-items-membership-denormalised
 // (kata dzdh) set it for the pb1e one-baseline rebuild; that rebuild landed and re-armed it.
 // There is no env var, CLI flag or file that turns the guard off: it is a source edit a PR reviews.
 export const BASELINE_REBUILD_SUSPENSION: string | null = null;
@@ -148,7 +148,7 @@ export function check_staged(): [boolean, string] {
   return [true, "ok"];
 }
 
-/** ARMED (guard as written) | SUSPENDED (decision-069's window) | EXPIRED (rebuild landed). */
+/** ARMED (guard as written) | SUSPENDED (decision:project-items-membership-denormalised's window) | EXPIRED (rebuild landed). */
 export function suspension_state(marker_on_ref: boolean): string {
   if (BASELINE_REBUILD_SUSPENSION === null) return "ARMED";
   return marker_on_ref ? "SUSPENDED" : "EXPIRED";
@@ -158,13 +158,13 @@ export function suspension_state(marker_on_ref: boolean): string {
 export function suspension_message(state: string): string {
   if (state === "SUSPENDED") {
     return (
-      "ALLOWED UNCHECKED: decision-069 (kata dzdh) suspends the historical-migration " +
+      "ALLOWED UNCHECKED: decision:project-items-membership-denormalised (kata dzdh) suspends the historical-migration " +
       `guard until the one-baseline rebuild drops pb_migrations/${BASELINE_REBUILD_SUSPENSION}.`
     );
   }
   return (
     "the baseline rebuild has landed on the comparison ref " +
-    `(pb_migrations/${BASELINE_REBUILD_SUSPENSION} is gone), so decision-069's one-event ` +
+    `(pb_migrations/${BASELINE_REBUILD_SUSPENSION} is gone), so decision:project-items-membership-denormalised's one-event ` +
     "suspension is over and every pb_migrations/ change is refused: lift it by setting " +
     "BASELINE_REBUILD_SUSPENSION = null in scripts/check_historical_migrations.ts."
   );
