@@ -65,6 +65,8 @@ export const PRUNE_REL_PREFIXES = [
   "docs/generated/",
   // The migration set legitimately names itself, and the historical guard forbids editing it.
   "pb_migrations/",
+  // The vendored v1 file list is the lookup table, not a citation.
+  "scripts/migrations-v1.txt",
 ];
 
 // .gitattributes lists every GENERATED artifact (scripts/gen_gitattributes.ts writes it from
@@ -119,6 +121,11 @@ export function assert_shape(names: string[]): void {
 /** Basenames in the tagged v1 tree, read ONCE — never a git call per citation. */
 export function tagged_migrations(root: string): Set<string> {
   const [status, out] = git(root, "ls-tree", "-r", "--name-only", TAG, `${MIGRATIONS_DIR}/`);
+  // This repo was imported without history, so the tag is absent; its file list is vendored.
+  const vendored = path.join(root, "scripts", "migrations-v1.txt");
+  if ((status !== 0 || !py_strip(out)) && fs.existsSync(vendored)) {
+    return new Set(splitlines(read_text(vendored)).filter((line) => py_strip(line)));
+  }
   if (status !== 0 || !py_strip(out)) {
     throw new SystemExit(
       `❌ check_migration_citations: ${TAG} tag not in this checkout — ` +

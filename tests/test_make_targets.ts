@@ -24,10 +24,14 @@ function check(label: string, ok: boolean): void {
   if (!ok) FAILS.push(label);
 }
 
+// An enclosing `make battery BATTERY_SHARD=i/N` passes its command-line variables down through
+// MAKEFLAGS (and the environment), which would reach these stubs as if a test had set them.
+const { MAKEFLAGS, MFLAGS, MAKELEVEL, BATTERY_SHARD, BATTERY_MANIFEST, ...INHERITED } = process.env;
+
 function run(root: string, args: string[], env: Record<string, string> = {}) {
   const r = Bun.spawnSync(["make", "--no-print-directory", ...args], {
     cwd: root,
-    env: { ...process.env, ...env },
+    env: { ...INHERITED, ...env },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -53,155 +57,111 @@ function copy_resolver(root: string): void {
   try {
     const root = scratch;
     fs.copyFileSync(path.join(REPO, "Makefile"), path.join(root, "Makefile"));
-    fs.mkdirSync(path.join(root, "web"));
-    fs.mkdirSync(path.join(root, "web-carbon"));
-    fs.mkdirSync(path.join(root, "scripts"));
-    write_exe(
-      path.join(root, "scripts/ci_changes.sh"),
-      '#!/bin/sh\nprintf "e2e=false\\nregister_only=true\\n"\n',
-    );
+    for (const dir of ["scripts/model", "battery-manifests"]) {
+      fs.mkdirSync(path.join(root, dir), { recursive: true });
+    }
+    // The gate globs these; empty files suffice because the stub bun only records its argv.
+    for (const name of [
+      "gen_a.ts",
+      "check_b.ts",
+      "check_historical_migrations.ts",
+      "check_migration_citations.ts",
+    ]) {
+      fs.writeFileSync(path.join(root, "scripts", name), "");
+    }
+    fs.writeFileSync(path.join(root, "battery-manifests/battery-manifest-1.txt"), "");
     const bin_dir = path.join(root, "bin");
     fs.mkdirSync(bin_dir);
     const log = path.join(root, "calls");
-    for (const command of ["bun", "npm", "npx"]) {
-      write_exe(
-        path.join(bin_dir, command),
-        "#!/bin/sh\nprintf '%s|%s|%s\\n' \"" +
-          command +
-          '" "$*" "$NEXT_PUBLIC_PB_URL" >> "$CALLS"\n' +
-          '[ "$FAIL_COMMAND" != "' +
-          command +
-          '" ] || exit 9\n' +
-          (command === "npm"
-            ? 'if [ "$*" = "run build" ]; then\n' +
-              '  [ -z "$BUILD_DELAY" ] || sleep "$BUILD_DELAY"\n' +
-              '  [ "$FAIL_BUILD" != 1 ] || exit 9\n' +
-              '  [ -z "$BUILD_DONE" ] || : > "$BUILD_DONE"\n' +
-              "fi\n"
-            : "") +
-          (command === "npx"
-            ? 'case "$*" in playwright\\ test*)\n' +
-              '  [ "$REQUIRE_BUILD_DONE" != 1 ] || [ -f "$BUILD_DONE" ] || exit 8\n' +
-              ";; esac\n"
-            : ""),
-      );
-    }
+    const fake_pb = path.join(bin_dir, "pocketbase");
+    write_exe(fake_pb, "#!/bin/sh\nexit 0\n");
+    // Records every bun call except the binary lookup, which answers with the fake binary.
+    write_exe(
+      path.join(bin_dir, "bun"),
+      '#!/bin/sh\ncase "$*" in *--print-bin*) echo "$FAKE_PB"; exit 0;; esac\n' +
+        'printf \'bun|%s\\n\' "$*" >> "$CALLS"\n' +
+        '[ "$*" != "$FAIL_ARGS" ] || exit 9\n',
+    );
+    write_exe(
+      path.join(root, "scripts/run_suite_battery.sh"),
+      '#!/bin/sh\nprintf \'battery|%s\\n\' "$BATTERY_SHARD" >> "$CALLS"\n',
+    );
     const env: Record<string, string> = {
       PATH: `${bin_dir}:${process.env.PATH}`,
       CALLS: log,
+      FAKE_PB: fake_pb,
       PB_PORT_OFFSET: "0",
     };
 
     const calls = (): string[][] =>
-      splitlines(read_text(log)).map((line) => py_split(line, "|", 2));
+      fs.existsSync(log) ? splitlines(read_text(log)).map((line) => py_split(line, "|", 1)) : [];
     const same = (got: unknown, want: unknown): boolean => Bun.deepEquals(got, want, true);
+    const STATIC = [
+      ["bun", "run format:check"],
+      ["bun", "run typecheck"],
+      ["bun", "scripts/gen_a.ts --check"],
+      ["bun", "scripts/model/extract_current.ts --check"],
+      ["bun", "scripts/check_b.ts"],
+      ["bun", "scripts/check_migration_citations.ts"],
+      ["bun", "scripts/check_historical_migrations.ts --staged"],
+    ];
 
-    const selector = run(root, ["ci-changes"], env);
+    const static_run = run(root, ["check-static"], env);
     check(
-      "ci-changes forwards selector output without make noise",
-      selector.stdout === "e2e=false\nregister_only=true\n",
-    );
-
-    const web = run(root, ["web-gates"], env);
-    check(
-      "web-gates runs the exact web checks in order",
-      web.returncode === 0 &&
-        same(calls(), [
-          ["npm", "run typecheck", ""],
-          ["npm", "run lint", ""],
-          ["npm", "run format:check", ""],
-          ["npm", "test", ""],
-          ["npm", "run codegen:check", ""],
-          ["npm", "run componentmap:check", ""],
-        ]),
+      "check-static runs format, typecheck, every generator --check, then every checker",
+      static_run.returncode === 0 && same(calls(), STATIC),
     );
 
     unlink_missing_ok(log);
-    const carbon = run(root, ["carbon-gates"], env);
-    check(
-      "carbon gates check types and tests before building",
-      carbon.returncode === 0 &&
-        same(calls(), [
-          ["npm", "run typecheck", ""],
-          ["npm", "test", ""],
-          ["npm", "run build", ""],
-        ]),
-    );
-    unlink_missing_ok(log);
-    const carbon_failed = run(root, ["carbon-gates"], { ...env, FAIL_COMMAND: "npm" });
-    check(
-      "carbon gate failure stops the remaining checks",
-      carbon_failed.returncode !== 0 && same(calls(), [["npm", "run typecheck", ""]]),
-    );
-    unlink_missing_ok(log);
-    const carbon_e2e = run(root, ["carbon-e2e"], env);
-    check(
-      "carbon e2e runs the sibling harness",
-      carbon_e2e.returncode === 0 && same(calls(), [["npm", "run test:e2e", ""]]),
-    );
-
-    unlink_missing_ok(log);
-    const register = run(root, ["ci-register-docs"], env);
-    check(
-      "register target runs the exact checks in order",
-      register.returncode === 0 &&
-        same(calls(), [
-          ["bun", "scripts/gen_feature_register.ts --check", ""],
-          ["bun", "scripts/gen_status.ts --check", ""],
-          ["bun", "scripts/check_doc_frontmatter.ts", ""],
-          ["bun", "scripts/check_decision_citations.ts", ""],
-          ["bun", "scripts/check_keep_in_sync.ts", ""],
-          ["bun", "tests/test_ci_changes.ts", ""],
-        ]),
-    );
-
-    unlink_missing_ok(log);
-    const build = run(root, ["e2e-build"], { ...env, PB_PORT_OFFSET: "400" });
-    const test = run(root, ["e2e-test", "ARGS=--shard=2/4"], env);
-    const recorded = calls();
-    check(
-      "e2e build sets the offset room URL",
-      build.returncode === 0 &&
-        recorded.some((c) => same(c, ["npm", "run build", "http://127.0.0.1:8592"])),
-    );
-    check(
-      "e2e test forwards shard arguments",
-      test.returncode === 0 &&
-        recorded.some((c) => same(c, ["npx", "playwright test --shard=2/4", ""])),
-    );
-
-    unlink_missing_ok(log);
-    const build_done = path.join(root, "build-done");
-    const ordered = run(root, ["-j2", "e2e"], {
+    const static_failed = run(root, ["check-static"], {
       ...env,
-      BUILD_DELAY: "0.1",
-      BUILD_DONE: build_done,
-      REQUIRE_BUILD_DONE: "1",
+      FAIL_ARGS: "scripts/gen_a.ts --check",
     });
     check(
-      "parallel e2e waits for its build",
-      ordered.returncode === 0 &&
+      "a failing generator --check fails check-static and stops the remaining checks",
+      static_failed.returncode !== 0 && same(calls(), STATIC.slice(0, 3)),
+    );
+
+    unlink_missing_ok(log);
+    const whole = run(root, ["check"], env);
+    check(
+      "check runs check-static, then the whole battery",
+      whole.returncode === 0 && same(calls(), [...STATIC, ["battery", ""]]),
+    );
+
+    unlink_missing_ok(log);
+    const whole_failed = run(root, ["check"], { ...env, FAIL_ARGS: "run typecheck" });
+    check(
+      "a red static part never reaches the battery",
+      whole_failed.returncode !== 0 && same(calls(), STATIC.slice(0, 2)),
+    );
+
+    unlink_missing_ok(log);
+    const shard = run(root, ["battery", "BATTERY_SHARD=2/4"], env);
+    const shard_env = run(root, ["battery"], { ...env, BATTERY_SHARD: "3/4" });
+    check(
+      "battery hands BATTERY_SHARD to the battery from the command line or the environment",
+      shard.returncode === 0 &&
+        shard_env.returncode === 0 &&
         same(calls(), [
-          ["npm", "run build", "http://127.0.0.1:8192"],
-          ["npx", "playwright test", ""],
+          ["battery", "2/4"],
+          ["battery", "3/4"],
         ]),
     );
 
     unlink_missing_ok(log);
-    unlink_missing_ok(build_done);
-    const failed_build = run(root, ["-j2", "e2e"], {
-      ...env,
-      BUILD_DONE: build_done,
-      FAIL_BUILD: "1",
-    });
+    const verify = run(root, ["ci-battery-verify"], env);
     check(
-      "failed e2e build never starts tests",
-      failed_build.returncode !== 0 &&
-        same(calls(), [["npm", "run build", "http://127.0.0.1:8192"]]),
+      "ci-battery-verify unions the downloaded shard manifests",
+      verify.returncode === 0 &&
+        same(calls(), [
+          [
+            "bun",
+            "scripts/check_battery_suites.ts --manifests battery-manifests/battery-manifest-1.txt",
+          ],
+        ]),
     );
-
-    const failed = run(root, ["ci-static-checks"], { ...env, FAIL_COMMAND: "npm" });
-    check("Make preserves check failure", failed.returncode !== 0);
+    fs.writeFileSync(log, "");
 
     // A PATH that can still run make and the row-count helpers, but offers no sqlite3.
     const nosqlite = path.join(root, "nosqlite-bin");
@@ -227,7 +187,6 @@ function copy_resolver(root: string): void {
     const root = scratch;
     fs.copyFileSync(path.join(REPO, "Makefile"), path.join(root, "Makefile"));
     fs.copyFileSync(path.join(REPO, "Dockerfile"), path.join(root, "Dockerfile"));
-    fs.mkdirSync(path.join(root, "web"));
     fs.mkdirSync(path.join(root, "scripts"));
     copy_resolver(root);
     const bin_dir = path.join(root, "bin");
@@ -251,8 +210,6 @@ function copy_resolver(root: string): void {
       '#!/bin/sh\nprintf \'curl|%s\\n\' "$*" >> "$CALLS"\n' +
         'case "$*" in *api/health*) [ -f "$UP_MARKER" ] && exit 0;; esac\nexit 22\n',
     );
-    // Stands in for the web dev server so `make dev` can reach its success tail and return.
-    write_exe(path.join(bin_dir, "npm"), "#!/bin/sh\nexit 0\n");
     const env: Record<string, string> = {
       PATH: `${bin_dir}:${process.env.PATH}`,
       CALLS: log,
@@ -461,37 +418,25 @@ function copy_resolver(root: string): void {
 
 const workflow: any = Bun.YAML.parse(read_text(path.join(REPO, ".github/workflows/ci.yml")));
 const jobs = getitem(workflow, "jobs");
-const expected: Record<string, string> = {
-  changes: 'make ci-changes >> "$GITHUB_OUTPUT"',
-  "register-docs": "make ci-register-docs",
-  "static-checks": "make ci-static-checks",
-  "app-docs-coverage": "make ci-app-docs",
-  "suite-battery": "make battery",
+const runs = (job: string): string[] =>
+  getitem(getitem(jobs, job), "steps").map((step: any) => step.run ?? "");
+for (const [job, command] of Object.entries({
+  static: "make check-static",
+  battery: "make battery",
   "battery-verify": "make ci-battery-verify",
-  "web-gates": "make web-gates",
-  "web-image": "make web-image",
-  "web-e2e": "make e2e-build",
-  "carbon-gates": "make carbon-gates",
-  "carbon-e2e": "make carbon-e2e",
-};
-for (const [job, command] of Object.entries(expected)) {
-  check(
-    `${job} calls ${command}`,
-    getitem(getitem(jobs, job), "steps").some((step: any) => step.run === command),
-  );
+})) {
+  check(`${job} calls ${command}`, runs(job).includes(command));
 }
-check(
-  "e2e test target keeps the shard expression",
-  getitem(getitem(jobs, "web-e2e"), "steps").some(
-    (step: any) => step.run === "make e2e-test ARGS=--shard=${{ matrix.shard }}/4",
-  ),
-);
-const prod: any = Bun.YAML.parse(read_text(path.join(REPO, ".github/workflows/prod-smoke.yml")));
-check(
-  "prod smoke calls its Make target",
-  getitem(getitem(getitem(prod, "jobs"), "prod-smoke"), "steps").some(
-    (step: any) => step.run === "make prod-smoke",
-  ),
-);
+const makefile = read_text(path.join(REPO, "Makefile"));
+for (const job of Object.keys(jobs)) {
+  for (const [, target] of runs(job)
+    .join("\n")
+    .matchAll(/(?<![\w-])make\s+([a-z][\w-]*)/g)) {
+    check(
+      `${job}'s make ${target} is a Makefile target`,
+      new RegExp(`^${target}:`, "m").test(makefile),
+    );
+  }
+}
 
 process.exit(FAILS.length ? 1 : 0);

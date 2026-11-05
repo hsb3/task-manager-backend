@@ -1,144 +1,50 @@
 #!/usr/bin/env bun
 /**
- * Unit-pin scripts/check_battery_suites.ts's gate-line parser: which shapes read as wired.
+ * Unit-pin scripts/check_battery_suites.ts's battery parser: which suite-line shapes read as run.
  *
- * Parser shapes only — no server, no DB, no port. Every fixture is a throwaway .sh under a
- * scratch dir; the shipped gate files are never read, so nothing here can rewrite a tracked file.
+ * Parser shapes only — no server, no DB, no port. Every fixture is an in-memory battery text; the
+ * shipped battery is never read, so nothing here can rewrite a tracked file.
  */
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { print, py_repr, read_text, truthy, tup } from "../scripts/_py.ts";
+import { print, py_repr, read_text, tup } from "../scripts/_py.ts";
 import * as cbs from "../scripts/check_battery_suites.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const CHECKER = path.join(REPO_ROOT, "scripts", "check_battery_suites.ts");
 const SCRATCH = fs.mkdtempSync(path.join(os.tmpdir(), "gateshapes_"));
-const OPENER: Record<string, RegExp> = {
-  dod: cbs.DOD_OPENER,
-  bat: cbs.BATTERY_OPENER,
-  pre: cbs.PRECOMMIT_OPENER,
-};
-const PROBE = "check_zprobe";
-const ANCHOR = "check_anchor";
-// Every fixture carries one real gate of each shape, so an empty parse reads as breakage
+const PROBE = "test_zprobe";
+const ANCHOR = "test_anchor";
+// Every fixture carries one real suite of each shape, so an empty parse reads as breakage
 // rather than as "the probe is not wired".
-const PREAMBLE =
-  "run_gate x 'bun scripts/check_anchor.ts'\n" +
-  'run_suite "a" bun scripts/check_anchor.ts\n' +
-  'bun "$root/scripts/check_anchor.ts"\n';
+const PREAMBLE = "LEGACY_SUITES=(test_legacy)\n" + 'run_suite "a" bun tests/test_anchor.ts\n';
 
-// (home, expect_wired, label, snippet)
-const CASES: [string, boolean, string, string][] = [
-  ["dod", false, "echo'd run_gate line", `echo 'run_gate backend "bun scripts/check_zprobe.ts"'`],
-  [
-    "dod",
-    false,
-    "heredoc body",
-    "bun run - <<'TS'\nrun_gate backend \"bun scripts/check_zprobe.ts\"\nTS",
-  ],
-  ["dod", false, "name in an echo message", 'echo "run: bun scripts/check_zprobe.ts"'],
-  ["bat", false, "echo'd run_suite line", `echo 'run_suite "z" bun scripts/check_zprobe.ts'`],
-  ["bat", false, "heredoc body", 'cat > f <<EOF\nrun_suite "z" bun scripts/check_zprobe.ts\nEOF'],
-  ["bat", true, "single-quoted label", "run_suite 'check_zprobe' bun scripts/check_zprobe.ts"],
-  ["bat", true, "bare label", "run_suite check_zprobe bun scripts/check_zprobe.ts"],
-  ["bat", true, "$REPO_ROOT prefix", 'run_suite "z" bun "$REPO_ROOT/scripts/check_zprobe.ts"'],
-  ["bat", true, "bun --smol", 'run_suite "z" bun --smol scripts/check_zprobe.ts'],
-  ["dod", true, "cd web && ...", 'run_gate frontend "cd web && bun ../scripts/check_zprobe.ts"'],
-  ["dod", true, "bun run subcommand form", 'run_gate backend "bun run scripts/check_zprobe.ts"'],
-  ["dod", true, "line continuation", 'run_gate backend \\\n  "bun scripts/check_zprobe.ts"'],
-  ["dod", true, "$REPO prefix", 'run_gate backend "bun $REPO/scripts/check_zprobe.ts"'],
-  ["dod", true, "bun --smol", 'run_gate backend "bun --smol scripts/check_zprobe.ts"'],
-  ["dod", true, "env-var prefix", 'run_gate backend "PB_URL=x bun scripts/check_zprobe.ts"'],
-  ["dod", true, "multi-scope token", 'run_gate backend,docs "bun scripts/check_zprobe.ts"'],
-  ["dod", true, "flag after path", 'run_gate backend "bun scripts/check_zprobe.ts --staged"'],
-  ["pre", true, '"$root"/ outside the quotes', 'bun "$root"/scripts/check_zprobe.ts'],
-  ["pre", true, "unquoted $root", "bun $root/scripts/check_zprobe.ts"],
-  ["pre", true, "a variable other than $root", 'bun "$repo_root/scripts/check_zprobe.ts"'],
-  [
-    "pre",
-    true,
-    "command substitution",
-    'out="$(bun "$root/scripts/check_zprobe.ts" --print-sites)"',
-  ],
-  ["pre", false, "name inside an echo message", 'echo "run: bun scripts/check_zprobe.ts"'],
-  ["pre", true, "Lefthook `run: bun …`", "      run: bun scripts/check_zprobe.ts"],
-  ["pre", true, "Lefthook `- run: bun …`", "        - run: bun scripts/check_zprobe.ts"],
-  [
-    "pre",
-    false,
-    "Lefthook `run: echo …` naming the gate",
-    '      run: echo "bun scripts/check_zprobe.ts"',
-  ],
-  // Declared ceiling, not an oversight: reachability is not analysed, so an unreachable
-  // gate line still reads as wired — section (c) holds the checker to saying so.
-  [
-    "dod",
-    true,
-    "BOUND: unreachable `if false` block",
-    'if false; then\nrun_gate backend "bun scripts/check_zprobe.ts"\nfi',
-  ],
-  [
-    "dod",
-    true,
-    "echo THEN the gate, ; separated",
-    'run_gate backend "echo starting; bun scripts/check_zprobe.ts"',
-  ],
-  [
-    "dod",
-    true,
-    "echo THEN the gate, && separated",
-    'run_gate backend "echo starting && bun scripts/check_zprobe.ts"',
-  ],
-  [
-    "dod",
-    false,
-    "runner given an echo",
-    'run_gate backend "echo reminder: see scripts/check_zprobe.ts"',
-  ],
-  [
-    "bat",
-    false,
-    "run_suite given an echo",
-    'run_suite "z" echo see tests/check_zprobe.ts scripts/check_zprobe.ts',
-  ],
-  ["dod", false, "commented-out run_gate line", '# run_gate backend "bun scripts/check_zprobe.ts"'],
-  ["bat", false, "commented-out run_suite line", '# run_suite "z" bun scripts/check_zprobe.ts'],
-  ["pre", false, "commented-out hook invocation", '# bun "$root/scripts/check_zprobe.ts"'],
+// (expect_run, label, snippet)
+const CASES: [boolean, string, string][] = [
+  [false, "echo'd run_suite line", `echo 'run_suite "z" bun tests/test_zprobe.ts'`],
+  [false, "heredoc body", 'cat > f <<EOF\nrun_suite "z" bun tests/test_zprobe.ts\nEOF'],
+  [true, "single-quoted label", "run_suite 'test_zprobe' bun tests/test_zprobe.ts"],
+  [true, "bare label", "run_suite test_zprobe bun tests/test_zprobe.ts"],
+  [true, "$REPO_ROOT prefix", 'run_suite "z" bun "$REPO_ROOT/tests/test_zprobe.ts"'],
+  [true, "bun --smol", 'run_suite "z" bun --smol tests/test_zprobe.ts'],
+  [true, "behind env assignments", 'run_suite "z" env "PB_URL=x" bun tests/test_zprobe.ts'],
+  [true, "a backslash-continued line", 'run_suite "z" env \\\n  bun tests/test_zprobe.ts'],
+  [false, "run_suite given an echo", 'run_suite "z" echo see tests/test_zprobe.ts'],
+  [false, "commented-out run_suite line", '# run_suite "z" bun tests/test_zprobe.ts'],
   // A whole-line `#` never reaches the runner regex anyway; only a trailing comment ON a
-  // live gate line can tell whether comments are stripped at all.
+  // live suite line can tell whether comments are stripped at all.
   [
-    "dod",
-    false,
-    "gate named only in a trailing comment",
-    'run_gate backend "bun scripts/check_anchor.ts"  # bun scripts/check_zprobe.ts',
-  ],
-  [
-    "bat",
     false,
     "suite named only in a trailing comment",
-    'run_suite "a" bun scripts/check_anchor.ts  # bun scripts/check_zprobe.ts',
+    'run_suite "a" bun tests/test_anchor.ts  # bun tests/test_zprobe.ts',
   ],
+  // The runner must OPEN the line: only a non-echo command quoting a suite line tests the anchor.
   [
-    "pre",
-    false,
-    "hook gate named only in a trailing comment",
-    'bun "$root/scripts/check_anchor.ts"  # bun "$root/scripts/check_zprobe.ts"',
-  ],
-  // The runner must OPEN the line: the echo cases above are also caught by the echo stripper,
-  // so only a non-echo command quoting a gate line tests the anchor itself.
-  [
-    "dod",
-    false,
-    "a run_gate line quoted as another command's argument",
-    `grep -q 'run_gate backend "bun scripts/check_zprobe.ts"' scripts/dod.sh`,
-  ],
-  [
-    "bat",
     false,
     "a run_suite line quoted as another command's argument",
-    `grep -q 'run_suite "z" bun scripts/check_zprobe.ts' scripts/run_suite_battery.sh`,
+    `grep -q 'run_suite "z" bun tests/test_zprobe.ts' scripts/run_suite_battery.sh`,
   ],
 ];
 
@@ -155,51 +61,31 @@ function check(label: string, got: unknown, want: unknown): void {
   }
 }
 
-/** A throwaway gate file holding `body`; the path is what the parser is pointed at. */
+/** A throwaway file holding `body`; the path is what the parser is pointed at. */
 function fixture(body: string): string {
   fixtures += 1;
-  const p = path.join(SCRATCH, `fixture_${fixtures}.sh`);
+  const p = path.join(SCRATCH, `fixture_${fixtures}.txt`);
   fs.writeFileSync(p, body, "utf-8");
   return p;
 }
 
-print("── (a) gate-line shapes: what the parser counts as an invocation ──");
-for (const [home, expect, label, snippet] of CASES) {
-  const [got, errs] = cbs.gate_references(
-    fixture(PREAMBLE + snippet + "\n"),
-    "probe",
-    OPENER[home]!,
-  );
-  check(`[${home}] ${label}: the fixture's own anchor gate parses`, got.has(ANCHOR), true);
-  check(`[${home}] ${label}: probe wired`, got.has(PROBE), expect);
-  check(`[${home}] ${label}: no parse-assumption error`, errs, []);
+print("── (a) suite-line shapes: what the parser counts as running a suite ──");
+for (const [expect, label, snippet] of CASES) {
+  const [got, errs] = cbs.battery_references(PREAMBLE + snippet + "\n");
+  check(`${label}: the fixture's own anchor suite parses`, got.has(ANCHOR), true);
+  check(`${label}: the LEGACY_SUITES token parses`, got.has("test_legacy"), true);
+  check(`${label}: probe run`, got.has(PROBE), expect);
+  check(`${label}: no parse-assumption error`, errs, []);
 }
 
-print("\n── (b) fail-closed default: an unreadable gate file is an error, never an empty pass ──");
-for (const home of ["dod", "bat", "pre"]) {
-  const [got, errs] = cbs.gate_references(
-    fixture('run_gate x "echo nothing runs here"\nrun_suite "a" echo nothing\n'),
-    `${home} fixture`,
-    OPENER[home]!,
-  );
-  check(`[${home}] a gate file invoking no check_*.ts parses nothing`, got, new Set());
-  check(`[${home}] ...and says so rather than passing silently`, errs.length, 1);
-  check(
-    `[${home}] ...naming the file and the broken assumption`,
-    truthy(errs) ? errs[0]!.startsWith(`${home} fixture invokes no scripts/check_*.ts gate`) : errs,
-    true,
-  );
-}
+print("\n── (b) fail-closed default: a battery without LEGACY_SUITES is an error, never a pass ──");
 {
-  const [got, errs] = cbs.gate_references(
-    path.join(SCRATCH, "absent.sh"),
-    "absent",
-    cbs.DOD_OPENER,
-  );
+  const [got, errs] = cbs.battery_references('run_suite "a" bun tests/test_anchor.ts\n');
+  check("the run_suite line still parses", got.has(ANCHOR), true);
   check(
-    "a gate file that is not there is an error, not an empty result",
-    tup(got, errs.length),
-    tup(new Set(), 1),
+    "...and the missing array is a parse-assumption error",
+    tup(errs.length, errs.length === 1 && errs[0]!.includes("LEGACY_SUITES")),
+    tup(1, true),
   );
 }
 
@@ -207,64 +93,21 @@ print("\n── (c) the declared reachability ceiling, held to the checker's own
 const BOUND =
   "Bound: reachability is NOT analysed. A well-formed gate line inside an uncalled function, an\n" +
   "// `if false` block, or after an early `exit 0` still reads as wired.";
-const checker_src = read_text(CHECKER);
 check(
   "check_battery_suites.ts still states the bound section (a) pins",
-  checker_src.includes(BOUND),
+  read_text(CHECKER).includes(BOUND),
   true,
 );
-const [early] = cbs.gate_references(
-  fixture(PREAMBLE + 'exit 0\nrun_gate backend "bun scripts/check_zprobe.ts"\n'),
-  "probe",
-  cbs.DOD_OPENER,
+const [early] = cbs.battery_references(
+  PREAMBLE + 'exit 0\nrun_suite "z" bun tests/test_zprobe.ts\n',
 );
-check("...a gate line after an early `exit 0` still reads as wired", early.has(PROBE), true);
-const [uncalled] = cbs.gate_references(
-  fixture(PREAMBLE + 'never_called() {\n  run_gate backend "bun scripts/check_zprobe.ts"\n}\n'),
-  "probe",
-  cbs.DOD_OPENER,
+check("...a suite line after an early `exit 0` still reads as run", early.has(PROBE), true);
+const [uncalled] = cbs.battery_references(
+  PREAMBLE + 'never_called() {\n  run_suite "z" bun tests/test_zprobe.ts\n}\n',
 );
 check("...and so does one inside a function nothing calls", uncalled.has(PROBE), true);
 
-print(
-  "\n── (d) lefthook.yml: only the top-level `pre-commit:` hook's jobs are pre-commit gates ──",
-);
-const LEFTHOOK =
-  "# bun scripts/check_zprobe.ts\n" +
-  "pre-push:\n" +
-  "  jobs:\n" +
-  "    - name: push-only\n" +
-  "      run: bun scripts/check_zprobe.ts\n" +
-  "pre-commit:\n" +
-  "  jobs:\n" +
-  "    - name: anchor\n" +
-  "      run: |\n" +
-  "        bun scripts/check_anchor.ts\n";
-{
-  let [got, errs] = cbs.gate_references(
-    fixture(LEFTHOOK),
-    "probe",
-    cbs.PRECOMMIT_OPENER,
-    "pre-commit",
-  );
-  check("a pre-commit job's gate is wired", got.has(ANCHOR), true);
-  check("a pre-push job's gate is not a pre-commit gate", got.has(PROBE), false);
-  check("...and the file parses without error", errs, []);
-  [got, errs] = cbs.gate_references(
-    fixture(LEFTHOOK.replace("pre-commit:", "commit-msg:")),
-    "probe",
-    cbs.PRECOMMIT_OPENER,
-    "pre-commit",
-  );
-  check("a file with no `pre-commit:` hook wires nothing", got, new Set());
-  check(
-    "...and is a parse-assumption error, never an empty pass",
-    errs.length === 1 && errs[0]!.includes("no top-level `pre-commit:`"),
-    true,
-  );
-}
-
-print("\n── (e) battery labels: the inventory CI's shard table and manifests reconcile against ──");
+print("\n── (d) battery labels: the inventory CI's shard table and manifests reconcile against ──");
 const BATTERY_TEXT =
   "LEGACY_SUITES=(test_rules test_hooks)\n" +
   'for suite in "${LEGACY_SUITES[@]}"; do\n' +
@@ -335,7 +178,7 @@ function shard_case(
 }
 
 print(
-  "\n── (f) shard table: every battery label in exactly one contiguous shard, heaviest first ──",
+  "\n── (e) shard table: every battery label in exactly one contiguous shard, heaviest first ──",
 );
 shard_case("a complete, sorted, contiguous table passes", GOOD_ROWS, null);
 shard_case(
@@ -391,7 +234,7 @@ function manifest_case(label: string, paths: string[], needle: string | null): v
   }
 }
 
-print("\n── (g) --manifests: the union of CI's shard manifests ran every label exactly once ──");
+print("\n── (f) --manifests: the union of CI's shard manifests ran every label exactly once ──");
 const SHARD_1 = ["test_rules", "check_quoted"];
 const SHARD_2 = ["test_hooks", "test_email", "gen_bare"];
 manifest_case(
@@ -420,7 +263,7 @@ manifest_case(
   "absent.txt does not exist",
 );
 
-print("\n── (h) no tracked file was touched ──");
+print("\n── (g) no tracked file was touched ──");
 check("every fixture lived under the scratch dir", fs.readdirSync(SCRATCH).length !== 0, true);
 fs.rmSync(SCRATCH, { recursive: true, force: true });
 check("scratch dir cleaned up", fs.existsSync(SCRATCH), false);

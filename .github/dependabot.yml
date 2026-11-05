@@ -4,8 +4,10 @@
 # ignore rules below cannot suppress security-update PRs (which use defaults, no ignores).
 version: 2
 updates:
-  - package-ecosystem: npm
-    directory: /web
+  # The root bun.lock (prettier, typescript, @types/bun, railway); Dependabot reads Bun lockfiles
+  # through its bun ecosystem.
+  - package-ecosystem: bun
+    directory: /
     target-branch: main
     schedule:
       interval: weekly
@@ -15,8 +17,7 @@ updates:
         update-types:
           - "version-update:semver-minor"
           - "version-update:semver-patch"
-      # Owner ruling 2026-08-11 (decision-030): TS 7.0 ships no JS API — typescript-eslint and
-      # @hey-api/openapi-ts crash. Capped until the 7.1 API + both tools support it (TASK-180).
+      # TS 7.0 ships no JS API, which several scripts/ gates parse TypeScript with.
       - dependency-name: "typescript"
         versions: [">=7"]
   - package-ecosystem: github-actions

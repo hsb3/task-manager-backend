@@ -956,7 +956,7 @@ try {
 
   // ── (9c) bulk read-all is ONE server-side statement ─────────────────────────
   // COVERS: route:POST /api/tracker/notifications/read-all
-  // KEEP IN SYNC: web/lib/proxy/handlers/notifications.ts post() calls `/api/tracker/notifications/read-all` ONCE — a
+  // web/lib/proxy/handlers/notifications.ts post() calls `/api/tracker/notifications/read-all` ONCE — a
   // PATCH per row spends the caller's whole /api/ rate-limit budget and half-marks a big inbox.
   console.log("\n── (9c) bulk read-all: one request marks exactly the listed set ──");
   const READ_ALL = "/api/tracker/notifications/read-all";

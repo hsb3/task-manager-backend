@@ -1,18 +1,12 @@
 name: CI
 
+# The repo's one gate is `make check`: its static part runs here as `static`, its battery as the
+# four `battery` shards, and `battery-verify` proves the shards together ran every suite once.
 on:
-  # One run per commit, never two. An unrestricted `push:` fires alongside `pull_request:`
-  # on every branch push, so the same sha ran all six jobs twice — and the pair can DISAGREE,
-  # one red and one green. Branch commits are covered by the PR run; `main` by the push run.
-  # Trade-off: a branch with no PR open gets no CI until one is opened.
+  # One run per commit, never two: branch commits are covered by the PR run, `main` by the push run.
   push:
     branches: [main]
   pull_request:
-    # Neither `ready_for_review` nor `labeled` is in the default set, so without them a draft
-    # marked ready, or labelled `ci-full`, would wait for its next push before anything heavy ran.
-    # `workflow_dispatch` cannot do this job: it carries no `github.event.before`, so `BASE` is
-    # empty and every job running `Verify change range` dies before its gate (measured, PR #795).
-    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,171 +14,32 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-  BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-  RANGE: ${{ format('{0}..{1}', github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before, github.sha) }}
+  # Must equal the Dockerfile's ARG PB_VERSION, the canonical pin (scripts/check_pb_pin.ts).
+  PB_VERSION: "0.40.4"
 
 jobs:
-  changes:
-    # A label is added for many reasons; only `ci-full` is asking for CI. Every other job needs
-    # this one, so skipping it here skips the whole run rather than burning a matrix on a rename.
-    if: github.event.action != 'labeled' || github.event.label.name == 'ci-full'
-    # web-e2e is a full-stack browser test (real PB + the app), so it must run on backend
-    # runtime changes too, not just web/** — a pb_hooks/pb_migrations change can break a user
-    # flow only e2e catches. No third-party actions: git, bash, and the runner's own gh and jq.
+  static:
     runs-on: ubuntu-latest
-    # Without an explicit checks grant the predicate's API read 403s, and every merge re-runs
-    # the heavy matrix forever with nothing in the log saying why.
-    permissions:
-      contents: read
-      checks: read
-    outputs:
-      e2e: ${{ steps.filter.outputs.e2e }}
-      register_only: ${{ steps.filter.outputs.register_only }}
-      web_image: ${{ steps.filter.outputs.web_image }}
-      proven: ${{ steps.proven.outputs.proven }}
-      inherited: ${{ steps.inherited.outputs.inherited }}
-      heavy: ${{ steps.heavy.outputs.heavy }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          # Need history so BASE...HEAD has a merge-base to diff against.
-          fetch-depth: 0
-      - id: filter
-        env:
-          HEAD: ${{ github.sha }}
-        run: make ci-changes >> "$GITHUB_OUTPUT"
-      - id: proven
-        env:
-          GH_TOKEN: ${{ github.token }}
-          # The filter's own answers, so the script requires only what this run would schedule.
-          PROVEN_REGISTER_ONLY: ${{ steps.filter.outputs.register_only }}
-          PROVEN_E2E: ${{ steps.filter.outputs.e2e }}
-          PROVEN_WEB_IMAGE: ${{ steps.filter.outputs.web_image }}
-          CI_FAST_MODE: ${{ vars.CI_FAST_MODE }}
-          # `<tag> <check-run name>`; a matrix job contributes one name per shard.
-          # KEEP IN SYNC: the REQUIRED list in tests/test_ci_proven.ts, e.g. "suite-battery (1)".
-          PROVEN_REQUIRED_JOBS: |
-            e2e web-e2e (1)
-            e2e web-e2e (2)
-            e2e web-e2e (3)
-            e2e web-e2e (4)
-            battery suite-battery (1)
-            battery suite-battery (2)
-            battery suite-battery (3)
-            battery suite-battery (4)
-            battery battery-verify
-            image web-image
-        run: bash scripts/ci_proven.sh >> "$GITHUB_OUTPUT"
-      - id: heavy
-        # A draft PR is unfinished work, so only the cheap gates judge it; the `ci-full` label
-        # opts one back in, from the moment it is added. Only a literal `true` withholds the
-        # matrix, so an unset DRAFT (a push) and a broken interpolation both run it rather than
-        # silently skipping it.
-        env:
-          DRAFT: ${{ github.event.pull_request.draft }}
-          FORCED: ${{ contains(github.event.pull_request.labels.*.name, 'ci-full') }}
-        run: |
-          heavy=true
-          if [ "$DRAFT" = true ] && [ "$FORCED" != true ]; then heavy=false; fi
-          echo "heavy=$heavy" >> "$GITHUB_OUTPUT"
-      - id: inherited
-        run: echo "inherited=$(git rev-parse --verify -q HEAD^2 || echo none)" >> "$GITHUB_OUTPUT"
 
-  register-docs:
-    needs: changes
-    if: needs.changes.outputs.register_only == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
+      - name: Cache PocketBase binary
+        uses: actions/cache@v6
         with:
-          fetch-depth: 0
+          path: pocketbase
+          key: pocketbase-${{ env.PB_VERSION }}-linux-amd64
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.3"
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-      - name: Install root dependencies
-        run: npm ci
+      - name: Run the static checks
+        run: make check-static
 
-      - name: Verify change range
-        run: git rev-parse --verify "$BASE^{commit}"
-
-      - name: Check register documentation
-        run: make ci-register-docs
-
-  static-checks:
-    # Lean, server-free gates: the root TypeScript typecheck and format check.
-    needs: changes
-    if: needs.changes.outputs.register_only != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.3"
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            web/package-lock.json
-
-      - name: Install root dependencies
-        run: npm ci
-
-      # tests/test_workspace_proxy_save.ts imports the web proxy handler (next/server).
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Run static checks
-        run: make ci-static-checks
-
-  app-docs-coverage:
-    needs: changes
-    if: needs.changes.outputs.register_only != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.3"
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install root dependencies
-        run: npm ci
-
-      - name: Download PocketBase
-        env:
-          # Must equal the Dockerfile's ARG PB_VERSION, the canonical pin (scripts/check_pb_pin.ts).
-          PB_VERSION: "0.40.4"
-        run: |
-          curl -sL "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip" -o pb.zip
-          unzip -o pb.zip pocketbase
-          chmod +x pocketbase
-
-      - name: Check app_docs coverage
-        run: make ci-app-docs
-
-  suite-battery:
-    # The whole battery, split by scripts/battery_shards.tsv; battery-verify proves every suite ran.
-    needs: changes
-    if: needs.changes.outputs.register_only != 'true' && vars.CI_FAST_MODE != '1' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true'
+  battery:
     runs-on: ubuntu-latest
     strategy:
       # Each shard is its own verdict — battery-verify, not fail-fast, is what joins them.
@@ -192,57 +47,26 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     env:
-      # Must equal the Dockerfile's ARG PB_VERSION, the canonical pin (scripts/check_pb_pin.ts).
-      PB_VERSION: "0.40.4"
-      # Dummy CI superuser creds — NOT secrets. The script upserts these into each
-      # clean room. Real creds live only in .env / Railway variables.
+      # Dummy CI superuser creds — NOT secrets. The battery upserts these into each clean room.
       PB_SUPERUSER_EMAIL: ci@example.test
       PB_SUPERUSER_PASSWORD: ci-battery-dummy-pw-000
     steps:
       - uses: actions/checkout@v7
-        with:
-          # Full history: gen_feature_register --check reads BASE..HEAD commit subjects,
-          # and a shallow clone makes that range empty — the gate passes by seeing nothing.
-          fetch-depth: 0
 
       - name: Cache PocketBase binary
-        id: pbcache
         uses: actions/cache@v6
         with:
           path: pocketbase
           key: pocketbase-${{ env.PB_VERSION }}-linux-amd64
 
-      - name: Download PocketBase
-        if: steps.pbcache.outputs.cache-hit != 'true'
-        run: |
-          curl -sL "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip" -o pb.zip
-          unzip -o pb.zip pocketbase
-          chmod +x pocketbase
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.3"
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            web/package-lock.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-      - name: Install root dependencies
-        run: npm ci
-
-      # tests/test_workspace_proxy_save.ts imports the web proxy handler (next/server).
-      - name: Install web dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Verify change range
-        run: git rev-parse --verify "$BASE^{commit}"
-
-      - name: Run the suite battery
+      - name: Run the battery shard
         run: make battery
         env:
           BATTERY_SHARD: ${{ matrix.shard }}/4
@@ -257,14 +81,13 @@ jobs:
           path: ${{ runner.temp }}/battery-manifest-${{ matrix.shard }}.txt
           retention-days: 7
           if-no-files-found: ignore
-          # A re-run shard replaces its attempt's manifest; without this the upload 409s and verify reads the stale one.
+          # A re-run shard replaces its attempt's manifest; without this the upload 409s.
           overwrite: true
 
   battery-verify:
-    # !cancelled() keeps this join reachable after a red shard. A failed `changes` job leaves
-    # `heavy` empty, so this job skips instead, and landing-verdict's heavy guard reds the run.
-    needs: [changes, suite-battery]
-    if: "!cancelled() && needs.changes.outputs.register_only != 'true' && vars.CI_FAST_MODE != '1' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true'"
+    # !cancelled() keeps this join reachable after a red shard.
+    needs: battery
+    if: "!cancelled()"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -272,6 +95,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.3"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Download the shard manifests
         uses: actions/download-artifact@v8
@@ -280,277 +106,13 @@ jobs:
           merge-multiple: true
           path: battery-manifests
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install root dependencies
-        run: npm ci
-
       # First, so a red shard's own failure leads the log instead of its truncated manifest's gaps.
       - name: Require every battery shard to have passed
-        if: always()
         env:
-          BATTERY_RESULT: ${{ needs.suite-battery.result }}
+          BATTERY_RESULT: ${{ needs.battery.result }}
         run: |
-          [ "$BATTERY_RESULT" = success ] || { echo "suite-battery result: $BATTERY_RESULT"; exit 1; }
+          [ "$BATTERY_RESULT" = success ] || { echo "battery result: $BATTERY_RESULT"; exit 1; }
 
       - name: Check every suite ran in exactly one shard
         if: always()
         run: make ci-battery-verify
-
-  web-gates:
-    # Frontend's own gates (behind /api/proxy, decision-004): typecheck, lint, unit
-    # tests, and openapi.contract.json codegen drift.
-    needs: changes
-    if: needs.changes.outputs.register_only != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.3"
-
-      - name: Install dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Run web gates
-        run: make web-gates
-
-  carbon-gates:
-    needs: changes
-    if: needs.changes.outputs.register_only != 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: web-carbon/package-lock.json
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.3"
-      - name: Install Carbon dependencies
-        working-directory: web-carbon
-        run: npm ci
-      - name: Check Carbon frontend
-        run: make carbon-gates
-
-  carbon-e2e:
-    # Until this new harness has inheritance proof, every ready non-register change runs it.
-    needs: changes
-    if: needs.changes.outputs.register_only != 'true' && needs.changes.outputs.heavy == 'true'
-    runs-on: ubuntu-latest
-    env:
-      PB_PORT_OFFSET: "6200"
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: web-carbon/package-lock.json
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.3"
-      - name: Check local stack tooling
-        run: docker compose version
-      - name: Install Carbon dependencies
-        working-directory: web-carbon
-        run: npm ci
-      - name: Install Chromium
-        working-directory: web-carbon
-        timeout-minutes: 5
-        run: npx playwright install chromium
-      - name: Test Carbon against local Docker stack
-        run: make carbon-e2e
-      - name: Upload Carbon test evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: carbon-test-evidence
-          path: web-carbon/test-results/
-          retention-days: 7
-          if-no-files-found: ignore
-
-  web-image:
-    # The image Railway builds for the web service. No other job builds it, so an
-    # image-only break (a COPY whose path stopped existing) reaches deploy otherwise.
-    needs: changes
-    if: needs.changes.outputs.web_image == 'true' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Build the web image
-        run: make web-image
-
-  web-e2e:
-    # Boots its own clean PB room (8192) + the built app server (3103); owner-ruled hard gate for screen promotions.
-    # Skipped on docs/tooling-only diffs (PBTT-432) — the `changes` job decides. No CI check is
-    # merge-required (rulesets enforce PR + no-force-push only), so a skip blocks nothing.
-    needs: changes
-    # CI_FAST_MODE=1 (repo variable) suspends this job for rapid-iteration windows; anything
-    # merged while it is set owes a retroactive e2e run on main when the variable clears.
-    if: needs.changes.outputs.e2e == 'true' && vars.CI_FAST_MODE != '1' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      # Each shard is its own verdict — a red shard must not cancel the other three's evidence.
-      fail-fast: false
-      matrix:
-        # Clean record measured 2026-09-16 (0 test flakes in 408 shard jobs) on shards of ~68-159 tests; one unsharded local run is far longer, so load-only races surface there first.
-        shard: [1, 2, 3, 4]
-    env:
-      # Must equal the Dockerfile's ARG PB_VERSION, the canonical pin (scripts/check_pb_pin.ts).
-      PB_VERSION: "0.40.4"
-      # Dummy CI superuser creds — NOT secrets (the e2e clean rooms upsert these).
-      PB_SUPERUSER_EMAIL: ci@example.test
-      PB_SUPERUSER_PASSWORD: ci-battery-dummy-pw-000
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "26.5.0"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.3"
-
-      - name: Cache PocketBase binary
-        id: pbcache
-        uses: actions/cache@v6
-        with:
-          # The e2e harness boots $PB_BIN, which is unset here, so it falls back to this repo-root path.
-          path: pocketbase
-          key: pocketbase-${{ env.PB_VERSION }}-linux-amd64
-
-      - name: Download PocketBase
-        if: steps.pbcache.outputs.cache-hit != 'true'
-        run: |
-          curl -sL "https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip" -o pb.zip
-          unzip -o pb.zip pocketbase
-          chmod +x pocketbase
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v6
-        with:
-          # Browser download is a CLI fetch (not an npm lifecycle script), keyed on
-          # the resolved Playwright version in the lockfile.
-          path: ~/.cache/ms-playwright
-          key: ms-playwright-${{ hashFiles('web/package-lock.json') }}
-
-      - name: Install dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Install Playwright chromium
-        working-directory: web
-        # No --with-deps: the runner image already carries chromium's libs, so apt only ever
-        # refreshed indexes — and hung for 4.5min when azure.archive.ubuntu.com went dark.
-        # Timeout bounds the browser fetch, which the cache above can still miss.
-        timeout-minutes: 5
-        run: npx playwright install chromium
-
-      - name: Build (the e2e harness serves the standalone output)
-        # NEXT_PUBLIC_PB_URL is inlined at build time — realtime.spec.ts's browser SSE channel
-        # needs it pointed at the 8192 room, not the default (decision-004 exception, lib/realtime.ts).
-        run: make e2e-build
-
-      - name: Run the browser e2e suite
-        # Sharding across runners, never workers inside a room (decision:web-e2e-sharding) —
-        # each shard runs its own globalSetup and gets its own room, serial within.
-        run: make e2e-test ARGS=--shard=${{ matrix.shard }}/4
-
-      - name: Prove the e2e harness leaks nothing when globalSetup dies
-        # One shard only: the probe re-binds this runner's PB+app ports (so it must follow the
-        # test run that held them) and its verdict is shard-independent.
-        if: matrix.shard == 1
-        working-directory: web
-        run: node e2e/support/leak-probe.mjs
-
-      - name: Upload the failed-test traces, their error contexts and the app-server log
-        # always(), not failure(): a green run still writes an app-server log, and the server
-        # warnings in it are what explain a later red one — failure() would discard exactly the
-        # baseline worth comparing against. The log is absent when globalSetup dies before the
-        # app spawns, which is what if-no-files-found: ignore covers.
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-traces-shard-${{ matrix.shard }}
-          path: |
-            web/test-results/**/trace.zip
-            web/test-results/**/error-context.md
-            web/test-results/app-server-*.log
-          # A triage cycle is days; a trace is tens of MB and every flaky green run adds one.
-          retention-days: 14
-          if-no-files-found: ignore
-          # A re-run shard replaces its attempt's traces; without this the upload 409s.
-          overwrite: true
-
-  landing-verdict:
-    # A heavy job can be absent because of the path filter, register-only CI, CI_FAST_MODE or an
-    # inherited verdict, so "skipped" alone proves nothing; each job is judged on its own `if:`.
-    # A cancelled run skips this job outright, leaving that sha with no record; main never cancels.
-    needs: [changes, register-docs, static-checks, app-docs-coverage, web-gates, carbon-gates, carbon-e2e, suite-battery, battery-verify, web-e2e, web-image]
-    # The same label guard `changes` carries: a run where nothing was scheduled has no verdict to
-    # record, and without this it would read `changes` as wrongly skipped and fail.
-    if: "!cancelled() && (github.event.action != 'labeled' || github.event.label.name == 'ci-full')"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Record this sha's verdict
-        env:
-          PROVEN: ${{ needs.changes.outputs.proven }}
-          HEAVY: ${{ needs.changes.outputs.heavy }}
-          INHERITED: ${{ needs.changes.outputs.inherited }}
-          # KEEP IN SYNC: each row's middle field is that job's own `if:` expression in "ci.yml",
-          # minus the `!cancelled()` this job already applies to all of them.
-          EXPECTATIONS: |
-            changes ${{ github.event.action != 'labeled' || github.event.label.name == 'ci-full' }} ${{ needs.changes.result }}
-            register-docs ${{ needs.changes.outputs.register_only == 'true' }} ${{ needs.register-docs.result }}
-            static-checks ${{ needs.changes.outputs.register_only != 'true' }} ${{ needs.static-checks.result }}
-            app-docs-coverage ${{ needs.changes.outputs.register_only != 'true' }} ${{ needs.app-docs-coverage.result }}
-            web-gates ${{ needs.changes.outputs.register_only != 'true' }} ${{ needs.web-gates.result }}
-            carbon-gates ${{ needs.changes.outputs.register_only != 'true' }} ${{ needs.carbon-gates.result }}
-            carbon-e2e ${{ needs.changes.outputs.register_only != 'true' && needs.changes.outputs.heavy == 'true' }} ${{ needs.carbon-e2e.result }}
-            suite-battery ${{ needs.changes.outputs.register_only != 'true' && vars.CI_FAST_MODE != '1' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true' }} ${{ needs.suite-battery.result }}
-            battery-verify ${{ needs.changes.outputs.register_only != 'true' && vars.CI_FAST_MODE != '1' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true' }} ${{ needs.battery-verify.result }}
-            web-e2e ${{ needs.changes.outputs.e2e == 'true' && vars.CI_FAST_MODE != '1' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true' }} ${{ needs.web-e2e.result }}
-            web-image ${{ needs.changes.outputs.web_image == 'true' && needs.changes.outputs.proven != 'true' && needs.changes.outputs.heavy == 'true' }} ${{ needs.web-image.result }}
-        run: |
-          set -u
-          inherited=${INHERITED:-none}
-          # An unset `heavy` reads as "skip" on every heavy job AND as "rightly skipped" here, so
-          # main would go green having run nothing. Only true/false is a decision.
-          case "${HEAVY:-}" in
-            true|false) ;;
-            *) printf '::error::heavy is %s, expected true or false\n' "${HEAVY:-<unset>}"; exit 1 ;;
-          esac
-          printf 'sha %s, inherited PR head %s, proven=%s\n' "$GITHUB_SHA" "$inherited" "${PROVEN:-false}"
-          {
-            printf '## Landing verdict\n\n'
-            printf -- '- sha: `%s`\n- inherited PR head: `%s`\n- already proven: `%s`\n\n' \
-              "$GITHUB_SHA" "$inherited" "${PROVEN:-false}"
-            printf '| job | expected | result |\n| --- | --- | --- |\n'
-          } >> "$GITHUB_STEP_SUMMARY"
-          bad=0
-          while read -r job expected result; do
-            [ -n "$job" ] || continue
-            if [ "$expected" = true ]; then want=success; else want=skipped; fi
-            [ "$result" = "$want" ] || { bad=1; printf '::error::%s is %s, expected %s\n' "$job" "$result" "$want"; }
-            printf '| %s | %s | %s |\n' "$job" "$want" "$result" >> "$GITHUB_STEP_SUMMARY"
-          done <<< "$EXPECTATIONS"
-          exit "$bad"

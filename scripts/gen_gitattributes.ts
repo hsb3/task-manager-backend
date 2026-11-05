@@ -12,7 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { parse_args } from "./_argparse.ts";
-import { PY_WS, by_code_point, print, py_join, read_text, splitlines } from "./_py.ts";
+import { by_code_point, print, py_join, read_text, splitlines } from "./_py.ts";
 import { parse_ts } from "./_ts_source.ts";
 
 const REPO = path.dirname(path.dirname(path.resolve(import.meta.path)));
@@ -32,8 +32,6 @@ const GENERATOR_GLOBS = [
   "scripts/gen_*.ts",
   "scripts/utilities/*/build*.ts",
   "scripts/model/extract_current.ts",
-  "web/scripts/gen-*.mjs",
-  "web/openapi-ts.config.ts",
 ];
 
 // The output-constant names the repo's TypeScript generators declare. A name ending in _DIR
@@ -47,18 +45,6 @@ const PY_OUTPUT_NAMES = [
   "OUT_DIR",
   "PATTERNS_FILE",
 ];
-
-const JS_OUTPUT_NAMES = ["OUT_JSON", "OUT_HTML"];
-const JS_CONST = new RegExp(
-  String.raw`(?:^|(?<=\n))[${PY_WS}]*const[${PY_WS}]+(OUT_JSON|OUT_HTML)[${PY_WS}]*=[${PY_WS}]*["']([^"']+)["']`,
-  "gu",
-);
-
-const TS_OUTPUT_NAMES = ["output.path"];
-const TS_OUTPUT_PATH = new RegExp(
-  String.raw`output[${PY_WS}]*:[${PY_WS}]*\{[^}]*?(?<![\p{L}\p{N}_])path[${PY_WS}]*:[${PY_WS}]*["']([^"']+)["']`,
-  "gsu",
-);
 
 /** A discovered generator whose output path this script cannot derive. */
 class Unrecognised extends Error {}
@@ -196,44 +182,15 @@ function _python_outputs(rel_source: string, text: string): [string, boolean][] 
   return out;
 }
 
-/** A leading ./ or ../ is relative to the generator's own directory, anything else to REPO. */
-function _resolve(rel_source: string, value: string): string {
-  const base = value.startsWith(".") ? path.posix.dirname(rel_source) : "";
-  return _normpath(py_join(base, value));
-}
-
 /** (path, is_dir) per output a generator writes. Throws Unrecognised when it declares none. */
 function outputs_of(rel_source: string): [string, boolean][] {
   const text = read_text(path.join(REPO, rel_source));
 
-  let found: [string, boolean][];
-  let names: string[];
-  if (!rel_source.endsWith(".mjs") && !rel_source.endsWith(".config.ts")) {
-    // Already repo-relative: a TypeScript generator builds its output path from REPO.
-    [found, names] = [_python_outputs(rel_source, text), PY_OUTPUT_NAMES];
-  } else {
-    let raw: string[];
-    let is_dir: boolean;
-    if (rel_source.endsWith(".mjs")) {
-      [raw, names, is_dir] = [
-        [...text.matchAll(JS_CONST)].map((m) => m[2]!),
-        JS_OUTPUT_NAMES,
-        false,
-      ];
-    } else {
-      // The codegen config's `output.path` is a directory by definition.
-      [raw, names, is_dir] = [
-        [...text.matchAll(TS_OUTPUT_PATH)].map((m) => m[1]!),
-        TS_OUTPUT_NAMES,
-        true,
-      ];
-    }
-    found = raw.map((v): [string, boolean] => [_resolve(rel_source, v), is_dir]);
-  }
-
+  // Already repo-relative: a TypeScript generator builds its output path from REPO.
+  const found = _python_outputs(rel_source, text);
   if (!found.length) {
     throw new Unrecognised(
-      `${rel_source}: no output path found — looked for ${names.join(", ")}. ` +
+      `${rel_source}: no output path found — looked for ${PY_OUTPUT_NAMES.join(", ")}. ` +
         `Teach scripts/gen_gitattributes.ts this generator's output constant.`,
     );
   }

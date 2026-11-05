@@ -16,7 +16,6 @@ const REPO_ROOT = path.dirname(path.dirname(path.resolve(import.meta.path)));
 
 const CHECKER = path.join(REPO_ROOT, "scripts", "check_constants.ts");
 const MIRRORED_TREES = ["pb_migrations", "pb_hooks", "schema", "docs"];
-const MIRRORED_FILES = [path.join("web", "lib", "show-context.ts")];
 
 const NOTIFY = "pb_hooks/notify.pb.js";
 const CYCLES = "pb_hooks/cycles.pb.js";
@@ -54,10 +53,6 @@ function mirror(): string {
       recursive: true,
       dereference: true,
     });
-  }
-  for (const rel of MIRRORED_FILES) {
-    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
-    fs.copyFileSync(path.join(REPO_ROOT, rel), path.join(root, rel));
   }
   return root;
 }

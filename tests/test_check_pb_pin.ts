@@ -126,7 +126,7 @@ console.log(
 );
 for (const [label, rel] of [
   ["Makefile", MAKEFILE],
-  [".github/workflows/ci.yml (one of three)", CI],
+  [".github/workflows/ci.yml", CI],
   ["scripts/run_suite_battery.sh", BATTERY],
 ]) {
   fs.rmSync(ROOT, { recursive: true });
@@ -152,11 +152,11 @@ write(ROOT, DOCKERFILE, mutate_version(read(ROOT, DOCKERFILE), CANONICAL, BUMPED
 check("bumping only the Dockerfile's ARG exits 1", code, 1);
 check("...the Makefile is named", out.includes(`${MAKEFILE}:`), true);
 check("...the battery is named", out.includes(`${BATTERY}:`), true);
-check("...ci.yml is named 3 times (all three sites)", count(out, `${CI}:`), 3);
+check("...ci.yml is named once (its one workflow-level site)", count(out, `${CI}:`), 1);
 check(
-  "...5 findings total (1 + 3 + 1), the Dockerfile itself is not one",
+  "...3 findings total (1 + 1 + 1), the Dockerfile itself is not one",
   count(out, "     • "),
-  5,
+  3,
 );
 
 console.log("\n── (d) a required site with its pin line deleted is refused, not vanished ──");
@@ -193,7 +193,7 @@ check("a quoted Makefile pin and an unquoted battery pin both exit 0", code, 0);
 console.log("\n── (f2) a single-quoted YAML pin is held too ──");
 fs.rmSync(ROOT, { recursive: true });
 ROOT = mirror();
-write(ROOT, CI, replace_match(read(ROOT, CI), 1, pin_line(MISMATCH, ":", true, "'")));
+write(ROOT, CI, replace_match(read(ROOT, CI), 0, pin_line(MISMATCH, ":", true, "'")));
 [code, out] = run(ROOT);
 check("a single-quoted wrong ci.yml pin -> exit 1", code, 1);
 check("...names ci.yml", out.includes(`${CI}:`), true);
