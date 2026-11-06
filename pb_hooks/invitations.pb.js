@@ -298,8 +298,8 @@ routerAdd(
       } catch (_) {
         m = null;
       }
-      // The owner already has full authority; accepting their own invitation gets no
-      // membership row, same as an existing member's row is left untouched.
+      // The owner already has full authority and a row; accepting their own invitation writes
+      // nothing and answers as the owner, same as an existing member's row is left untouched.
       if (!m && txWs.get("owner") !== uid) {
         m = new Record(txApp.findCollectionByNameOrId("workspace_members"));
         m.set("workspace", wsId);
@@ -309,20 +309,21 @@ routerAdd(
         txApp.save(m);
       }
       txApp.delete(cur);
-      out = m
-        ? {
-            workspace: wsId,
-            membership: m.id,
-            role: m.getString("role"),
-            // An empty stored status is the backfill convention for active.
-            status: m.getString("status") || "active",
-          }
-        : {
-            workspace: wsId,
-            membership: null,
-            role: "owner",
-            status: "active",
-          };
+      out =
+        m && txWs.get("owner") !== uid
+          ? {
+              workspace: wsId,
+              membership: m.id,
+              role: m.getString("role"),
+              // An empty stored status is the backfill convention for active.
+              status: m.getString("status") || "active",
+            }
+          : {
+              workspace: wsId,
+              membership: null,
+              role: "owner",
+              status: "active",
+            };
     });
     // Thrown out here, not inside the callback, so it keeps its 404 status.
     if (!out) throw new NotFoundError("Invitation not found.");

@@ -142,7 +142,7 @@ try {
       .sort(),
     [
       ["Alice's", "member"],
-      ["Bob's", "member"],
+      ["Bob's", "admin"],
     ],
   );
 
@@ -210,10 +210,14 @@ try {
     estimate: 3,
   });
   check(
-    "patch with unknown key `estimate`",
-    [s, r.title, "estimate" in r],
-    [200, "Probe zephyr task v3", false],
+    "patch with unknown key `estimate` → 400 naming it",
+    [s, String(r.message ?? "").includes("estimate")],
+    [400, true],
   );
+  [s, r] = await api("PATCH", `/api/collections/tasks/records/${TASK}`, bob, {
+    title: "Probe zephyr task v3",
+  });
+  check("patch without it → 200, title saved", [s, r.title], [200, "Probe zephyr task v3"]);
 
   console.log("\n── list through project_items, one filter at a time ──");
   // A decoy the due bound and the label id must each exclude.

@@ -560,7 +560,7 @@ try {
         owner: OWNER_ID,
         scope: "personal",
         project: getitem(SHADOW, "id"),
-        filters: {},
+        filterData: {},
       },
       {
         name: "shadow-view-b",
@@ -568,7 +568,7 @@ try {
         owner: OWNER_ID,
         scope: "personal",
         project: getitem(NORMAL, "id"),
-        filters: {},
+        filterData: {},
       },
     ],
     [

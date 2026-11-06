@@ -288,7 +288,7 @@ Every rule requires the workspace to be untrashed, so an invitation into a trash
 The invitee uses system routes, because `users.email_key` is hidden and PocketBase drops hidden fields from filter matching:
 
 - `GET /api/tracker/invitations/mine` lists the invitations matching the caller `email_key`, with the workspace name and whether each has expired.
-- `POST /api/tracker/invitations/{id}/accept` answers 404 when the invitation is not the caller or its workspace is trashed, so it is no existence oracle; 403 for an unverified account; 410 once expired. It then, in one transaction, creates an active membership with the invitation role and deletes the invitation. An owner gets no membership row, and an existing row in any status is left as it is, so accepting never reactivates a suspended member.
+- `POST /api/tracker/invitations/{id}/accept` answers 404 when the invitation is not the caller or its workspace is trashed, so it is no existence oracle; 403 for an unverified account; 410 once expired. It then, in one transaction, creates an active membership with the invitation role and deletes the invitation. The owner already holds a membership row, so accepting writes nothing for them and answers with role owner and no membership; an existing row in any status is left as it is, so accepting never reactivates a suspended member.
 - `POST /api/tracker/invitations/{id}/decline` deletes the invitation and creates nothing, expired or not.
 
 ### Expiry

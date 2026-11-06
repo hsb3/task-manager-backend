@@ -1528,9 +1528,8 @@ routerAdd(
         );
       }
 
-      // Absent means the outgoing owner never had a roster row: only the users-create
-      // auto-provision makes one, so a workspace created via POST /api/collections/workspaces
-      // has none and this route must MINT it.
+      // Every workspace create gives its owner a roster row (owner.pb.js); it is minted here only if
+      // that provision failed, so the handover never leaves the outgoing owner without standing.
       let outgoing;
       try {
         outgoing = txApp.findFirstRecordByFilter(

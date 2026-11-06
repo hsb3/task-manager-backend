@@ -1,5 +1,52 @@
 /// <reference path="../pb_data/types.d.ts" />
-// workspace_members.status moves only active<->suspended; a stale write is refused 409.
+// workspace_members.status moves only active<->suspended; a stale write is refused 409; the owner's row is fixed.
+
+// Ownership moves only through transfer-ownership, so the owner's own row cannot be demoted,
+// suspended, reassigned or removed. A superuser is exempt: operator repair and the fixtures that prove the rest.
+// KEEP IN SYNC: the owner-row refusal on update and on delete below.
+onRecordUpdateRequest((e) => {
+  if (e.auth && e.auth.isSuperuser()) return e.next();
+  const o = e.record.original();
+  const owner = e.app
+    .findRecordById("workspaces", o.getString("workspace"))
+    .getString("owner");
+  if (o.getString("user") !== owner) return e.next();
+  const changed = ["role", "status", "user", "workspace"].filter(
+    (f) => e.record.getString(f) !== o.getString(f),
+  );
+  // Raising the row to active admin is no demotion: an owner handed a member row may fix it.
+  const toAdmin =
+    e.record.getString("role") === "admin" &&
+    e.record.getString("status") === "active" &&
+    changed.indexOf("user") === -1 &&
+    changed.indexOf("workspace") === -1;
+  if (!changed.length || toAdmin) return e.next();
+  const msg =
+    "The owner's membership cannot be changed. To hand the workspace over, transfer ownership.";
+  const data = {};
+  for (const f of changed)
+    data[f] = new ValidationError("last_active_owner", msg);
+  throw new ApiError(409, msg, data);
+}, "workspace_members");
+
+onRecordDeleteRequest((e) => {
+  if (e.auth && e.auth.isSuperuser()) return e.next();
+  const owner = e.app
+    .findRecordById("workspaces", e.record.getString("workspace"))
+    .getString("owner");
+  if (e.record.getString("user") !== owner) return e.next();
+  const msg =
+    "The owner cannot be removed from the workspace. To hand the workspace over, transfer ownership.";
+  throw new ApiError(409, msg, {
+    user: new ValidationError("last_active_owner", msg),
+  });
+}, "workspace_members");
+
+// A membership created without a role is a plain member; a blank role is still refused.
+onRecordCreateRequest((e) => {
+  if (!("role" in (e.requestInfo().body || {}))) e.record.set("role", "member");
+  return e.next();
+}, "workspace_members");
 
 onRecordUpdateRequest((e) => {
   // An empty stored status is the backfill convention for active.

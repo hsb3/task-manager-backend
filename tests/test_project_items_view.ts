@@ -331,6 +331,8 @@ try {
   for (const [ty, coll] of Object.entries(TYPES)) {
     const title_field = coll === "milestones" ? "name" : "title";
     const base = { workspace: WS, project: PRJ };
+    // tasks carry no draft field, so their "drafts" are plain rows.
+    const draft = coll === "tasks" ? {} : { draft: true };
     let live: any, d_owner: any, d_member: any, trashed: any, doomed: any, td: any;
     [s, live] = await api("POST", `/api/collections/${coll}/records`, alice, {
       ...base,
@@ -340,13 +342,13 @@ try {
     [s, d_owner] = await api("POST", `/api/collections/${coll}/records`, alice, {
       ...base,
       [title_field]: `PIV ${ty} draft-by-owner`,
-      draft: true,
+      ...draft,
     });
     check(`${coll}: draft authored by the OWNER`, s, 200);
     [s, d_member] = await api("POST", `/api/collections/${coll}/records`, member, {
       ...base,
       [title_field]: `PIV ${ty} draft-by-member`,
-      draft: true,
+      ...draft,
     });
     check(`${coll}: draft authored by a plain MEMBER`, s, 200);
     [s, trashed] = await api("POST", `/api/collections/${coll}/records`, alice, {
@@ -366,7 +368,7 @@ try {
     [s, td] = await api("POST", `/api/collections/${coll}/records`, alice, {
       ...base,
       [title_field]: `PIV ${ty} trashed-draft-by-owner`,
-      draft: true,
+      ...draft,
     });
     check(`${coll}: draft authored by the owner, about to be trashed`, s, 200);
     [s] = await api("DELETE", `/api/collections/${coll}/records/${td.id}`, alice);

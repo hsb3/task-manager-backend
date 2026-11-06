@@ -813,10 +813,12 @@ await carol_admin.done();
 [s] = await api("DELETE", `/api/collections/workspace_members/records/${carol_admin.id}`, alice);
 check("cleanup: Carol's admin membership removed (Carol is a non-member again)", s, 204);
 
-// role + status are REQUIRED. createRule is null for every user token (proven in MEMBER
+// status is REQUIRED and role defaults to member when omitted. createRule is null for every user token (proven in MEMBER
 // MANAGEMENT above), so a user-token create is refused 403 before validation ever runs — only a
 // superuser reaches field validation, since rules never apply to a superuser caller.
-console.log("\n── REQUIRED FIELDS: a membership create missing role or status is refused ──");
+console.log(
+  "\n── REQUIRED FIELDS: a membership create missing status, or with a blank role, is refused ──",
+);
 [s, r] = await api("POST", "/api/collections/workspace_members/records", alice, {
   workspace: ALICE_WORKSPACE,
   user: carol_id,
@@ -825,7 +827,6 @@ console.log("\n── REQUIRED FIELDS: a membership create missing role or statu
 check("Alice (owner) adds Carol with status omitted (null rule → 403, not validation)", s, 403);
 for (const [field, body] of [
   ["status", { workspace: ALICE_WORKSPACE, user: carol_id, role: "member" }],
-  ["role", { workspace: ALICE_WORKSPACE, user: carol_id, status: "active" }],
   ["status", { workspace: ALICE_WORKSPACE, user: carol_id, role: "member", status: "" }],
   ["role", { workspace: ALICE_WORKSPACE, user: carol_id, role: "", status: "active" }],
 ] as [string, any][]) {
@@ -845,6 +846,14 @@ for (const [field, body] of [
   alice,
 );
 check("  ↳ no partial row survived any refusal", r.items, []);
+[s, r] = await api("POST", "/api/collections/workspace_members/records", su, {
+  workspace: ALICE_WORKSPACE,
+  user: carol_id,
+  status: "active",
+});
+check("superuser adds Carol with role omitted → 200, role member", [s, r.role], [200, "member"]);
+[s] = await api("DELETE", `/api/collections/workspace_members/records/${r.id}`, su);
+check("cleanup: the defaulted row is removed (Carol is a non-member again)", s, 204);
 
 // TASK-017.17: draft privacy. Self-contained like the blocks above — Carol is added,
 // promoted to admin, then removed, ending the run a non-member again.

@@ -346,8 +346,9 @@ async function batch_create(
 
 /**
  * Raise the DATABASE's workspace total to `target` with workspaces neither measured
- * principal can see. Each carries an active membership row so the foreign membership table
- * grows too, AND an item of its own so over-reading is visible in `totalItems`.
+ * principal can see. Each carries its owner's active membership row (every workspace create
+ * makes one) so the foreign membership table grows too, AND an item of its own so over-reading
+ * is visible in `totalItems`.
  */
 async function grow_to(su: string, cap: number, owner_id: string, target: number): Promise<void> {
   const missing = target - (await workspace_count(su));
@@ -362,12 +363,6 @@ async function grow_to(su: string, cap: number, owner_id: string, target: number
       name: `Unrelated ${n5(base + i)}`,
       owner: owner_id,
     })),
-  );
-  await batch_create(
-    su,
-    cap,
-    "workspace_members",
-    ws_ids.map((w) => ({ workspace: w, user: owner_id, role: "member", status: "active" })),
   );
   const project_ids = await batch_create(
     su,

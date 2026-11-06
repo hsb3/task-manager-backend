@@ -96,6 +96,14 @@ export const ALLOWLIST = new Map<string, string>([
     "card f27c: the trash route also groups by type; the record lists it",
   ],
   [
+    '["1785186900_seed_app_docs.js", "decision:invitation-keyed-by-email", "An owner gets no membership row, and an existing row in any "]',
+    "card 06sf: every workspace gives its owner a membership row, so the record now says accepting writes nothing for the owner",
+  ],
+  [
+    '["1785186900_seed_app_docs.js", "collection:workspace_members", "The provisioning paths also give each workspace owner a sel"]',
+    "card 06sf: every workspace create gives its owner an admin row, not only the provisioning paths a member row; the record now says so",
+  ],
+  [
     '["1785186700_seed_app_docs.js", "route:tracker-summary", "Returns {user, total, byStatus, assignedToMe} for the tasks"]',
     "card vc8g: the summary route counts only workspaces the caller owns or holds an active membership in; the record now says so",
   ],

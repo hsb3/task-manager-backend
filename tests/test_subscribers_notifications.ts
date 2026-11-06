@@ -1745,10 +1745,10 @@ try {
   }
   check("35 users created and joined ACTIVE (every call 200)", batch_statuses, new Set([200]));
   check(
-    "the workspace really carries 35 active members",
+    "the workspace really carries 36 active members: the 35 joined and its owner",
     (await find_by_filter("workspace_members", `(workspace='${esc(BWS)}' && status='active')`, su))
       .length,
-    35,
+    36,
   );
   let btask: any;
   [s, btask] = await api("POST", "/api/collections/tasks/records", alice, {
@@ -2441,7 +2441,7 @@ try {
     cap_db.close();
   }
   check(
-    "every bulk-inserted member is ACTIVE in the workspace, and PocketBase sees them",
+    "every bulk-inserted member is ACTIVE in the workspace beside its owner, and PocketBase sees them",
     (
       await find_by_filter(
         "workspace_members",
@@ -2450,7 +2450,7 @@ try {
         500,
       )
     ).length,
-    CAP_MEMBERS,
+    CAP_MEMBERS + 1,
   );
   [s, ctask] = await api("POST", "/api/collections/tasks/records", alice, {
     title: "G2-cap-item",
