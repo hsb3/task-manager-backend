@@ -163,6 +163,129 @@ append(root, HOST, "// routerAdd(`mentioned in a comment`)");
 check("comment only: no offences", offenders(root).length === 0, JSON.stringify(offenders(root)));
 fs.rmSync(root, { recursive: true, force: true });
 
+/** Insert `entry` (an object literal) under `key` in the mirrored ROUTES and serve it from HOST. */
+function plant_entry(r: string, key: string, entry: string): void {
+  const p = path.join(r, REGISTRY);
+  const text = fs.readFileSync(p, "utf8");
+  const at = text.indexOf("\n};", text.indexOf("ROUTES"));
+  fs.writeFileSync(p, `${text.slice(0, at)}\n  "${key}": ${entry},${text.slice(at)}`);
+  append(r, HOST, `require(\`\${__hooks}/lib/routes.js\`).add("${key}", (e) => e.json(200, {}));`);
+}
+
+/** Append `text` to `rel` in a mirror and return the 1-based line it lands on. */
+function plant_line(r: string, rel: string, text: string): number {
+  const n = fs.readFileSync(path.join(r, rel), "utf8").split("\n").length + 1;
+  append(r, rel, text);
+  return n;
+}
+
+const BASE = 'summary: "x", auth: "any", response: { status: 200, schema: null }';
+const PROBE = "POST /api/probe/f";
+const MAL = (field: string) =>
+  new RegExp(`^POST /api/probe/f is malformed: ${field}, if present`, "u");
+
+console.log("\n── (i) a route bound through the onServe router outside the registry ──");
+expect_red(
+  "se.router in onServe",
+  (r) =>
+    append(
+      r,
+      HOST,
+      '$app.onServe().bindFunc((se) => { se.router.GET("/x", (e) => e.string(200, "x")) })',
+    ),
+  [/^router token at pb_hooks\/me\.pb\.js:\d+ — register through pb_hooks\/lib\/routes\.js$/u],
+);
+root = mirror();
+const AT = plant_line(root, OTHER, "e.router.GET('/z', (e) => e.string(200, 'z'))");
+const GOT = offenders(root);
+check(
+  "e.router: names the exact file:line",
+  GOT.length === 1 && GOT[0].startsWith(`router token at ${OTHER}:${AT} `),
+  JSON.stringify(GOT),
+);
+fs.rmSync(root, { recursive: true, force: true });
+
+console.log("\n── (j) routerAdd reached without a direct call ──");
+expect_red(
+  "const ra = routerAdd alias",
+  (r) => append(r, HOST, 'const ra = routerAdd; ra("GET", "/y", (e) => e.string(200, "y"));'),
+  [/^routerAdd token at pb_hooks\/me\.pb\.js:\d+ — register through pb_hooks\/lib\/routes\.js$/u],
+);
+expect_red(
+  "routerAdd.call",
+  (r) => append(r, OTHER, 'routerAdd.call(null, "GET", "/z", (e) => e.string(200, "z"));'),
+  [/^routerAdd token at pb_hooks\/names\.pb\.js:\d+ /u],
+);
+
+console.log("\n── (k) router in comments, and the real onServe, stay GREEN ──");
+root = mirror();
+append(root, HOST, "// se.router.GET is only mentioned here");
+append(root, OTHER, "/* router\n   e.router.GET(...) */");
+check(
+  "commented router: no offences",
+  offenders(root).length === 0,
+  JSON.stringify(offenders(root)),
+);
+fs.rmSync(root, { recursive: true, force: true });
+const GUARDS = fs.readFileSync(path.join(REPO_ROOT, "pb_hooks/schema_guards.pb.js"), "utf8");
+check("schema_guards.pb.js still uses onServe", /\$app\.onServe\(\)\.bindFunc/u.test(GUARDS));
+check(
+  "schema_guards.pb.js: no offence",
+  !offenders(REPO_ROOT).some((o) => o.includes("schema_guards")),
+  JSON.stringify(offenders(REPO_ROOT)),
+);
+
+console.log("\n── (l) the v2 fields are validated ──");
+expect_red(
+  "request not type object",
+  (r) => plant_entry(r, PROBE, `{ ${BASE}, request: { type: "array" } }`),
+  [MAL("request")],
+);
+expect_red(
+  "responses key not a 3-digit status",
+  (r) => plant_entry(r, PROBE, `{ ${BASE}, responses: { "4xx": "Refused." } }`),
+  [MAL("responses")],
+);
+expect_red(
+  "responses value not one line",
+  (r) => plant_entry(r, PROBE, `{ ${BASE}, responses: { "409": "a\\nb" } }`),
+  [MAL("responses")],
+);
+expect_red(
+  "denies other than superuser",
+  (r) => plant_entry(r, PROBE, `{ ${BASE}, denies: ["users"] }`),
+  [MAL("denies")],
+);
+expect_red(
+  "denies without auth any",
+  (r) =>
+    plant_entry(
+      r,
+      PROBE,
+      `{ summary: "x", auth: "users", response: { status: 200, schema: null }, denies: ["superuser"] }`,
+    ),
+  [MAL("denies")],
+);
+expect_red("docs not route:<slug>", (r) => plant_entry(r, PROBE, `{ ${BASE}, docs: "hook:x" }`), [
+  MAL("docs"),
+]);
+expect_red("field outside the list", (r) => plant_entry(r, PROBE, `{ ${BASE}, bodies: {} }`), [
+  /^POST \/api\/probe\/f is malformed: unknown field\(s\) bodies$/u,
+]);
+root = mirror();
+plant_entry(
+  root,
+  PROBE,
+  `{ ${BASE}, request: { type: "object", properties: { name: { type: "string" } } }, responses: { "400": "Bad body.", "404": "Not found." }, denies: ["superuser"], docs: "route:probe-f" }`,
+);
+check(
+  "every v2 field well-formed: no offences",
+  offenders(root).length === 0,
+  JSON.stringify(offenders(root)),
+);
+check("every v2 field well-formed: CLI exits 0", cli(root) === 0);
+fs.rmSync(root, { recursive: true, force: true });
+
 console.log("\n── (h) no tracked source was rewritten ──");
 check("pb_hooks/ is byte-identical", tree_hash() === BEFORE);
 

@@ -4,6 +4,6 @@ clients/tm/src/api.generated.ts merge=binary
 docs/generated/decisions.md merge=binary
 openapi.json merge=binary
 pb_hooks/field_patterns.json merge=binary
-pb_migrations/1785187700_seed_app_docs.js merge=binary
+pb_migrations/1785187800_seed_app_docs.js merge=binary
 schema/** merge=binary
 scripts/model/current/** merge=binary
