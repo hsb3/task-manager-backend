@@ -213,8 +213,13 @@ try {
     },
     "GET /api/tracker/trash": {
       400: (c) => call("GET", "/api/tracker/trash", c.Alice),
-      403: (c) => call("GET", "/api/tracker/trash?workspace=nope", c.Alice),
-      404: (c) => call("GET", `/api/tracker/trash?workspace=${c.trashed_ws}`, c.Alice),
+      403: (c) => call("GET", `/api/tracker/trash?workspace=${c.ws}`, c.su),
+      404: async (c) => {
+        // a trashed workspace and an unknown id share the one 404; the first to differ is reported
+        const trashed = await call("GET", `/api/tracker/trash?workspace=${c.trashed_ws}`, c.Alice);
+        if (trashed[0] !== 404) return trashed;
+        return call("GET", "/api/tracker/trash?workspace=nope", c.Alice);
+      },
     },
     "GET /api/tracker/users/{id}/settings": {
       404: (c) => call("GET", `/api/tracker/users/${c.Bob_id}/settings`, c.Alice),

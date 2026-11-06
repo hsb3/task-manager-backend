@@ -64,7 +64,7 @@ capabilities:
       ?= "active")) && (draft = false || author = @request.auth.id || workspace.owner = @request.auth.id
       || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role
       ?= "admin" && workspace.workspace_members_via_workspace.status ?= "active")) && workspace.trashed
-      = ""'
+      = "" && (@request.body.project = "" || @request.body.project.trashed = "")'
     actors:
     - workspace-owner
     - active-workspace-writer
@@ -73,6 +73,11 @@ capabilities:
     - workspace-owner
     - active-workspace-admin
     authRequired: guard
+    body_guards:
+    - '@request.body.project'
+    body_pins:
+    - '@request.body.project = ""'
+    - '@request.body.project.trashed = ""'
     record_state:
     - workspace.trashed = ""
   delete:

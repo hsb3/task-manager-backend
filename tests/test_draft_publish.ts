@@ -447,7 +447,7 @@ try {
 
   for (const caller of Object.keys(CALLERS)) {
     [s, body] = await api("GET", `/api/tracker/trash?${TRASH_QS}`, TOKEN[caller]);
-    // The route scopes by hand and answers a non-active caller 403, never a filtered 200.
+    // The route scopes by hand and answers a non-active caller 404, never a filtered 200.
     if (CAN_READ_PUBLISHED.has(caller)) {
       const served = new Map<any, any>();
       for (const i of body.items || []) {
@@ -488,7 +488,7 @@ try {
         );
       }
     } else {
-      check(`§3 route  → ${caller} holds no active membership → 403`, s, 403);
+      check(`§3 route  → ${caller} holds no active membership → 404`, s, 404);
     }
   }
 

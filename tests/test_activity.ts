@@ -944,7 +944,8 @@ try {
   // COVERS: hook:realtime.pb.js#onRecordUpdateRequest:milestones
   // An update envelope carries the whole record too, so renaming a row that is hidden on BOTH
   // sides of the save hands every subscriber a title it 404s. The item updateRule reads
-  // neither `trashed` nor `project.trashed`, so the owner can still PATCH such a row.
+  // neither `trashed` nor the stored `project.trashed` (only a SUBMITTED project, card 2vpm),
+  // so the owner can still PATCH such a row in place.
   console.log(
     "\n── (7g) renaming a row hidden on both sides broadcasts nothing; a live one does ──",
   );

@@ -185,17 +185,24 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/search", (e) => {
 
 // GET /api/tracker/trash — enumerate a workspace's trashed items (self-scoped by membership; routes BYPASS rules).
 require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/trash", (e) => {
+  // A superuser holds no membership, so it is refused rather than answered an empty trash.
+  if (e.auth.isSuperuser())
+    throw new ForbiddenError(
+      "This route answers a workspace member, and a superuser is no member of any.",
+    );
   const uid = e.auth.id;
   const wsId = (e.request.url.query().get("workspace") || "").trim();
   if (!wsId) throw new BadRequestError("workspace query param required");
   // KEEP IN SYNC: project_items viewRule trash branch in schema/project_items.view.json — the owner or an active member, never a trashed workspace, and for non-task items an owner/admin or `draft = false || author`.
   // MEMBERSHIP SCOPE BY HAND — a wrong scope leaks another tenant's trash. Caller must own
   // wsId OR have a workspace_members row (R7 find-first-or-throw idiom, trash.pb.js:59-67).
+  // An unknown id, a stranger and a trashed workspace all answer the one 404 the other workspace
+  // routes answer a user (decision:inaccessible-workspace-answers-404).
   let ws;
   try {
     ws = e.app.findRecordById("workspaces", wsId);
   } catch (_) {
-    throw new ForbiddenError("not a member of this workspace");
+    throw new NotFoundError("not found");
   }
   let member = ws.get("owner") === uid;
   if (!member) {
@@ -212,10 +219,9 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/trash", (e) => {
       member = false;
     }
   }
-  if (!member) throw new ForbiddenError("not a member of this workspace");
+  if (!member) throw new NotFoundError("not found");
   // A TRASHED workspace is refused outright, the owner included: this route bypasses
-  // collection rules, so the cascade cannot reach it. It runs BELOW the membership check so a
-  // stranger gets the same refusal for a trashed id as for one that never existed.
+  // collection rules, so the cascade cannot reach it.
   if (String(ws.get("trashed")) !== "") throw new NotFoundError("not found");
   // KEEP IN SYNC: decisions/documents/milestones listRule draft branch (mirrors the export
   // route's canSeeDrafts below) — trashing a draft must not publish it to the members its

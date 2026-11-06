@@ -50,11 +50,17 @@ capabilities:
   update:
     verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status
-      ?= "active")) && workspace.trashed = ""'
+      ?= "active")) && workspace.trashed = "" && (@request.body.project = "" || @request.body.project.trashed
+      = "")'
     actors:
     - workspace-owner
     - active-workspace-writer
     authRequired: guard
+    body_guards:
+    - '@request.body.project'
+    body_pins:
+    - '@request.body.project = ""'
+    - '@request.body.project.trashed = ""'
     record_state:
     - workspace.trashed = ""
   delete:

@@ -833,17 +833,23 @@ check(
 
 // COVERS: route:GET /api/tracker/trash
 [s] = await api("GET", `/api/tracker/trash?workspace=${ALICE_WORKSPACE}`, eve);
-check("T11: Eve (confirmed non-member) GET trash -> 403", s, 403);
+check("T11: Eve (confirmed non-member) GET trash -> 404 (no existence leak)", s, 404);
 [s] = await api("GET", `/api/tracker/trash?workspace=${ALICE_WORKSPACE}`, null);
 check("T11: anon (no token) GET trash -> 401", s, 401);
 [s] = await api("GET", trash_q(ALICE_WORKSPACE, { filter: 'type = "task"', page: 2 }), eve);
-check("T11: Eve (non-member) GET trash with filter/page params -> 403", s, 403);
+check("T11: Eve (non-member) GET trash with filter/page params -> 404", s, 404);
 [s] = await api("GET", trash_q(ALICE_WORKSPACE, { group: "status" }), null);
 check("T11: anon grouped GET trash -> 401", s, 401);
 [s] = await api("GET", "/api/tracker/trash", bob);
 check("T11: member GET trash with missing workspace param -> 400", s, 400);
 [s] = await api("GET", "/api/tracker/trash?workspace=zzzzzzzzzzzzzzz", bob);
-check("T11: member GET trash for a nonexistent workspace id -> 403 (no existence leak)", s, 403);
+check("T11: member GET trash for a nonexistent workspace id -> 404 (no existence leak)", s, 404);
+[s] = await api("GET", `/api/tracker/trash?workspace=${ALICE_WORKSPACE}`, su);
+check(
+  "T11: superuser GET trash -> 403 (refused as on the other users-only workspace routes)",
+  s,
+  403,
+);
 
 // A second, LATER-trashed decision to prove the per-collection -trashed sort.
 let dec_t11b: any;
@@ -1990,7 +1996,7 @@ check("T22: group honours filter (decisions only -> total 2)", tup(s, body.total
 [s] = await api("GET", trash_q(ZARA_WS, { group: "bogus" }), zara);
 check("T22: an unknown group is refused 400", s, 400);
 [s] = await api("GET", trash_q(ZARA_WS, { group: "status" }), eve);
-check("T22: a non-member's grouped read is still 403", s, 403);
+check("T22: a non-member's grouped read is still 404", s, 404);
 
 // purge_at = trashed + retention, read from app_settings exactly as the sweep reads it.
 const purge_of = (trashed: string, days: number): string =>

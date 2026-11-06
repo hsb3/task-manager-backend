@@ -36,7 +36,7 @@ export const MIGRATIONS = path.join(REPO, "pb_migrations");
 // The NEWEST app_docs seed migration is the corpus's current source; a re-seed moves this.
 // .gitattributes is generated from this constant, so a re-seed moves `merge=binary` onto the new
 // seed and the superseded one drops out of it; gen_gitattributes.ts --check blesses that move.
-export const DEFAULT_OUTPUT = path.join(REPO, "pb_migrations", "1785188800_seed_app_docs.js");
+export const DEFAULT_OUTPUT = path.join(REPO, "pb_migrations", "1785188900_seed_app_docs.js");
 
 // `created`/`updated` are autodate fields: seeding them would make every regeneration differ.
 export const FIELDS = ["id", "slug", "refName", "title", "body"];
