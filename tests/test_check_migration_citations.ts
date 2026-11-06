@@ -352,11 +352,13 @@ function proofs(): void {
   echo(r12.stdout + r12.stderr);
   check("exit code is 1", r12.returncode === 1);
   check(
-    "names the tag and the fetch that repairs it",
+    "says the tag is absent and lives in hsb3/task-manager",
     (r12.stdout + r12.stderr).includes(
-      "migrations-v1 tag not in this checkout — run: git fetch --tags origin",
+      "migrations-v1 tag not in this checkout and no scripts/migrations-v1.txt list — " +
+        "the tag lives in hsb3/task-manager and cannot be fetched here",
     ),
   );
+  check("no longer advises git fetch --tags", !(r12.stdout + r12.stderr).includes("fetch --tags"));
 
   console.log("── 12b. without the tag, the vendored scripts/migrations-v1.txt is the v1 set ──");
   const vendored = {
@@ -366,6 +368,11 @@ function proofs(): void {
   const r12b = run(make_repo("vendored", vendored, [V2_ONLY], false));
   echo(r12b.stdout + r12b.stderr);
   check("a v1 citation in the vendored list exits 0", r12b.returncode === 0);
+  check(
+    "the summary says it read the vendored list, not the tag",
+    r12b.stdout.includes("1 v1 via scripts/migrations-v1.txt") &&
+      !r12b.stdout.includes("via the migrations-v1 tag"),
+  );
   const r12c = run(
     make_repo("vendored-ghost", { ...vendored, "cite.md": `See v1:${GHOST}.\n` }, [V2_ONLY], false),
   );

@@ -106,6 +106,7 @@ onRecordUpdate(landInShadowProject, "milestones");
 // Request tier, so it sees ONLY what the client submitted: the placement above runs on the
 // universal tier afterwards and must stay free to write the same id.
 function refuseSubmittedShadowProject(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const p = e.record.get("project");
   // Only a CHANGE is a choice: an item already living there is edited like any other, and on
   // create the original is empty so any container id here came from the client.

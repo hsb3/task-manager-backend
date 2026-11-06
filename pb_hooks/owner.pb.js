@@ -65,22 +65,24 @@ onRecordAfterCreateSuccess((e) => {
 }, "workspaces");
 
 // An account delete empties saved_views.owner (kata bwpj); a personal view is readable only by its
-// owner, so an emptied one is unreachable. Universal tier: the purge cron deletes programmatically.
-onRecordAfterDeleteSuccess((e) => {
+// owner, so an emptied one is unreachable. Ids are read BEFORE e.next() (after it the owner is already
+// cleared); universal tier: the purge cron deletes programmatically.
+onRecordDelete((e) => {
+  let mine = [];
   try {
-    const orphans = e.app.findRecordsByFilter(
+    mine = e.app.findRecordsByFilter(
       "saved_views",
-      "owner = '' && scope = 'personal'",
+      "owner = {:u} && scope = 'personal'",
       "",
       0,
       0,
+      { u: e.record.id },
     );
-    for (const v of orphans) e.app.delete(v);
   } catch (err) {
     e.app
       .logger()
       .error(
-        "personal view cleanup failed",
+        "personal view lookup failed",
         "user",
         e.record.id,
         "err",
@@ -88,4 +90,19 @@ onRecordAfterDeleteSuccess((e) => {
       );
   }
   e.next();
+  for (const v of mine) {
+    try {
+      e.app.delete(v);
+    } catch (err) {
+      e.app
+        .logger()
+        .error(
+          "personal view cleanup failed",
+          "user",
+          e.record.id,
+          "err",
+          String(err),
+        );
+    }
+  }
 }, "users");

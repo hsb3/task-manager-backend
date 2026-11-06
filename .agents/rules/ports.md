@@ -24,7 +24,7 @@ sharing the same DEFAULT loud, before either ever boots. **The one thing the
 offset does NOT move** is the container's `PORT` — `Dockerfile`'s `EXPOSE` is a build-time
 directive that cannot read it, so that literal stays. `scripts/smtp_sink.ts`'s `SINK_PORT`
 DOES shift with it. Per-site vars still win where they
-exist (`PB_URL`, `PB_PUBLIC_URL`, `MAIL_SINK_PORT`, `PB_SINK_PORT`, `SINK_PORT`).
+exist (`PB_URL`, `PB_PUBLIC_URL`, `MAIL_SINK_PORT`, `PB_SINK_PORT`, `SINK_PORT`). `roomkit.serve` defaults `PB_PUBLIC_URL` to the room's own URL so `{APP_URL}` in mail follows the shifted port; a hand-booted room gets `mail.pb.js`'s 8090.
 
 **Defaults:** 8090 dev (off-limits to tests) · 8091-8093 battery rooms ·
 8094/8095/8098/8099 "probes" — ALSO the defaults of test_oauth, test_backups,
@@ -50,7 +50,7 @@ test_invite_mirror · 8145 = test_mutation_proof · 8146 = test_api_keys · 8149
 test_pb_refusal_statuses · 8148 = test_draft_publish · 8193 = test_tm_cli · 8194 = test_tm_mcp. SMTP sinks:
 2526 battery email · 2527 battery hardening · 2528-2531 test_observability · 2532
 test_collab_flow · 2533 test_subscribers_notifications · 2534 test_signup_verification. `scripts/check_port_collisions.ts`
-prints the ports shared by design (the dev port, the probe band, the one hardening sink).
+prints the ports shared by design (the dev port, the probe band, the one hardening sink). With `PB_PORT_OFFSET` set (or `--offset N`) it also refuses an offset that lands any default on 5432/6379/3306/27017 (local Postgres/Redis/MySQL/MongoDB; 2900 puts test_collab_flow's 2532 sink on 5432), and `scripts/run_suite_battery.sh` runs it first so a battery at such an offset refuses before booting anything.
 
 # Two kinds of suite
 

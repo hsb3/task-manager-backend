@@ -49,6 +49,7 @@ onRecordCreateRequest((e) => {
 }, "decisions");
 
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   if (!e.record.get("workspace") && e.record.get("project")) {
     let proj = null;
     try {
@@ -356,6 +357,7 @@ onRecordUpdate((e) => {
 // decision:user-settings-write-checks — the default pointers must be readable and not the shadow project, and the
 // time zone a real one; the settings route (pb_hooks/user_settings.pb.js) applies the same lib checks.
 function validateUserSettingsWrite(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const pick = (r) => ({
     default_project: r.getString("default_project"),
     default_view: r.getString("default_view"),
@@ -376,6 +378,7 @@ onRecordUpdateRequest(validateUserSettingsWrite, "user_settings");
 // KEEP IN SYNC: the five blocks below are byte-parallel apart from the collection tag
 // (and the projects superuser exemption).
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("tasks", e.record.id);
   if (orig.get("workspace") !== e.record.get("workspace")) {
     throw new BadRequestError("workspace is immutable");
@@ -383,6 +386,7 @@ onRecordUpdateRequest((e) => {
   return e.next();
 }, "tasks");
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("decisions", e.record.id);
   if (orig.get("workspace") !== e.record.get("workspace")) {
     throw new BadRequestError("workspace is immutable");
@@ -390,6 +394,7 @@ onRecordUpdateRequest((e) => {
   return e.next();
 }, "decisions");
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("documents", e.record.id);
   if (orig.get("workspace") !== e.record.get("workspace")) {
     throw new BadRequestError("workspace is immutable");
@@ -397,6 +402,7 @@ onRecordUpdateRequest((e) => {
   return e.next();
 }, "documents");
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("milestones", e.record.id);
   if (orig.get("workspace") !== e.record.get("workspace")) {
     throw new BadRequestError("workspace is immutable");
@@ -408,6 +414,7 @@ onRecordUpdateRequest((e) => {
 // closing this for ALL callers would leave no in-room construction for the already-incoherent
 // row the D1 predicate above must tolerate, which is the TASK-055/TASK-057 regression trap.
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   if (e.auth && e.auth.isSuperuser()) return e.next();
   const orig = e.app.findRecordById("projects", e.record.id);
   if (orig.get("workspace") !== e.record.get("workspace")) {
@@ -425,6 +432,7 @@ onRecordUpdateRequest((e) => {
 // KEEP IN SYNC: the create + update handlers below are byte-parallel (only the
 // registration verb differs). INLINED per handler (pooled JSVM — no shared helper).
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const labels = e.record.get("labels");
   if (labels && labels.length) {
     const p = e.record.get("project");
@@ -465,6 +473,7 @@ onRecordCreateRequest((e) => {
   return e.next();
 }, "tasks");
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const labels = e.record.get("labels");
   if (labels && labels.length) {
     const p = e.record.get("project");
@@ -512,6 +521,7 @@ onRecordUpdateRequest((e) => {
 // KEEP IN SYNC: the create + update handlers below are byte-parallel (only the
 // registration verb differs). INLINED per handler (pooled JSVM — no shared helper).
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const raw = e.record.get("templateData");
   const s = raw == null ? "" : String(raw);
   if (s.trim() === "") return e.next();
@@ -684,6 +694,7 @@ onRecordCreateRequest((e) => {
   return e.next();
 }, "templates");
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const raw = e.record.get("templateData");
   const s = raw == null ? "" : String(raw);
   if (s.trim() === "") return e.next();

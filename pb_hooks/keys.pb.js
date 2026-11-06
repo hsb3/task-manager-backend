@@ -85,6 +85,7 @@ onRecordUpdate(lockProjectKey, "projects");
 // refuses only a client's write, never a server-side save.
 // KEEP IN SYNC: this is refuseSubmittedItemKey's rule, for the counter behind the key.
 function refuseSubmittedItemSeq(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   if (e.record.get("item_seq") !== e.record.original().get("item_seq")) {
     throw new BadRequestError("item_seq is server-owned");
   }
@@ -192,7 +193,8 @@ onRecordAfterCreateSuccess(assignItemKey, "milestones");
 // The key follows the item (decision:item-display-keys): moving an item to another project leaves its label
 // alone, so this guard is also what stops a move from re-keying it into the new project's range.
 // Lenient on an EMPTY original: this universal tier also fires on a server-side save that labels
-// an unkeyed item, and PB aborts the boot on a migration a hook refuses.
+// an unkeyed item (a re-save of the object assignItemKey just set the key on), and PB aborts the
+// boot on a migration a hook refuses.
 // KEEP IN SYNC: refuseSubmittedItemKey below is this rule without the empty-original escape.
 function lockItemKey(e) {
   const original = e.record.original().get("key");
@@ -211,6 +213,7 @@ onRecordUpdate(lockItemKey, "milestones");
 // sees a server-side save: that write is exactly the empty-original case escaped above.
 // KEEP IN SYNC: this is lockItemKey's rule, strict on the empty original.
 function refuseSubmittedItemKey(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   if (e.record.get("key") !== e.record.original().get("key")) {
     throw new BadRequestError("key is immutable");
   }

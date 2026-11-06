@@ -759,6 +759,36 @@ check("a missing schema dir is a SETUP error, not a pass", proc.returncode, 2);
 proc = cli("--hooks-dir", "/nonexistent");
 check("a missing hooks dir is a SETUP error, not a pass", proc.returncode, 2);
 
+const lib_scan = with_tmp("pbmem_lib_", (tmp) => {
+  fs.mkdirSync(path.join(tmp, "lib"));
+  fs.writeFileSync(path.join(tmp, "top.pb.js"), "// nothing\n");
+  fs.writeFileSync(
+    path.join(tmp, "lib", "bad.js"),
+    'app.findRecordsByFilter("workspace_members", "user = {:u}", "", 10, 0, { u: 1 });\n',
+  );
+  return guard.scan_hooks(tmp, new Map());
+});
+check(
+  "a pb_hooks/lib/ site is scanned and named by its lib/ path",
+  lib_scan.findings.map((f) => `${f.file}:${f.line}`),
+  ["lib/bad.js:1"],
+);
+check("both files are counted", lib_scan.files_scanned, 2);
+
+const helper_scan = hook_scan(
+  'const m = earliest(app, "workspace_members", "user = {:u}", { u: 1 });\n',
+);
+check(
+  "a helper call with the collection in a later argument is a site",
+  helper_scan.findings.map((f) => `${f.file}:${f.line}`),
+  ["synthetic.pb.js:1"],
+);
+const helper_ok = hook_scan(
+  'const m = earliest(app, "workspace_members", "user = {:u} && status = \'active\'", { u: 1 });\n',
+);
+check("...and a pinned helper filter passes", helper_ok.findings.length, 0);
+check("...as one scanned site", helper_ok.sites.length, 1);
+
 console.log();
 if (failures) {
   console.log(`❌ FAIL — ${failures} check(s) mismatched`);

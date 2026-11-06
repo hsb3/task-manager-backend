@@ -1234,7 +1234,8 @@ require(`${__hooks}/lib/routes.js`).add("POST /api/tracker/export", (e) => {
     return t && taskIdSet[t];
   });
 
-  // notifications.listRule also requires membership of the item's workspace: each row runs the live rule.
+  // Per-row canAccessRecord is kept: the live listRule is the single source of truth and a hand-rolled
+  // membership filter would drift from it; the cost is bounded by one user's notifications per export.
   const notifRule = e.app.findCollectionByNameOrId("notifications").listRule;
   const info = e.requestInfo();
   const notificationsOut = fetchAll("notifications", "user = {:uid}", {
@@ -1499,6 +1500,19 @@ require(`${__hooks}/lib/routes.js`).add(
 
       ws.set("owner", target);
       txApp.save(ws);
+
+      // The shadow project is owned by the workspace owner (shadow.pb.js); it moves with the handover.
+      try {
+        const shadow = txApp.findFirstRecordByFilter(
+          "projects",
+          "workspace = {:w} && shadow = true",
+          { w: wsId },
+        );
+        shadow.set("owner", target);
+        txApp.save(shadow);
+      } catch (err) {
+        if (!String(err).includes("no rows")) throw err;
+      }
 
       // `incoming` is read for eligibility ONLY and deliberately never written: ownership lives
       // on workspaces.owner, so the roster row is the standing held BENEATH it, and rewriting an

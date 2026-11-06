@@ -39,16 +39,23 @@ function echo(out: string): void {
   }
 }
 
-type Result = { returncode: number; stdout: string };
+type Result = { returncode: number; stdout: string; stderr: string };
 
-function run_checker(args: string[], cwd?: string): Result {
+function run_checker(args: string[], cwd?: string, offset?: string): Result {
+  const env = { ...process.env };
+  delete env.PB_PORT_OFFSET; // ambient offset must not leak into a case that names none
+  if (offset !== undefined) env.PB_PORT_OFFSET = offset;
   const proc = Bun.spawnSync([process.execPath, CHECKER, ...args], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
-    env: process.env,
+    env,
   });
-  return { returncode: proc.exitCode ?? -1, stdout: proc.stdout.toString() };
+  return {
+    returncode: proc.exitCode ?? -1,
+    stdout: proc.stdout.toString(),
+    stderr: proc.stderr.toString(),
+  };
 }
 
 function run(repo_dir: string, ports_doc: string): Result {
@@ -286,6 +293,55 @@ const r7h = run(repo7h, doc7h);
 echo(r7h.stdout);
 check("exit code is 1", r7h.returncode === 1);
 check("the bind after the url string is seen", r7h.stdout.includes("scripts/url_peer.ts:2"));
+
+console.log("── 8. an offset that lands a default on a local service port → RED; others silent ──");
+const [repo8, doc8] = make_repo(
+  "service-port",
+  { "tests/test_s.ts": suite(2532, "SINK_PORT") },
+  "",
+);
+const r8_args = ["--repo", repo8, "--ports-doc", doc8];
+const r8a = run_checker(r8_args, undefined, "2900");
+echo(r8a.stdout);
+check("PB_PORT_OFFSET=2900 exits 1", r8a.returncode === 1);
+check(
+  "names the default, the sum and the suite",
+  r8a.stdout.includes("2532") &&
+    r8a.stdout.includes("5432") &&
+    r8a.stdout.includes("tests/test_s.ts"),
+);
+const r8b = run_checker([...r8_args, "--offset", "2900"]);
+check("--offset 2900 refuses the same way", r8b.returncode === 1 && r8b.stdout.includes("5432"));
+const r8c = run_checker(r8_args, undefined, "5700");
+check("PB_PORT_OFFSET=5700 is GREEN", r8c.returncode === 0);
+const r8d = run_checker(r8_args);
+check(
+  "no offset at all is GREEN and silent about it",
+  r8d.returncode === 0 && !r8d.stdout.includes("5432"),
+);
+
+console.log("── 8b. shell-only defaults count; a non-integer offset is one clean line ──");
+const [repo8s, doc8s] = make_repo(
+  "shell-default",
+  { "scripts/battery.sh": "LEGACY_PORT=$((8091 + PB_PORT_OFFSET))\n" },
+  "",
+);
+const r8s = run_checker(["--repo", repo8s, "--ports-doc", doc8s, "--offset", "18926"]);
+echo(r8s.stdout);
+check(
+  "8091 + 18926 = 27017 from a .sh file is refused",
+  r8s.returncode === 1 &&
+    r8s.stdout.includes("scripts/battery.sh:1") &&
+    r8s.stdout.includes("27017"),
+);
+const r8t = run_checker(["--repo", repo8s, "--ports-doc", doc8s], undefined, "abc");
+echo(r8t.stdout + r8t.stderr);
+check(
+  "PB_PORT_OFFSET=abc exits 2 with one line and no stack",
+  r8t.returncode === 2 &&
+    r8t.stdout.includes("PB_PORT_OFFSET") &&
+    !(r8t.stdout + r8t.stderr).includes("    at "),
+);
 
 console.log("── 6. the shipped tree passes with no arguments ──");
 const r6 = run_checker([], REPO_ROOT);

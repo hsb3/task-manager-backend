@@ -391,4 +391,39 @@ try {
   stub.stop(true);
 }
 
+console.log("── hooks_dir() refuses a symlinked entry ──");
+{
+  const fx = fs.mkdtempSync(path.join(os.tmpdir(), "rk-hooks-"));
+  const src = path.join(fx, "src");
+  fs.mkdirSync(path.join(src, "lib"), { recursive: true });
+  fs.writeFileSync(path.join(src, "a.pb.js"), "//a\n");
+  fs.symlinkSync(path.join(fx, "elsewhere"), path.join(src, "lib", "link.js"));
+  let msg = "";
+  try {
+    with_env({ PB_HOOKS_DIR: null }, () => roomkit.hooks_dir(path.join(fx, "room"), src));
+  } catch (e) {
+    msg = String(e);
+  }
+  check("a symlink under lib/ throws naming lib/link.js", msg.includes("lib/link.js"));
+  check("nothing was copied", !fs.existsSync(path.join(fx, "room", "pb_hooks")));
+  fs.rmSync(path.join(src, "lib", "link.js"));
+  const dest = with_env({ PB_HOOKS_DIR: null }, () =>
+    roomkit.hooks_dir(path.join(fx, "room"), src),
+  );
+  const root_link = path.join(fx, "rootlink");
+  fs.symlinkSync(src, root_link);
+  msg = "";
+  try {
+    with_env({ PB_HOOKS_DIR: null }, () => roomkit.hooks_dir(path.join(fx, "room2"), root_link));
+  } catch (e) {
+    msg = String(e);
+  }
+  check(
+    "a symlinked SOURCE root is refused too",
+    msg.includes("symlink") && msg.includes("rootlink"),
+  );
+  check("a symlink-free tree copies", fs.existsSync(path.join(dest, "a.pb.js")));
+  fs.rmSync(fx, { recursive: true, force: true });
+}
+
 process.exit(FAILS.length ? 1 : 0);
