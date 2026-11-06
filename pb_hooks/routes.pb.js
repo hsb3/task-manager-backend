@@ -953,7 +953,7 @@ require(`${__hooks}/lib/routes.js`).add(
     const role = body.role === undefined ? "member" : body.role;
     // KEEP IN SYNC: the invite-mirror suite asserts this list equals the role select
     // field values declared on workspace_invitations by the LIVE server. A value this list
-    // still accepts after the field drops it reaches the save below and re-throws as a bare
+    // still accepts after the field drops it reaches the save below and fails as a field
     // validation error instead of this message.
     if (role !== "admin" && role !== "member" && role !== "viewer")
       throw new BadRequestError("role must be admin, member or viewer");
@@ -977,7 +977,7 @@ require(`${__hooks}/lib/routes.js`).add(
     } catch (err) {
       // Re-inviting a pending address resends that invitation (decision:invitation-mail-and-resend).
       // Detected by re-reading the pair (the create hook folded email_key onto rec), never by
-      // matching PB's validation wording — every OTHER save failure re-throws untouched.
+      // matching PB's validation wording.
       const key = rec.getString("email_key");
       let existing = null;
       if (key) {
@@ -991,7 +991,19 @@ require(`${__hooks}/lib/routes.js`).add(
           existing = null;
         }
       }
-      if (!existing) throw err;
+      if (!existing) {
+        // KEEP IN SYNC: transfer-ownership's catch and membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
+        const v = err.value || err;
+        if (v && (v.status || typeof v.marshalJSON === "function")) throw err;
+        e.app
+          .logger()
+          .error(
+            "POST resolve-member-email invitation save failed",
+            "error",
+            String(err),
+          );
+        throw new InternalServerError("The invitation could not be saved.");
+      }
       const invLib = require(`${__hooks}/lib/invitations.js`);
       if (
         invLib.expiry(existing.getString("created"), invLib.expiryDays(e.app))
@@ -1476,133 +1488,151 @@ require(`${__hooks}/lib/routes.js`).add(
     // EVERY read is INSIDE the tx: with the owner check resolved outside it, two concurrent
     // transfers by one owner both pass, both answer 200, and the loser rewrites the winner's
     // roster.
-    $app.runInTransaction(function (txApp) {
-      let ws;
-      try {
-        ws = txApp.findRecordById("workspaces", wsId);
-      } catch (_) {
-        throw new NotFoundError("workspace not found");
-      }
-      // OWNER OR SUPERUSER — unlike the vocab route, an active admin confers no authority here.
-      // Deny → 404, SAME as not-found (no existence leak).
-      if (ws.get("owner") !== uid && !isSuperuser)
-        throw new NotFoundError("workspace not found");
-      // AFTER the authorization check: a non-owner must still get the no-leak 404 on a trashed
-      // workspace, so only a caller already known to be authorized reads this cause.
-      if (String(ws.get("trashed")) !== "")
-        throw new BadRequestError(
-          "this workspace is in the trash; restore it before transferring ownership",
-        );
-      // Read INSIDE the tx and AFTER the trash check, so a name that went stale mid-flight and
-      // a name that was wrong when sent are the same refusal, and the trash cause still wins.
-      if (isSuperuser && ws.get("owner") !== currentOwner)
-        throw new BadRequestError(
-          "this workspace is owned by someone other than the person named as its current owner; check who owns it and try again",
-        );
-      // The OUTGOING owner is the workspace's owner, never the caller: a superuser's e.auth.id
-      // is a _superusers record id and would mint a roster row for it.
-      const outgoingId = ws.get("owner");
-      // Without this a no-op call rewrites one row twice, leaving one person owner AND admin.
-      if (target === outgoingId)
-        throw new BadRequestError("the new owner is already the owner");
-
-      let incoming;
-      try {
-        incoming = txApp.findFirstRecordByFilter(
-          "workspace_members",
-          "workspace = {:w} && user = {:u} && status = 'active' && role != 'viewer'",
-          { w: wsId, u: target },
-        );
-      } catch (_) {
-        // A viewer IS an active member, so the membership refusal below would be a false
-        // statement about one — name the real cause instead.
-        let viewer = true;
+    try {
+      $app.runInTransaction(function (txApp) {
+        let ws;
         try {
-          txApp.findFirstRecordByFilter(
+          ws = txApp.findRecordById("workspaces", wsId);
+        } catch (_) {
+          throw new NotFoundError("workspace not found");
+        }
+        // OWNER OR SUPERUSER — unlike the vocab route, an active admin confers no authority here.
+        // Deny → 404, SAME as not-found (no existence leak).
+        if (ws.get("owner") !== uid && !isSuperuser)
+          throw new NotFoundError("workspace not found");
+        // AFTER the authorization check: a non-owner must still get the no-leak 404 on a trashed
+        // workspace, so only a caller already known to be authorized reads this cause.
+        if (String(ws.get("trashed")) !== "")
+          throw new BadRequestError(
+            "this workspace is in the trash; restore it before transferring ownership",
+          );
+        // Read INSIDE the tx and AFTER the trash check, so a name that went stale mid-flight and
+        // a name that was wrong when sent are the same refusal, and the trash cause still wins.
+        if (isSuperuser && ws.get("owner") !== currentOwner)
+          throw new BadRequestError(
+            "this workspace is owned by someone other than the person named as its current owner; check who owns it and try again",
+          );
+        // The OUTGOING owner is the workspace's owner, never the caller: a superuser's e.auth.id
+        // is a _superusers record id and would mint a roster row for it.
+        const outgoingId = ws.get("owner");
+        // Without this a no-op call rewrites one row twice, leaving one person owner AND admin.
+        if (target === outgoingId)
+          throw new BadRequestError("the new owner is already the owner");
+
+        let incoming;
+        try {
+          incoming = txApp.findFirstRecordByFilter(
             "workspace_members",
-            "workspace = {:w} && user = {:u} && status = 'active' && role = 'viewer'",
+            "workspace = {:w} && user = {:u} && status = 'active' && role != 'viewer'",
             { w: wsId, u: target },
           );
         } catch (_) {
-          viewer = false;
-        }
-        if (viewer)
+          // A viewer IS an active member, so the membership refusal below would be a false
+          // statement about one — name the real cause instead.
+          let viewer = true;
+          try {
+            txApp.findFirstRecordByFilter(
+              "workspace_members",
+              "workspace = {:w} && user = {:u} && status = 'active' && role = 'viewer'",
+              { w: wsId, u: target },
+            );
+          } catch (_) {
+            viewer = false;
+          }
+          if (viewer)
+            throw new BadRequestError(
+              "a viewer cannot be made the owner of this workspace",
+            );
           throw new BadRequestError(
-            "a viewer cannot be made the owner of this workspace",
+            "the new owner must be an active member of this workspace",
           );
-        throw new BadRequestError(
-          "the new owner must be an active member of this workspace",
+        }
+
+        // Every workspace create gives its owner a roster row (owner.pb.js); it is minted here only if
+        // that provision failed, so the handover never leaves the outgoing owner without standing.
+        let outgoing;
+        try {
+          outgoing = txApp.findFirstRecordByFilter(
+            "workspace_members",
+            "workspace = {:w} && user = {:u}",
+            { w: wsId, u: outgoingId },
+          );
+        } catch (_) {
+          outgoing = new Record(
+            txApp.findCollectionByNameOrId("workspace_members"),
+          );
+        }
+
+        ws.set("owner", target);
+        txApp.save(ws);
+
+        // The shadow project is owned by the workspace owner (shadow.pb.js); it moves with the handover.
+        try {
+          const shadow = txApp.findFirstRecordByFilter(
+            "projects",
+            "workspace = {:w} && shadow = true",
+            { w: wsId },
+          );
+          shadow.set("owner", target);
+          txApp.save(shadow);
+        } catch (err) {
+          if (!String(err).includes("no rows")) throw err;
+        }
+
+        // `incoming` is read for eligibility ONLY and deliberately never written: ownership lives
+        // on workspaces.owner, so the roster row is the standing held BENEATH it, and rewriting an
+        // admin to "member" here destroyed that standing (mahh).
+
+        outgoing.set("workspace", wsId);
+        outgoing.set("user", outgoingId);
+        outgoing.set("role", "admin");
+        outgoing.set("status", "active");
+        txApp.save(outgoing);
+
+        // Same transaction as the flip: a handover nobody was told about is the defect 95s3 closes,
+        // and a refused transfer must leave no trace, which only a shared rollback guarantees.
+        const audit = new Record(
+          txApp.findCollectionByNameOrId("task_activity"),
         );
-      }
+        audit.set("workspace", wsId);
+        // One identity per row, and never both: a member's call fills actor (a users relation),
+        // and a superuser's fills operator with the email that made it, because a _superusers id
+        // resolves to no users row. An empty pair would be an unattributed handover.
+        if (isSuperuser)
+          audit.set("operator", String(e.auth.get("email") || ""));
+        else audit.set("actor", uid);
+        audit.set("field", "owner");
+        // JSON.stringify: the same encoding activity.pb.js gives a relation change.
+        audit.set("from", JSON.stringify(outgoingId));
+        audit.set("to", JSON.stringify(target));
+        txApp.save(audit);
 
-      // Every workspace create gives its owner a roster row (owner.pb.js); it is minted here only if
-      // that provision failed, so the handover never leaves the outgoing owner without standing.
-      let outgoing;
-      try {
-        outgoing = txApp.findFirstRecordByFilter(
-          "workspace_members",
-          "workspace = {:w} && user = {:u}",
-          { w: wsId, u: outgoingId },
-        );
-      } catch (_) {
-        outgoing = new Record(
-          txApp.findCollectionByNameOrId("workspace_members"),
-        );
-      }
-
-      ws.set("owner", target);
-      txApp.save(ws);
-
-      // The shadow project is owned by the workspace owner (shadow.pb.js); it moves with the handover.
-      try {
-        const shadow = txApp.findFirstRecordByFilter(
-          "projects",
-          "workspace = {:w} && shadow = true",
-          { w: wsId },
-        );
-        shadow.set("owner", target);
-        txApp.save(shadow);
-      } catch (err) {
-        if (!String(err).includes("no rows")) throw err;
-      }
-
-      // `incoming` is read for eligibility ONLY and deliberately never written: ownership lives
-      // on workspaces.owner, so the roster row is the standing held BENEATH it, and rewriting an
-      // admin to "member" here destroyed that standing (mahh).
-
-      outgoing.set("workspace", wsId);
-      outgoing.set("user", outgoingId);
-      outgoing.set("role", "admin");
-      outgoing.set("status", "active");
-      txApp.save(outgoing);
-
-      // Same transaction as the flip: a handover nobody was told about is the defect 95s3 closes,
-      // and a refused transfer must leave no trace, which only a shared rollback guarantees.
-      const audit = new Record(txApp.findCollectionByNameOrId("task_activity"));
-      audit.set("workspace", wsId);
-      // One identity per row, and never both: a member's call fills actor (a users relation),
-      // and a superuser's fills operator with the email that made it, because a _superusers id
-      // resolves to no users row. An empty pair would be an unattributed handover.
-      if (isSuperuser) audit.set("operator", String(e.auth.get("email") || ""));
-      else audit.set("actor", uid);
-      audit.set("field", "owner");
-      // JSON.stringify: the same encoding activity.pb.js gives a relation change.
-      audit.set("from", JSON.stringify(outgoingId));
-      audit.set("to", JSON.stringify(target));
-      txApp.save(audit);
-
-      const notices = txApp.findCollectionByNameOrId("notifications");
-      const parties = [outgoingId, target];
-      for (let i = 0; i < parties.length; i++) {
-        const notice = new Record(notices);
-        notice.set("user", parties[i]);
-        notice.set("workspace", wsId);
-        notice.set("kind", "ownership_transferred");
-        // A superuser's id names no users row, so an operator's handover carries no actor.
-        if (!isSuperuser) notice.set("actor", uid);
-        txApp.save(notice);
-      }
-    });
+        const notices = txApp.findCollectionByNameOrId("notifications");
+        const parties = [outgoingId, target];
+        for (let i = 0; i < parties.length; i++) {
+          const notice = new Record(notices);
+          notice.set("user", parties[i]);
+          notice.set("workspace", wsId);
+          notice.set("kind", "ownership_transferred");
+          // A superuser's id names no users row, so an operator's handover carries no actor.
+          if (!isSuperuser) notice.set("actor", uid);
+          txApp.save(notice);
+        }
+      });
+    } catch (err) {
+      // KEEP IN SYNC: pb_hooks/membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal or field validation error keeps its own answer; a 500 (the membership hook's) is this route's own.
+      const v = err.value || err;
+      if (
+        v &&
+        v.status !== 500 &&
+        (v.status || typeof v.marshalJSON === "function")
+      )
+        throw err;
+      e.app
+        .logger()
+        .error("POST transfer-ownership failed", "error", String(err));
+      throw new InternalServerError("The ownership could not be transferred.");
+    }
 
     return e.json(200, { ok: true });
   },
