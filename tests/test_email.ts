@@ -200,6 +200,14 @@ const throwaway = `tw-${randomBytes(4).toString("hex")}@example.com`;
 check("signup", s, 200);
 check("new account verified flag", r.verified, false);
 const tw_id = r.id;
+// The signup sends its own verification mail before answering, so it is already captured here.
+const signup_eml = await newest_eml_after(baseline);
+check(
+  "signup sent the branded verification mail",
+  extract_subject(decode_eml(signup_eml)),
+  "Confirm your Task Tracker account",
+);
+baseline = count_eml();
 
 console.log("\n── AUTH before verify (authRule: verified = true) ──");
 [s] = await api("POST", "/api/collections/users/auth-with-password", null, {

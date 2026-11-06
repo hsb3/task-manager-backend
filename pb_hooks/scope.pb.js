@@ -315,8 +315,8 @@ onRecordUpdate((e) => {
 
 // decision:shadow-project — a personal default project may not be the workspace container; nothing else
 // validates this relation, so the whole guard is the shadow refusal.
-// KEEP IN SYNC: the same refusal in the labels/templates/saved_views guards above and in
-// validateDefaultProject (pb_hooks/main.pb.js).
+// KEEP IN SYNC: the same refusal in the labels/templates/saved_views guards above, in
+// validateDefaultProject (pb_hooks/main.pb.js) and in the settings route (pb_hooks/user_settings.pb.js).
 onRecordCreateRequest((e) => {
   const p = e.record.get("default_project");
   if (p) {

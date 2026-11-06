@@ -22,6 +22,7 @@
 4	11	test_owner_transfer
 2	10	test_oauth
 1	9	test_boot_refusals
+4	9	test_signup_verification
 3	8	test_backups
 2	8	test_counts_route
 4	8	test_cycles
@@ -87,6 +88,8 @@
 3	2	test_pb_migrate
 2	2	test_pb_refusal_statuses
 4	2	test_rescope_guard_checker
+1	2	test_write_hygiene
+2	2	test_user_settings_me
 1	1	test_app_docs_seed_idempotent
 3	1	test_check_pb_pin
 1	1	test_decision_citations_checker

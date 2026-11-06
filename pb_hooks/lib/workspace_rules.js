@@ -1,7 +1,8 @@
 /// <reference path="../../pb_data/types.d.ts" />
 // The workspace write rules the collection PATCH hooks and the vocab route both apply; require() it inside a handler body.
 
-function rejectBlankName(collection, body) {
+// A submitted name/title/body is also set trimmed on `record`; slug/key patterns already refuse whitespace.
+function rejectBlankName(collection, body, record) {
   // Every required text field in schema/ is dispositioned: these five names carry a
   // value a reader or a lookup depends on, so whitespace-only is meaningless. `id` is
   // excluded by omission (its own `^[a-z0-9]+$` pattern already refuses whitespace) and so
@@ -21,6 +22,11 @@ function rejectBlankName(collection, body) {
       // KEEP IN SYNC: routes.pb.js phrases the same `must be a non-empty string` refusal for the vocab route.
       throw new BadRequestError(f.name + " must be a non-empty string");
     }
+    if (
+      typeof submitted === "string" &&
+      ["name", "title", "body"].indexOf(f.name) !== -1
+    )
+      record.set(f.name, submitted.trim());
   }
 }
 

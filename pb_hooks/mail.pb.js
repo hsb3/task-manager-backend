@@ -2,15 +2,15 @@
 
 // ── Boot hook: configure Resend SMTP from the environment ────────────────────
 // The users collection brands the email *templates*, but PocketBase still needs
-// a real SMTP transport to actually SEND them — the built-in sandbox mailer only
-// logs. We wire that transport up at boot instead of hand-editing settings in the
+// a real SMTP transport to SEND them — with SMTP off PB execs the host's sendmail
+// instead. We wire that transport up at boot instead of hand-editing settings in the
 // dashboard, so the same code path configures dev, CI, and Railway purely from an
 // env var. The API key never lives in git or in a migration.
 //
 // Deliberately env-DRIVEN and NO-OP when unset: local dev boots with no
-// RESEND_API_KEY, so the guard below returns early and leaves the sandbox mailer
-// in place. Only when a key is present do we flip settings.smtp on. onBootstrap
-// requires e.next() to complete core initialisation (DB + settings loaded); we
+// RESEND_API_KEY, so the guard below returns early and leaves SMTP off (PB's
+// sendmail fallback). Only when a key is present do we flip settings.smtp on.
+// onBootstrap requires e.next() to complete core initialisation (DB + settings loaded); we
 // call it first, THEN mutate settings so app.save has a live app to persist to.
 onBootstrap((e) => {
   e.next();
@@ -24,7 +24,7 @@ onBootstrap((e) => {
 
   const key = $os.getenv("RESEND_API_KEY");
   if (!key) {
-    // Dev / no-SMTP path: leave the sandbox mailer untouched. Never abort boot.
+    // Dev / no-SMTP path: leave SMTP off. Never abort boot.
     return;
   }
 
@@ -65,3 +65,37 @@ onBootstrap((e) => {
       key.length,
     );
 });
+
+// ── Request hook: a public signup sends its own verification email ───────────
+// Seeding/import (superuser) sends nothing; the send blocks the signup until SMTP answers.
+onRecordCreateRequest((e) => {
+  const send = !e.hasSuperuserAuth();
+  e.next();
+  if (!send || e.record.verified()) return;
+
+  // With SMTP off PB falls back to the host's sendmail, which would deliver real mail.
+  if (!e.app.settings().smtp.enabled) {
+    e.app
+      .logger()
+      .warn(
+        "signup verification email skipped: SMTP disabled",
+        "user",
+        e.record.id,
+      );
+    return;
+  }
+  try {
+    $mails.sendRecordVerification(e.app, e.record);
+  } catch (err) {
+    // The user is already committed; request-verification remains the retry path.
+    e.app
+      .logger()
+      .error(
+        "signup verification email failed",
+        "user",
+        e.record.id,
+        "err",
+        String(err).split(e.record.getString("email")).join("[address]"),
+      );
+  }
+}, "users");

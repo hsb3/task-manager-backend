@@ -509,6 +509,9 @@ run_suite "test_search"             bun tests/test_search.ts
 run_suite "test_export"             bun tests/test_export.ts
 run_suite "test_productivity_flow"  bun tests/test_productivity_flow.ts
 run_suite "test_user_settings_font" bun tests/test_user_settings_font.ts
+run_suite "test_user_settings_me"   bun tests/test_user_settings_me.ts
+run_suite "test_write_hygiene"      bun tests/test_write_hygiene.ts
+run_suite "test_signup_verification" bun tests/test_signup_verification.ts
 
 # ── project_items view: rule equivalence with the four base collections, ordering, >200 paging.
 run_suite "test_project_items_view" bun tests/test_project_items_view.ts

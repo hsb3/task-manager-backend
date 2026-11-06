@@ -587,7 +587,11 @@ routerAdd(
       for (const k in fields) ws.set(k, fields[k]);
       // Judged on the value as set, so a non-string name (null, [], {}) gets the same refusal as "  ".
       if ("name" in fields)
-        rules.rejectBlankName(ws.collection(), { name: ws.getString("name") });
+        rules.rejectBlankName(
+          ws.collection(),
+          { name: ws.getString("name") },
+          ws,
+        );
       rules.validateWorkspacePriorities(ws);
       rules.validateDefaultProject(e.app, ws);
     }
@@ -988,6 +992,21 @@ routerAdd(
       typeof body.workspace === "string" ? body.workspace : ""
     ).trim();
     if (!wsId) throw new BadRequestError("workspace is required");
+    // null/absent keeps meaning "everything"; any other non-list would silently export everything.
+    const isIdList = function (v) {
+      return (
+        Array.isArray(v) &&
+        v.every(function (x) {
+          return typeof x === "string";
+        })
+      );
+    };
+    if (body.projects != null && !isIdList(body.projects))
+      throw new BadRequestError("projects must be a list of project ids");
+    if (body.collections != null && !isIdList(body.collections))
+      throw new BadRequestError(
+        "collections must be a list of collection names",
+      );
 
     // MEMBERSHIP SCOPE BY HAND (mirror trash.pb.js R7 / routes.pb.js:113-134): caller must OWN
     // wsId or hold a workspace_members row. Deny → 404 (existence-hiding, no tenant-existence oracle).

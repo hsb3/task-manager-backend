@@ -908,7 +908,8 @@ try {
       0,
     ],
     ["unequal delimiters leave prose", tick + " @bram " + tick.repeat(2), 1],
-    ["four-space pseudo-fence leaves prose", "    ~~~\n@bram\n    ~~~", 1],
+    // A prose first line: a comment body is stored trimmed, which would unindent a leading fence.
+    ["four-space pseudo-fence leaves prose", "intro\n    ~~~\n@bram\n    ~~~", 1],
     [
       "backtick in fence info leaves prose",
       tick.repeat(3) + " info " + tick + "\n@bram\n" + tick.repeat(3),
