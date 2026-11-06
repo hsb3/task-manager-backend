@@ -7,6 +7,7 @@
  * Fully self-contained clean-room server. Port 8195 + PB_PORT_OFFSET. INSPIRE_UPSTREAM_URL aims at a closed port.
  */
 
+import { Database } from "bun:sqlite";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -158,6 +159,43 @@ try {
   const mine = async (tok: string): Promise<string> =>
     (await call("GET", "/api/tracker/invitations/mine", tok))[1].items?.[0]?.id ?? "none";
 
+  /** Make every listed write on `table` fail at the database, run fn, drop the triggers; the schema must read the same afterwards. */
+  async function withDbFailure(
+    coll: string,
+    table: string,
+    ops: string[],
+    fn: () => Promise<[number, any]>,
+  ) {
+    const strip = (c: any) => JSON.stringify({ ...c, updated: undefined });
+    const before = strip((await call("GET", `/api/collections/${coll}`, ctx.su))[1]);
+    const db = new Database(path.join(DATA_DIR, "data.db"));
+    try {
+      for (const op of ops)
+        db.run(
+          `CREATE TRIGGER zz_probe_${op} BEFORE ${op} ON ${table} BEGIN SELECT RAISE(ABORT, 'probe db failure'); END`,
+        );
+      return await fn();
+    } finally {
+      for (const op of ops) db.run(`DROP TRIGGER IF EXISTS zz_probe_${op}`);
+      const left = db.query("SELECT name FROM sqlite_master WHERE name LIKE 'zz_probe_%'").all();
+      db.close();
+      const after = strip((await call("GET", `/api/collections/${coll}`, ctx.su))[1]);
+      check(
+        `(fixture) ${table} triggers dropped, ${coll} schema identical`,
+        !left.length && before === after,
+      );
+    }
+  }
+  // PB writes logs in a batch, so the line is polled for.
+  const logged = async (needle: string, times = 1): Promise<boolean> => {
+    for (let i = 0; i < 20; i++) {
+      const [, l] = await call("GET", "/api/logs?perPage=200&filter=level%20%3E%3D%208", ctx.su);
+      const n = (l.items ?? []).filter((x: any) => String(x.message).includes(needle)).length;
+      if (n >= times) return true;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    return false;
+  };
   const RECIPES: Record<string, Record<string, Recipe>> = {
     "GET /api/tracker/admin/pending-users": {
       404: (c) => call("GET", "/api/tracker/admin/pending-users", c.Alice),
@@ -272,7 +310,16 @@ try {
       404: (c) => call("GET", `/api/tracker/workspaces/${c.ws}/deletion-impact`, c.Bob),
     },
     "POST /api/tracker/workspaces/{id}/resolve-member-email": {
-      400: (c) => invite(c, ""),
+      400: async (c) => {
+        // a field validation failure keeps its 400 and names the field
+        const [ls, lb] = await invite(c, `${"a".repeat(6000)}@example.com`);
+        check(
+          "an over-long email → 400 naming the email field",
+          ls === 400 && lb.data?.email?.code === "validation_max_text_constraint",
+          `${ls} ${py_repr(lb)}`,
+        );
+        return invite(c, "");
+      },
       404: (c) =>
         call("POST", "/api/tracker/workspaces/nope/resolve-member-email", c.Alice, {
           email: "x@y",
@@ -290,6 +337,19 @@ try {
           await setting("invitation_mint_limit_per_day", 50);
         }
       },
+      500: async (c) => {
+        const r = await withDbFailure(
+          "workspace_invitations",
+          "workspace_invitations",
+          ["INSERT"],
+          () => invite(c, "erin-new@example.com"),
+        );
+        check(
+          "  … and the cause is logged",
+          await logged("resolve-member-email invitation save failed"),
+        );
+        return r;
+      },
     },
     "POST /api/tracker/workspaces/{id}/transfer-ownership": {
       400: (c) => call("POST", `/api/tracker/workspaces/${c.ws}/transfer-ownership`, c.Alice, {}),
@@ -297,6 +357,76 @@ try {
         call("POST", "/api/tracker/workspaces/nope/transfer-ownership", c.Alice, {
           user: c.Bob_id,
         }),
+      500: async (c) => {
+        const email = "erin@example.com";
+        const [, u] = await call("POST", "/api/collections/users/records", c.su, {
+          email,
+          password: "test123456",
+          passwordConfirm: "test123456",
+          name: "Erin",
+          verified: true,
+          approved: true,
+        });
+        const [, a] = await call("POST", "/api/collections/users/auth-with-password", null, {
+          identity: email,
+          password: "test123456",
+        });
+        await invite(c, email);
+        const [acc] = await call(
+          "POST",
+          `/api/tracker/invitations/${await mine(a.token)}/accept`,
+          a.token,
+        );
+        check("(fixture) Erin is an active member", acc === 200, String(acc));
+        const go = () =>
+          call("POST", `/api/tracker/workspaces/${c.ws}/transfer-ownership`, c.Alice, {
+            user: u.id,
+          });
+        const r = await withDbFailure("projects", "projects", ["UPDATE"], go);
+        check("  … and the cause is logged", await logged("POST transfer-ownership failed"));
+        // a roster write failing inside the transaction is the route's own failure: its message, its log line
+        const [ms, mb] = await withDbFailure(
+          "workspace_members",
+          "workspace_members",
+          ["INSERT", "UPDATE"],
+          go,
+        );
+        check(
+          "  … a failing membership save → 500 with the route's own message",
+          ms === 500 &&
+            is_error(500, mb) &&
+            mb.message === "The ownership could not be transferred.",
+          `${ms} ${py_repr(mb)}`,
+        );
+        check(
+          "  … and the route logs it as its own failure",
+          await logged("POST transfer-ownership failed", 2),
+        );
+        // a collection write failing at the database answers 500 too
+        const [, mem] = await call(
+          "GET",
+          `/api/collections/workspace_members/records?filter=${encodeURIComponent(`user = "${u.id}"`)}`,
+          c.Alice,
+        );
+        const [ps, pb] = await withDbFailure(
+          "workspace_members",
+          "workspace_members",
+          ["UPDATE"],
+          () =>
+            call(
+              "PATCH",
+              `/api/collections/workspace_members/records/${mem.items?.[0]?.id}`,
+              c.Alice,
+              { status: "suspended" },
+            ),
+        );
+        check(
+          "PATCH workspace_members on a database failure → 500 Error body",
+          ps === 500 && is_error(500, pb),
+          `${ps} ${py_repr(pb)}`,
+        );
+        return r;
+      },
     },
     "POST /api/tracker/workspaces/{id}/vocab": {
       400: (c) =>
