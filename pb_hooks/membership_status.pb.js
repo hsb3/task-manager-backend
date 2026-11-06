@@ -78,59 +78,69 @@ onRecordUpdateExecute((e) => {
     os: loaded.getString("status"),
     or: loaded.getString("role"),
   };
-  e.app.runInTransaction((txApp) => {
-    const claimed = txApp
-      .db()
-      .newQuery(
-        "UPDATE workspace_members SET status = {:s}, role = {:r} WHERE id = {:id} AND status = {:os} AND role = {:or}",
-      )
-      .bind(claim)
-      .execute()
-      .rowsAffected();
-    if (claimed !== 1)
-      throw new ApiError(
-        409,
-        "This membership changed while you were editing it. Reload and try again.",
-        null,
-      );
-    // ponytail: the hookless save skips PB's field interceptors, so the two this collection
-    // needs are restated here (updated autodate, unique-index 400); a new file/autodate field or a later
-    // execute-stage hook on workspace_members would silently not run and must be restated too.
-    e.record.setRaw("updated", new DateTime());
-    try {
-      txApp.unsafeWithoutHooks().save(e.record);
-    } catch (err) {
-      const msg = String(err).toLowerCase().replace(/,/g, " ") + " ";
-      if (!msg.includes("unique constraint failed")) throw err;
-      const data = {};
-      for (const f of e.record.collection().fields.fieldNames())
-        if (msg.includes(" workspace_members." + f.toLowerCase() + " "))
-          data[f] = new ValidationError(
-            "validation_not_unique",
-            "Value must be unique",
-          );
-      throw new BadRequestError("Failed to update record.", data);
-    }
-    // Revoke pending invitations to the suspended member's address (security audit R-1); re-admission
-    // is the status flip back to active, since accepting an invitation never reactivates a suspended row.
-    if (claim.s === "suspended" && (claim.os || "active") !== "suspended") {
-      let emailKey = "";
+  try {
+    e.app.runInTransaction((txApp) => {
+      const claimed = txApp
+        .db()
+        .newQuery(
+          "UPDATE workspace_members SET status = {:s}, role = {:r} WHERE id = {:id} AND status = {:os} AND role = {:or}",
+        )
+        .bind(claim)
+        .execute()
+        .rowsAffected();
+      if (claimed !== 1)
+        throw new ApiError(
+          409,
+          "This membership changed while you were editing it. Reload and try again.",
+          null,
+        );
+      // ponytail: the hookless save skips PB's field interceptors, so the two this collection
+      // needs are restated here (updated autodate, unique-index 400); a new file/autodate field or a later
+      // execute-stage hook on workspace_members would silently not run and must be restated too.
+      e.record.setRaw("updated", new DateTime());
       try {
-        emailKey = txApp
-          .findRecordById("users", e.record.getString("user"))
-          .getString("email_key");
-      } catch (_) {
-        emailKey = "";
+        txApp.unsafeWithoutHooks().save(e.record);
+      } catch (err) {
+        const msg = String(err).toLowerCase().replace(/,/g, " ") + " ";
+        if (!msg.includes("unique constraint failed")) throw err;
+        const data = {};
+        for (const f of e.record.collection().fields.fieldNames())
+          if (msg.includes(" workspace_members." + f.toLowerCase() + " "))
+            data[f] = new ValidationError(
+              "validation_not_unique",
+              "Value must be unique",
+            );
+        throw new BadRequestError("Failed to update record.", data);
       }
-      if (emailKey) {
-        txApp
-          .db()
-          .newQuery(
-            "DELETE FROM workspace_invitations WHERE workspace = {:w} AND email_key = {:k}",
-          )
-          .bind({ w: e.record.getString("workspace"), k: emailKey })
-          .execute();
+      // Revoke pending invitations to the suspended member's address (security audit R-1); re-admission
+      // is the status flip back to active, since accepting an invitation never reactivates a suspended row.
+      if (claim.s === "suspended" && (claim.os || "active") !== "suspended") {
+        let emailKey = "";
+        try {
+          emailKey = txApp
+            .findRecordById("users", e.record.getString("user"))
+            .getString("email_key");
+        } catch (_) {
+          emailKey = "";
+        }
+        if (emailKey) {
+          txApp
+            .db()
+            .newQuery(
+              "DELETE FROM workspace_invitations WHERE workspace = {:w} AND email_key = {:k}",
+            )
+            .bind({ w: e.record.getString("workspace"), k: emailKey })
+            .execute();
+        }
       }
-    }
-  });
+    });
+  } catch (err) {
+    // KEEP IN SYNC: routes.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
+    const v = err.value || err;
+    if (v && (v.status || typeof v.marshalJSON === "function")) throw err;
+    e.app
+      .logger()
+      .error("workspace_members update failed", "error", String(err));
+    throw new InternalServerError("The membership could not be saved.");
+  }
 }, "workspace_members");

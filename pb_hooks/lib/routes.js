@@ -774,6 +774,7 @@ const ROUTES = {
       404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin.",
       409: "The address recently declined an invitation to this workspace; invite it again later.",
       429: "The daily invitation limit of the inviter is reached, or the same pending invitation was sent again less than a minute ago; wait before inviting again.",
+      500: "The invitation could not be saved for a reason other than the address already being invited.",
     },
     response: {
       status: 200,
@@ -842,6 +843,7 @@ const ROUTES = {
     responses: {
       400: "The user is missing, already the owner, not an active member, or a viewer; the workspace is in the trash; or a superuser named no current owner or the wrong one.",
       404: "The workspace does not exist or the caller is neither its owner nor a superuser.",
+      500: "A write failed at the database, so the ownership was not transferred and nothing changed.",
     },
     response: {
       status: 200,
