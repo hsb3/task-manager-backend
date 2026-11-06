@@ -16,7 +16,7 @@ value that never travels to another user.
 
 (i) PBTT-290: the unconfirmed-signup purge cron deletes approved-but-unconfirmed
 accounts older than 30 days and nothing else — the retention boundary is proven to
-the hour, in both directions.
+the hour, in both directions — and skips one that solely owns a workspace with another member.
 
 Fully self-contained clean-room server: scratch --dir, a COPY of pb_migrations
 (*superuser_mfa.js dropped so a plain superuser auth-with-password
@@ -757,6 +757,7 @@ try {
     "purge-30d-minus-1h": [false, true, 30 * DAY - HOUR],
     "purge-30d-plus-1h": [false, true, 30 * DAY + HOUR],
     "purge-31d": [false, true, 31 * DAY],
+    "purge-31d-shared-owner": [false, true, 31 * DAY],
     "purge-confirmed-10y": [true, true, 3650 * DAY],
     "purge-unapproved-10y": [false, false, 3650 * DAY],
     "purge-today": [false, true, 0],
@@ -768,10 +769,9 @@ try {
     if (age) backdate(uid, age);
   }
 
-  // A co-member in the doomed account's workspace: the purge is a programmatic
-  // delete, so main.pb.js's onRecordDeleteRequest("users") sole-owner veto never
-  // fires, and the cascade's consequences ride the universal after-delete hooks.
-  const doomed = getitem(purge_ids, "purge-31d");
+  // A co-member in this account's workspace: the purge runs the account-delete
+  // sole-owner veto itself (kata bwpj), so this account must outlive the sweep.
+  const doomed = getitem(purge_ids, "purge-31d-shared-owner");
   const doomed_ws = await find_by_filter(
     room.base_url,
     "workspaces",
@@ -789,6 +789,26 @@ try {
     su_token,
   );
   check("(fixture) a co-member joins the doomed account's workspace", s, 200);
+  // Views a purged account saved in a workspace that outlives it: the purge is a programmatic
+  // delete, so this is the non-API half of the saved_views.owner proof (kata bwpj).
+  const purged_views: Record<string, any> = {};
+  for (const scope of ["workspace", "personal"]) {
+    let v: any;
+    [s, v] = await api(
+      room.base_url,
+      "POST",
+      "/api/collections/saved_views/records",
+      {
+        name: `purged-${scope}-view`,
+        workspace: doomed_ws_id,
+        owner: getitem(purge_ids, "purge-31d"),
+        scope,
+      },
+      su_token,
+    );
+    check(`(fixture) a purge-bound account's ${scope} view in that workspace`, s, 200);
+    purged_views[scope] = v.id ?? null;
+  }
 
   let cron_list: any;
   [s, cron_list] = await api(room.base_url, "GET", "/api/crons", null, su_token);
@@ -802,12 +822,21 @@ try {
 
   [s] = await api(room.base_url, "POST", "/api/crons/unconfirmed-signup-purge", null, su_token);
   check("POST /api/crons/unconfirmed-signup-purge → 204", s, 204);
-  // The cron trigger runs the sweep in the background — poll for it to land rather
-  // than sleep a guessed interval.
-  for (let _ = 0; _ < 60; _++) {
-    if (!(await user_alive(getitem(purge_ids, "purge-31d")))) break;
-    await Bun.sleep(250);
-  }
+  // The trigger runs the sweep in the background and a skipped account never disappears, so
+  // wait on the sweep's own log lines; PB holds an entry ~3s before /api/logs returns it.
+  const logged = async (message: string): Promise<number> => {
+    const deadline = Date.now() + 20000;
+    let n = 0;
+    while (Date.now() < deadline) {
+      const qs = urlencode({ filter: `message = "${message}"`, perPage: 50 });
+      const [, r] = await api(room.base_url, "GET", `/api/logs?${qs}`, null, su_token);
+      n = r.totalItems ?? 0;
+      if (n > 0) break;
+      await Bun.sleep(250);
+    }
+    return n;
+  };
+  check("the sweep ran to completion", (await logged("unconfirmed-signup-purge swept")) > 0, true);
 
   check("31 days unconfirmed → PURGED", await user_alive(getitem(purge_ids, "purge-31d")), false);
   check(
@@ -838,14 +867,50 @@ try {
   );
   check("the co-member's own account → SURVIVES", await user_alive(lodger_id), true);
   check(
-    "the sole-owner delete veto did not block the purge (it is Request-scoped)",
+    "31 days unconfirmed but sole owner of a shared workspace → SURVIVES (the veto)",
     await user_alive(doomed),
-    false,
+    true,
   );
   check(
-    "no orphan workspace is left owned by the purged account",
-    (await find_by_filter(room.base_url, "workspaces", `owner='${py_str(doomed)}'`, su_token))
-      .length,
+    "…and the workspace its co-member relies on survives with it",
+    (
+      await api(
+        room.base_url,
+        "GET",
+        `/api/collections/workspaces/records/${py_str(doomed_ws_id)}`,
+        null,
+        su_token,
+      )
+    )[0],
+    200,
+  );
+  check(
+    "…and the skip is logged",
+    (await logged("unconfirmed-signup-purge skipped a sole owner of a shared workspace")) > 0,
+    true,
+  );
+  const view_after = async (id: string | null): Promise<[number, any]> =>
+    api(room.base_url, "GET", `/api/collections/saved_views/records/${py_str(id)}`, null, su_token);
+  check(
+    "a purged account's shared view survives, owner emptied",
+    await view_after(purged_views.workspace).then(([st, v]) => [st, v.owner ?? null]),
+    [200, ""],
+  );
+  check(
+    "a purged account's personal view, reachable by no one now, is deleted",
+    (await view_after(purged_views.personal))[0],
+    404,
+  );
+  check(
+    "a purged sole owner of an unshared workspace leaves no workspace behind",
+    (
+      await find_by_filter(
+        room.base_url,
+        "workspaces",
+        `owner='${py_str(getitem(purge_ids, "purge-31d"))}'`,
+        su_token,
+      )
+    ).length,
     0,
   );
   check(

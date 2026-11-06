@@ -46,7 +46,7 @@ export const ALLOWLIST = new Map<string, string>([
   [
     JSON.stringify([
       "project_items",
-      '(((active_admins ~ @request.auth.id || author = @request.auth.id || draft = false || workspace_owner = @request.auth.id) && (active_members ~ @request.auth.id || workspace_owner = @request.auth.id) && type != "task") || ((active_members ~ @request.auth.id || assignee = @request.auth.id || workspace_owner = @request.auth.id) && type = "task"))',
+      '(((active_admins ~ @request.auth.id || author = @request.auth.id || draft = false || workspace_owner = @request.auth.id) && (active_members ~ @request.auth.id || workspace_owner = @request.auth.id) && type != "task") || ((active_members ~ @request.auth.id || workspace_owner = @request.auth.id) && type = "task"))',
     ]),
     TRASH_BRANCH_RULING,
   ],

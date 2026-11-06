@@ -1,7 +1,7 @@
 {
   "name": "project_stats",
   "type": "view",
-  "listRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))",
-  "viewRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))",
+  "listRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))",
+  "viewRule": "@request.auth.id != \"\" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\"))",
   "viewQuery": "SELECT p.id AS id, p.name AS name, p.owner AS owner, p.workspace AS workspace, COUNT(t.id) AS total, SUM(CASE WHEN s.category='triage' THEN 1 ELSE 0 END) AS triage, SUM(CASE WHEN s.category='backlog' THEN 1 ELSE 0 END) AS backlog, SUM(CASE WHEN s.category='unstarted' THEN 1 ELSE 0 END) AS unstarted, SUM(CASE WHEN s.category='started' THEN 1 ELSE 0 END) AS started, SUM(CASE WHEN s.category='completed' THEN 1 ELSE 0 END) AS completed, SUM(CASE WHEN s.category='canceled' THEN 1 ELSE 0 END) AS canceled FROM projects p LEFT JOIN tasks t ON t.project = p.id AND t.trashed = '' LEFT JOIN statuses s ON t.status = s.id WHERE p.trashed = '' AND EXISTS (SELECT 1 FROM workspaces w WHERE w.id = p.workspace AND w.trashed = '') AND p.shadow = 0 GROUP BY p.id, p.name, p.owner, p.workspace"
 }

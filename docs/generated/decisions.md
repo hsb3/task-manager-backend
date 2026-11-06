@@ -21,24 +21,24 @@ The `users` delete rule lets a user delete only their own record, and deleting a
 
 An `onRecordDeleteRequest` hook on `users` in `pb_hooks/main.pb.js` closes that gap. On a self-delete by a regular user it looks up every workspace the caller owns; if any of them has another member, it refuses the delete with 400 and names the way out: transfer ownership or remove the other members first. When every blocking workspace sits in the trash, the message says to restore it first, because both of those remedies are refused while a workspace is trashed (decision:workspace-configuration-freeze). A user whose owned workspaces have no other members deletes cleanly and the cascade removes those workspaces.
 
-The guard lives in a hook, not the delete rule, because it needs a lookup across `workspaces` and `workspace_members` that a rule cannot express. Superusers are exempt so an operator can always remove a junk or test account.
+The guard lives in a hook, not the delete rule, because it needs a lookup across `workspaces` and `workspace_members` that a rule cannot express. Superusers are exempt so an operator can always remove a junk or test account. The daily unconfirmed-signup purge (decision:verified-login) applies the same test and skips such an account.
 
 See collection:users and decision:last-workspace-reprovision.
 
 ## active-membership-grants-access
 
 - **Slug:** `decision:active-membership-grants-access`
-- **Title:** An active workspace membership grants access to the workspace and everything in it, and a task assignee keeps access to that task without one.
+- **Title:** An active workspace membership grants access to the workspace and everything in it, and assigning a task grants nothing more.
 - **Ref:** `workspace_members`
 
-Every workspace-scoped collection rule grants access through the workspace owner or through the `workspace_members` back-relation, and each membership branch requires the same row to carry `status` `active`. `workspace_members.status` holds only `active` or `suspended`, and `pb_hooks/membership_status.pb.js` lets it move only between those two. A suspended member therefore loses access to the workspace, its projects, documents, decisions, milestones and configuration, and to every task not assigned to them: they answer as if the caller were not a member.
+Every workspace-scoped collection rule grants access through the workspace owner or through the `workspace_members` back-relation, and each membership branch requires the same row to carry `status` `active`. `workspace_members.status` holds only `active` or `suspended`, and `pb_hooks/membership_status.pb.js` lets it move only between those two. A suspended member therefore loses access to the workspace, its projects, documents, decisions, milestones and configuration, and to every task, one still assigned to them included: they answer as if the caller were not a member.
 
-The exception is the task assignee. Four paths admit the assignee of a task with no status condition, so a suspended member keeps reading and writing a task still assigned to them: the `tasks` list, view and update rules; the `comments` rules on the task path, through `task.assignee`; the list and view rules of the `project_items` view; and the task leg of `GET /api/tracker/search` in `pb_hooks/routes.pb.js`. The task-scoped rules of `task_activity`, `task_subscribers` and `notifications` carry the same assignee branch.
+Assigning a task grants nothing on its own. No rule or route admits a task assignee except through the owner or active-membership branches: not the `tasks`, `comments`, `task_activity`, `task_subscribers` or `notifications` rules, not the `project_items` view, and not `GET /api/tracker/search` in `pb_hooks/routes.pb.js`. A suspended assignee loses the task with everything else, and an active viewer assignee reads it but writes nothing through it (decision:role-tiers).
 
 - **Reads follow membership.** An active member lists and views the workspace row itself and every project, task, decision, document and milestone in it, subject to draft privacy (decision:draft-private-publish-one-way) and trash visibility. Which roles may write is set by decision:role-tiers.
 - **The collection rules are the enforcement point.** A caller hitting PocketBase directly gets the same refusal as any other client; a hidden record answers 404 on view and is absent from lists.
 - **An absent expand is the hidden state.** PocketBase omits an expanded relation the caller cannot view, so a client reading `expand` must treat a missing key as a hidden record, never as an empty one.
-- **Task assignees.** A member who leaves has their tasks unassigned (decision:leaver-tasks-unassigned), so the assignee exception outlasts a suspension but not a departure. An assignee of a parent task may also create a subtask under it, which does require an active membership.
+- **Task assignees.** A member who leaves has their tasks unassigned (decision:leaver-tasks-unassigned); a suspended member stays the stored assignee but reads and writes nothing through it until reactivated. A subtask needs the same membership as any other task create.
 - **Assignment is limited to members.** A validation hook in `pb_hooks/main.pb.js` refuses, with a 400, an assignee who is neither the workspace owner nor an active member of the task workspace, which a rule cannot express because an update rule denial answers 404. It checks only a changed assignee, so a task whose assignee is later suspended stays editable on other fields.
 - **Accepting an invitation never reactivates a suspended member**: an existing membership row is left as it is.
 
@@ -408,7 +408,7 @@ The design accepts three costs:
 - **Title:** Workspace members can read the task counts of the projects in their workspace.
 - **Ref:** `project_stats`
 
-`project_stats` is a read-only view of task totals per project, bucketed by status category, with trashed projects and tasks excluded in its query. The query selects the project workspace as `workspace`, which PocketBase types as a relation to `workspaces`, so the list and view rules can admit the project owner or any active member of that workspace.
+`project_stats` is a read-only view of task totals per project, bucketed by status category, with trashed projects and tasks excluded in its query. The query selects the project workspace as `workspace`, which PocketBase types as a relation to `workspaces`, so the list and view rules can admit the owner of that workspace or any active member of it; the creator of the project, its `owner`, gains no read from that role (decision:active-membership-grants-access).
 
 The view joins no membership itself, so those two rules are its only tenant control. They also require an authenticated caller, because an anonymous empty id would otherwise match an empty membership join. Create, update and delete are null.
 
@@ -437,7 +437,7 @@ On `projects`:
 - **Delete**, which trashes and then purges, takes the workspace owner or an active admin. Trashing a project pulls shared work out from under every member and moves everything in it to the trash (decision:soft-delete-trash); Linear also reserves project deletion to admins.
 - **Locks.** The update rule refuses any submitted `owner` or `shadow`, and both locks are top-level conjuncts of the rule, because a lock inside one OR branch would leave the other branches writable.
 
-`owner` records who created the project and grants no write: no create, update or delete rule treats it as authority, so there is no project ownership transfer. Its one effect is a read, the task counts of the project (decision:project-stats-membership). The workspace of a project is immutable (decision:project-workspace-immutable). Role tiers themselves are described in decision:role-tiers.
+`owner` records who created the project and grants no write: no create, update or delete rule treats it as authority, so there is no project ownership transfer. It grants no read either: the task counts of the project follow workspace membership alone (decision:project-stats-membership). The workspace of a project is immutable (decision:project-workspace-immutable). Role tiers themselves are described in decision:role-tiers.
 
 ## rate-limits-batch-and-superuser-mfa
 
@@ -479,7 +479,7 @@ The owner powers come from `workspaces.owner`, independent of any membership row
 | purge from the trash | owner, admin |
 | read | every active role, viewer included |
 
-A viewer reads what a member reads and writes nothing in the workspace except on a task assigned to them: the assignee branches let a viewer edit that task (`tasks.updateRule`), comment on it and react to its comments (the `comments` rules), subscribe to it, and add subtasks under it (the parent-assignee branch of `tasks.createRule`). Items are tasks, decisions, documents and milestones. Their create, update and delete rules admit the owner and any active non-viewer member, plus the assignee on a task update, with draft privacy on top (decision:draft-private-publish-one-way), so a delete by a member moves the item to the trash (decision:soft-delete-trash).
+A viewer reads what a member reads and writes nothing in the workspace, a task assigned to them included: they cannot edit it, comment on it, react to its comments, subscribe to it or add subtasks under it. Items are tasks, decisions, documents and milestones. Their create, update and delete rules admit the owner and any active non-viewer member, with draft privacy on top (decision:draft-private-publish-one-way), so a delete by a member moves the item to the trash (decision:soft-delete-trash).
 
 Raising a role is an owner action on every path. Membership rows come from accepted invitations, and `workspace_invitations.createRule` lets an admin invite only with the member role while the owner may invite with any role. `workspace_members.updateRule` lets an admin edit a row only without touching `role`.
 
@@ -499,7 +499,7 @@ Create admits the owner and active non-viewer members, and the `owner` in the bo
 - **Title:** The search route scopes itself to what the caller could already list.
 - **Ref:** `tasks`
 
-`GET /api/tracker/search?q=` is a custom route in `pb_hooks/routes.pb.js`, and custom routes skip collection rules, so the handler scopes itself. It requires authentication (401 otherwise) and runs one bound-parameter query per collection (tasks, decisions, documents, milestones, projects), each limited to workspaces the caller owns or holds an active membership in; tasks also match the caller as assignee. The standard is parity with the list rules: search returns only rows the caller could list.
+`GET /api/tracker/search?q=` is a custom route in `pb_hooks/routes.pb.js`, and custom routes skip collection rules, so the handler scopes itself. It requires authentication (401 otherwise) and runs one bound-parameter query per collection (tasks, decisions, documents, milestones, projects), each limited to workspaces the caller owns or holds an active membership in; a task assigned to the caller matches only under that same limit. The standard is parity with the list rules: search returns only rows the caller could list.
 
 - Trashed rows and rows in a trashed project are excluded for everyone.
 - Drafts follow the list rules per row: a draft reaches only its author, the workspace owner and active admins.
@@ -614,7 +614,7 @@ The signup hook in `pb_hooks/main.pb.js` creates the row with `theme` and `font`
 - **Title:** An account must verify its email address before it can sign in.
 - **Ref:** `users`
 
-Anyone can sign up, so the `users` auth rule requires `verified`, alongside `approved` (decision:signup-approval): an unverified account cannot sign in. The verification email carries a token valid for 24 hours, and `POST /api/collections/users/confirm-verification` sets the flag. An approved account that never verifies is deleted: the daily `unconfirmed-signup-purge` cron in `pb_hooks/signup_purge.pb.js` removes approved, unverified accounts created more than 30 days ago, while an unapproved account is never swept. Superusers are not subject to the `users` auth rule.
+Anyone can sign up, so the `users` auth rule requires `verified`, alongside `approved` (decision:signup-approval): an unverified account cannot sign in. The verification email carries a token valid for 24 hours, and `POST /api/collections/users/confirm-verification` sets the flag. An approved account that never verifies is deleted: the daily `unconfirmed-signup-purge` cron in `pb_hooks/signup_purge.pb.js` removes approved, unverified accounts created more than 30 days ago, except the sole owner of a workspace with other members, which is skipped and logged (decision:account-delete-sole-owner), while an unapproved account is never swept. Superusers are not subject to the `users` auth rule.
 
 ## vocab-first-class-collections
 

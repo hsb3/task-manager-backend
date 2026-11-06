@@ -48,7 +48,7 @@
       "type": "text"
     },
     {
-      "cascadeDelete": true,
+      "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
       "help": "",
       "hidden": false,
@@ -57,7 +57,7 @@
       "minSelect": 0,
       "name": "owner",
       "presentable": false,
-      "required": true,
+      "required": false,
       "system": false,
       "type": "relation"
     },

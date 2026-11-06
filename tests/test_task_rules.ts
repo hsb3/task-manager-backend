@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**Prove the cross-relation rules on `tasks`: see/edit if you own the project OR
-are the assignee; only the project owner may delete; create only in your own
+hold an active membership (an assignment adds nothing); only the project owner may delete; create only in your own
 project; an UNASSIGNED task is not world-writable (TASK-049 anon-write guard).
 Self-contained & rerunnable — creates and cleans up its own fixture.
  */
@@ -152,7 +152,7 @@ const fixture = made.id;
 check("Alice adds task to BOB's project (blocked)", s, 400);
 
 // COVERS: rule:tasks.update
-console.log("\n── UPDATE: the assignee (not owner) can edit ──");
+console.log("\n── UPDATE: a member (not owner) can edit ──");
 [s] = await api("PATCH", `/api/collections/tasks/records/${fixture}`, bob, {
   status: DOING_STATUS,
 });
@@ -267,8 +267,8 @@ await carol_admin.done();
 [s] = await api("DELETE", `/api/collections/workspace_members/records/${carol_admin.id}`, alice);
 check("cleanup: admin membership removed", s, 204);
 
-// The viewer-denied and viewer+assignee-allowed checks below are a PAIR: same actor, same tier,
-// the assignee bit the only difference — together they isolate the `assignee =` clause.
+// The two viewer-denied checks below are a PAIR: same actor, same tier, the assignee bit the only
+// difference — together they prove an assignment grants a viewer no write (decision:role-tiers).
 [s, r] = await api("POST", "/api/collections/workspace_members/records", su, {
   workspace: ALICE_WORKSPACE,
   user: CAROL_ID,
@@ -302,9 +302,9 @@ check("  ↳ read-back confirms Carol is the assignee", assigned.assignee ?? nul
 // Same tier as the denial above (member/admin would grant this 200 through the member clause
 // instead), so the tier rides here too; what the pair does NOT read is the rule text itself.
 check(
-  "Carol (viewer AND assignee) updates",
+  "Carol (viewer AND assignee) updates (denied)",
   tup(await carol_viewer.now(), s, r.title ?? null),
-  tup("viewer", 200, "assignee edit"),
+  tup("viewer", 404, null),
 );
 await carol_viewer.done();
 [s] = await api("DELETE", `/api/collections/workspace_members/records/${carol_viewer.id}`, alice);

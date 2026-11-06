@@ -533,6 +533,9 @@ run_suite "test_invitation_limits"  bun tests/test_invitation_limits.ts
 # ── security: tenant-anchor relations are immutable on update — self-booting (own clean room).
 run_suite "test_rescope_guard"      bun tests/test_rescope_guard.ts
 
+# ── security: an assignment grants nothing an active, role-qualified membership does not — self-booting (own clean room).
+run_suite "test_access_rule_holes"  bun tests/test_access_rule_holes.ts
+
 # ── security: trashed/draft records stay invisible on every read surface, cases derived from schema/.
 run_suite "test_visibility_invariants" bun tests/test_visibility_invariants.ts
 

@@ -27,7 +27,7 @@
  *     totalItems, and a page-walk under two different sorts reaches the true first AND last row.
  *
  * (4) SERVED COUNTS + FLAGS (card q46b): comment_count, subtask_total/subtask_done past 500
- *     children, a non-member assignee's counts narrowed to their own children, the
+ *     children, a suspended assignee reading no item and so no count, the
  *     open/terminal/off_pipeline flags per status category, and statuses' terminal/off_pipeline.
  *
  * Plus view hygiene: no create/update/delete surface exists, and openapi.json documents the
@@ -435,7 +435,7 @@ try {
   );
   const [assignee] = await login("piv-assignee@example.com");
   const [suspended] = await login("piv-susp@example.com");
-  [s, r] = await api("GET", `/api/collections/tasks/records/${asg_task.id}`, assignee);
+  [s, r] = await api("GET", `/api/collections/tasks/records/${asg_task.id}`, su);
   check("suspension left the assignment in place", tup(s, r.assignee ?? null), tup(200, asg_id));
 
   // ── A SECOND WORKSPACE, cross-membership. The view resolves tenancy through aliased
@@ -842,9 +842,9 @@ try {
   const [, asgrecs] = await list_all("project_items", assignee);
   const asg_view = ids_of(asgrecs);
   check(
-    "suspended assignee sees the ONE assigned task that is live in a live project",
-    tup(same_set(asg_view, new Set([asg_task.id])), asg_view.size),
-    tup(true, 1),
+    "suspended assignee sees no item, their live assigned task included",
+    tup(asg_view.has(asg_task.id), asg_view.size),
+    tup(false, 0),
   );
 
   // Single-record viewRule: same answer as the list for the same actor.
@@ -1862,15 +1862,15 @@ try {
   let row: any;
   [s, row] = await view_row(asg_task.id, assignee);
   check(
-    "non-member assignee: subtask counts cover only their own children",
+    "suspended assignee: their assigned task item, counts included → 404",
     tup(s, row.subtask_total ?? null, row.subtask_done ?? null),
-    tup(200, 2, 1),
+    tup(404, null, null),
   );
   const [, asg_list] = await list_all("project_items", assignee, { filter: `id='${asg_task.id}'` });
   check(
     "  …in the list response too",
     asg_list.map((x) => tup(x.subtask_total ?? null, x.subtask_done ?? null)),
-    [tup(2, 1)],
+    [],
   );
   [s, row] = await view_row(asg_task.id, member);
   check(
@@ -2071,7 +2071,7 @@ try {
     tup(200, 0, 0, 0),
   );
   [s] = await view_row(asg_trash.id, assignee);
-  check("  positive control: the assignee reads their live task", s, 200);
+  check("  the suspended assignee reads their live task no more than a stranger", s, 404);
   [s] = await api("DELETE", `/api/collections/tasks/records/${asg_trash.id}`, alice);
   check("  …which the owner then trashes", s, 204);
   [s] = await view_row(asg_trash.id, assignee);

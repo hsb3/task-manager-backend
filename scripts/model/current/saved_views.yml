@@ -100,8 +100,8 @@ relations:
 - field: owner
   target: users
   cardinality: one
-  required: true
-  on_target_delete: cascade
+  required: false
+  on_target_delete: clear
 - field: project
   target: projects
   cardinality: one

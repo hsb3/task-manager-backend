@@ -242,21 +242,12 @@ function refuseUnbindableListRule(e) {
 onCollectionCreate(refuseUnbindableListRule, "project_items");
 onCollectionUpdate(refuseUnbindableListRule, "project_items");
 
-// Subtask counts are served here, never as view columns: a column is filterable and sortable,
-// which would let a non-member assignee read the true count past any body rewrite.
+// Subtask counts are served here, never as view columns: a column is filterable and sortable.
 onRecordEnrich((e) => {
   const type = e.record.get("type");
   let total = 0;
   let done = 0;
   if ((type === "task" || type === "milestone") && !e.record.get("trashed")) {
-    const auth = e.requestInfo ? e.requestInfo.auth : null;
-    // A non-member reaches a task only as its assignee and lists only the children assigned to them.
-    const narrow =
-      auth &&
-      !auth.isSuperuser() &&
-      e.record.get("workspace_owner") !== auth.id &&
-      String(e.record.get("active_members")).indexOf("," + auth.id + ",") ===
-        -1;
     const res = new DynamicModel({ total: 0, done: 0 });
     e.app
       .db()
@@ -267,10 +258,9 @@ onRecordEnrich((e) => {
           (type === "task" ? "parent" : "milestone") +
           " = {:id} AND k.trashed = ''" +
           // Mirrors tasks.listRule's project leg: a child in a trashed or missing project is listable by nobody.
-          " AND (k.project = '' OR EXISTS (SELECT 1 FROM projects p WHERE p.id = k.project AND p.trashed = ''))" +
-          (narrow ? " AND k.assignee = {:uid}" : ""),
+          " AND (k.project = '' OR EXISTS (SELECT 1 FROM projects p WHERE p.id = k.project AND p.trashed = ''))",
       )
-      .bind({ id: e.record.id, uid: narrow ? auth.id : "" })
+      .bind({ id: e.record.id })
       .one(res);
     total = res.total;
     done = res.done;

@@ -97,8 +97,8 @@ relations:
 - field: owner
   target: users
   cardinality: one
-  required: true
-  on_target_delete: cascade
+  required: false
+  on_target_delete: clear
 - field: workspace
   target: workspaces
   cardinality: one

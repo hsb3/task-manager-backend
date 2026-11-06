@@ -32,16 +32,16 @@
       "type": "relation"
     },
     {
-      "cascadeDelete": true,
+      "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
       "help": "",
       "hidden": false,
       "id": "relation3070000002",
       "maxSelect": 1,
-      "minSelect": 1,
+      "minSelect": 0,
       "name": "owner",
       "presentable": false,
-      "required": true,
+      "required": false,
       "system": false,
       "type": "relation"
     },

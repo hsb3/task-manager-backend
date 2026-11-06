@@ -6,13 +6,12 @@ kind: base
 capabilities:
   list:
     verbatim: '@request.auth.id != "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = ""'
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
+      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = ""'
     actors:
     - workspace-owner
     - active-workspace-member
-    - assignee
     authRequired: guard
     record_state:
     - task.trashed = ""
@@ -20,13 +19,12 @@ capabilities:
     - task.workspace.trashed = ""
   view:
     verbatim: '@request.auth.id != "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = ""'
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
+      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = ""'
     actors:
     - workspace-owner
     - active-workspace-member
-    - assignee
     authRequired: guard
     record_state:
     - task.trashed = ""
@@ -35,14 +33,13 @@ capabilities:
   create:
     verbatim: '@request.auth.id != "" && user = @request.auth.id && (task.workspace.owner = @request.auth.id
       || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role
-      ?!= "viewer" && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = ""'
+      ?!= "viewer" && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
+      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = ""'
     actors:
     - custom(user = @request.auth.id)
     - workspace-owner
     - active-workspace-writer
-    - assignee
     authRequired: guard
     record_state:
     - task.trashed = ""

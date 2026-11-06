@@ -1349,7 +1349,7 @@ routerAdd(
           "(t.project = '' OR EXISTS (SELECT 1 FROM projects p " +
           "WHERE p.id = t.project AND p.trashed = '')) AND " +
           "EXISTS (SELECT 1 FROM workspaces w WHERE w.id = t.workspace AND w.trashed = '' AND " +
-          "(w.owner = [[notifications.user]] OR t.assignee = [[notifications.user]] OR " +
+          "(w.owner = [[notifications.user]] OR " +
           "EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace = w.id AND " +
           "[[m.user]] = [[notifications.user]] AND m.status = 'active'))))) AND " +
           "(notifications.document = '' OR EXISTS (SELECT 1 FROM documents d " +
@@ -1422,7 +1422,7 @@ onBootstrap((e) => {
             "(t.project = '' OR EXISTS (SELECT 1 FROM projects p " +
             "WHERE p.id = t.project AND p.trashed = '')) AND " +
             "EXISTS (SELECT 1 FROM workspaces w WHERE w.id = t.workspace AND w.trashed = '' AND " +
-            "(w.owner = [[notifications.user]] OR t.assignee = [[notifications.user]] OR " +
+            "(w.owner = [[notifications.user]] OR " +
             "EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace = w.id AND " +
             "[[m.user]] = [[notifications.user]] AND m.status = 'active'))))) AND " +
             "(notifications.document = '' OR EXISTS (SELECT 1 FROM documents d " +
