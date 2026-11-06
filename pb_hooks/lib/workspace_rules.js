@@ -1,5 +1,5 @@
 /// <reference path="../../pb_data/types.d.ts" />
-// The workspace write rules the collection PATCH hooks and the vocab route both apply; require() it inside a handler body.
+// The write rules a collection hook and a tracker route both apply; require() it inside a handler body.
 
 // A submitted name/title/body is also set trimmed on `record`; slug/key patterns already refuse whitespace.
 function rejectBlankName(collection, body, record) {
@@ -166,8 +166,72 @@ function validateWorkspacePriorities(record) {
   record.set("priorities", entries);
 }
 
+// decision:user-settings-write-checks: a users.name changed to nothing but whitespace is refused; any other change is stored trimmed.
+// A resent unchanged name passes as stored, so an account that has no name stays editable.
+function refuseBlankUserName(field, value, stored) {
+  if (typeof value !== "string" || value === stored) return value;
+  const name = value.trim();
+  if (name === "") {
+    const data = {};
+    data[field] = new ValidationError(
+      "validation_required",
+      "Cannot be blank.",
+    );
+    throw new BadRequestError("The name cannot be blank.", data);
+  }
+  return name;
+}
+
+// decision:user-settings-write-checks: judge each changed pointer and the time zone of a user_settings save.
+// `next`/`prev` map default_project, default_view and time_zone to the value being saved and the stored one.
+function validateUserSettings(app, info, next, prev) {
+  const refuse = (field, code, message) => {
+    const data = {};
+    data[field] = new ValidationError(code, message);
+    throw new BadRequestError("The settings cannot be saved.", data);
+  };
+  const pointers = { default_project: "projects", default_view: "saved_views" };
+  for (const field in pointers) {
+    const id = next[field];
+    if (typeof id !== "string" || id === "" || id === prev[field]) continue;
+    let rec = null;
+    try {
+      rec = app.findRecordById(pointers[field], id);
+    } catch (_) {
+      rec = null;
+    }
+    // KEEP IN SYNC: pb_hooks/scope.pb.js guards its project pointers with the same `pick one from the project list` refusal.
+    if (rec && field === "default_project" && rec.get("shadow"))
+      throw new BadRequestError(
+        "that project cannot be chosen here; pick one from the project list",
+      );
+    // Missing and unreadable answer alike, with PocketBase's own missing-relation code, so the refusal reveals no record.
+    if (!rec || !app.canAccessRecord(rec, info, rec.collection().viewRule))
+      refuse(
+        field,
+        "validation_missing_rel_records",
+        "Failed to find all relation records with the provided ids.",
+      );
+  }
+  const sent = next.time_zone;
+  // KEEP IN SYNC: pb_hooks/counts.pb.js reads a zone the same way, `String(new Timezone(sent).string()) !== sent`.
+  if (
+    typeof sent === "string" &&
+    sent !== "" &&
+    sent !== prev.time_zone &&
+    (sent === "Local" || String(new Timezone(sent).string()) !== sent)
+  )
+    refuse(
+      "time_zone",
+      "validation_invalid_time_zone",
+      "The time zone must be an IANA name, such as Europe/Paris.",
+    );
+}
+
 module.exports = {
   rejectBlankName: rejectBlankName,
   validateDefaultProject: validateDefaultProject,
   validateWorkspacePriorities: validateWorkspacePriorities,
+  refuseBlankUserName: refuseBlankUserName,
+  validateUserSettings: validateUserSettings,
 };

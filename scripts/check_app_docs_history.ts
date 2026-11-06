@@ -84,6 +84,26 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785187200_seed_app_docs.js", "collection:project_items", "Any other operator, a modifier, an empty value where one is "]',
+    "card 1t2f: status.name and labels.name now filter by name; the record names status.category as the refused path",
+  ],
+  [
+    '["1785187200_seed_app_docs.js", "collection:user_settings", "On save only the 64-character limit on time_zone is enforced"]',
+    "card 1853 and card 2ghp: a save now refuses an unknown time zone and an unreadable default pointer; the record says so",
+  ],
+  [
+    '["1785187200_seed_app_docs.js", "collection:user_settings", "When the server counts days for the user, a time_zone that i"]',
+    "card 1853: an unknown zone can no longer be saved, so the record says only a value the server cannot load reads as unset",
+  ],
+  [
+    '["1785187200_seed_app_docs.js", "concept:write-normalisation", "This covers workspaces, projects, tasks, documents, decision"]',
+    "card 2ghp: users.name joins the trimmed, blank-refused set; the record lists it",
+  ],
+  [
+    '["1785187200_seed_app_docs.js", "route:tracker-user-settings", "The checks of the user_settings update request apply here to"]',
+    "card 2ghp and card 1853: the route applies the new name, pointer and time zone checks; the record lists them",
+  ],
+  [
     '["1785186800_seed_app_docs.js", "collection:user_settings", "The server does not interpret time_zone; the 64-character li"]',
     "card tpyx: the server now reads time_zone to count the user's days (decision:viewer-day-values); the record says how",
   ],

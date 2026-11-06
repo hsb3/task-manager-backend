@@ -45,6 +45,24 @@ onRecordUpdateRequest(rejectBlankName, "templates");
 onRecordCreateRequest(rejectBlankName, "workspaces");
 onRecordUpdateRequest(rejectBlankName, "workspaces");
 
+// decision:user-settings-write-checks: users.name is optional, so rejectBlankName (required fields only) never sees it.
+function refuseBlankUserName(e) {
+  const body = e.requestInfo().body || {};
+  if (typeof body.name !== "string") return e.next();
+  e.record.set(
+    "name",
+    require(`${__hooks}/lib/workspace_rules.js`).refuseBlankUserName(
+      "name",
+      body.name,
+      e.record.original().getString("name"),
+    ),
+  );
+  return e.next();
+}
+
+onRecordCreateRequest(refuseBlankUserName, "users");
+onRecordUpdateRequest(refuseBlankUserName, "users");
+
 // ── Refuse an update whose body names no field of the collection ───
 
 function refuseEmptyUpdate(e) {

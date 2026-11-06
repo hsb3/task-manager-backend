@@ -353,44 +353,24 @@ onRecordUpdate((e) => {
   return e.next();
 }, "saved_views");
 
-// decision:shadow-project — a personal default project may not be the workspace container; nothing else
-// validates this relation, so the whole guard is the shadow refusal.
-// KEEP IN SYNC: the same refusal in the labels/templates/saved_views guards above, in
-// validateDefaultProject (pb_hooks/main.pb.js) and in the settings route (pb_hooks/user_settings.pb.js).
-onRecordCreateRequest((e) => {
-  const p = e.record.get("default_project");
-  if (p) {
-    let proj = null;
-    try {
-      proj = e.app.findRecordById("projects", p);
-    } catch (_) {
-      proj = null;
-    }
-    if (proj && proj.get("shadow")) {
-      throw new BadRequestError(
-        "that project cannot be chosen here; pick one from the project list",
-      );
-    }
-  }
+// decision:user-settings-write-checks — the default pointers must be readable and not the shadow project, and the
+// time zone a real one; the settings route (pb_hooks/user_settings.pb.js) applies the same lib checks.
+function validateUserSettingsWrite(e) {
+  const pick = (r) => ({
+    default_project: r.getString("default_project"),
+    default_view: r.getString("default_view"),
+    time_zone: r.getString("time_zone"),
+  });
+  require(`${__hooks}/lib/workspace_rules.js`).validateUserSettings(
+    e.app,
+    e.requestInfo(),
+    pick(e.record),
+    pick(e.record.original()),
+  );
   return e.next();
-}, "user_settings");
-onRecordUpdateRequest((e) => {
-  const p = e.record.get("default_project");
-  if (p) {
-    let proj = null;
-    try {
-      proj = e.app.findRecordById("projects", p);
-    } catch (_) {
-      proj = null;
-    }
-    if (proj && proj.get("shadow")) {
-      throw new BadRequestError(
-        "that project cannot be chosen here; pick one from the project list",
-      );
-    }
-  }
-  return e.next();
-}, "user_settings");
+}
+onRecordCreateRequest(validateUserSettingsWrite, "user_settings");
+onRecordUpdateRequest(validateUserSettingsWrite, "user_settings");
 
 // ── WORKSPACE immutability (D4) on update — the four items + projects ──
 // KEEP IN SYNC: the five blocks below are byte-parallel apart from the collection tag

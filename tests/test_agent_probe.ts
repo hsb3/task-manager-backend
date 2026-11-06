@@ -251,11 +251,10 @@ try {
     ["Probe zephyr task v3"],
   ]);
   check("labels ~ label id", await items(`labels ~ '${LABEL}'`), [200, ["Probe zephyr task v3"]]);
-  const [ns, nb] = await items("status.name = 'In Progress'");
   check(
-    "filter by status NAME through the view names the field",
-    [ns, nb?.data?.status?.code],
-    [400, "not_expressible"],
+    "filter by status NAME returns the status id rows (decision:item-filter-by-name)",
+    await items("status.name = 'In Progress'"),
+    [200, ["Design homepage", "Probe zephyr task v3"]],
   );
 
   console.log("\n── comment, search ──");
