@@ -1034,14 +1034,18 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/inspire", (e) => {
     // outage reads to the client as a bad request. Only the send is wrapped, so a bug
     // below still surfaces as a bug.
     e.app.logger().error("inspire upstream call failed", "err", String(err));
-    return e.json(502, { error: "upstream unreachable" });
+    throw new ApiError(502, "The quote service did not answer.", {});
   }
   if (res.statusCode !== 200) {
-    return e.json(502, { error: "upstream returned " + res.statusCode });
+    throw new ApiError(502, "The quote service answered with an error.", {});
   }
   const q = (res.json || [])[0];
   if (!q || typeof q.q !== "string") {
-    return e.json(502, { error: "upstream returned an unusable body" });
+    throw new ApiError(
+      502,
+      "The quote service answered with an unusable body.",
+      {},
+    );
   }
   return e.json(200, { quote: q.q, author: q.a, source: "zenquotes.io" });
 });

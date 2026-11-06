@@ -639,6 +639,9 @@ run_suite "test_app_docs_schema_guards" bun tests/test_app_docs_schema_guards.ts
 # ── integrity: re-applying the generated app_docs seed changes no row (its comment's claim).
 run_suite "test_app_docs_seed_idempotent" bun tests/test_app_docs_seed_idempotent.ts
 
+# ── integrity: a fresh boot's app_docs + app_settings rows equal the newest seed's own data, column for column.
+run_suite "test_app_docs_seed_coverage" bun tests/test_app_docs_seed_coverage.ts
+
 # ── serverless proofs of the gate scripts and the shared libraries they lean on; make
 #    check-static runs the gates themselves (generators --check, scripts/check_*.ts).
 run_suite "test_app_docs_quotes_checker" bun tests/test_app_docs_quotes_checker.ts
@@ -671,6 +674,7 @@ run_suite "test_app_docs_down_up_checker" bun tests/test_app_docs_down_up_checke
 run_suite "test_historical_migration_guard" bun tests/test_historical_migration_guard.ts
 run_suite "test_keep_in_sync_checker" bun tests/test_keep_in_sync_checker.ts
 run_suite "test_route_registry_checker" bun tests/test_route_registry_checker.ts
+run_suite "test_route_statuses_checker" bun tests/test_route_statuses_checker.ts
 run_suite "test_field_help_checker" bun tests/test_field_help_checker.ts
 run_suite "test_openapi_routes" bun tests/test_openapi_routes.ts
 run_suite "test_route_errors" bun tests/test_route_errors.ts

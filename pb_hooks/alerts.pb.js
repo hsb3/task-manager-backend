@@ -40,7 +40,7 @@
 // key makes it fire exactly once per process. It runs AFTER re.next() so it never
 // affects the response, and proves the SAME newMailClient() transport the real alert
 // uses reaches ALERT_EMAIL — without waiting for a wall-clock cron minute.
-routerUse((re) => {
+require(`${__hooks}/lib/routes.js`).use((re) => {
   re.next();
   try {
     if (!$os.getenv("ALERT_SELFTEST")) {

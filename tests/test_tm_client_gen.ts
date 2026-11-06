@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { generate, render } from "../scripts/gen_tm_client.ts";
+import { generate, render, ts_type } from "../scripts/gen_tm_client.ts";
 import { read_text } from "../scripts/_py.ts";
 
 const REPO_ROOT = path.dirname(path.dirname(path.resolve(import.meta.path)));
@@ -98,6 +98,16 @@ try {
     "tsc --noEmit verbs.ts against the committed client exits 0",
     green.code === 0,
     `exit ${green.code}: ${green.out.trim().split("\n").slice(0, 3).join(" | ")}`,
+  );
+
+  console.log("── (e) union and nullable schemas render as unions ──");
+  check(
+    "type array, anyOf and nullable render string | null, string[] | null, number | boolean",
+    ts_type({ type: ["string", "null"] }) === "string | null" &&
+      ts_type({ type: ["array", "null"], items: { type: "string" } }) === "string[] | null" &&
+      ts_type({ anyOf: [{ type: "integer" }, { type: "boolean" }] }) === "number | boolean" &&
+      ts_type({ type: "string", nullable: true }) === "string | null",
+    ts_type({ type: ["string", "null"] }),
   );
 } finally {
   fs.rmSync(S, { recursive: true, force: true });

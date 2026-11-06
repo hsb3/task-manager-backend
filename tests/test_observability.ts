@@ -213,7 +213,8 @@ class Sink {
 /**
  * A self-contained `pocketbase serve` clean-room: fresh --dir, a COPY of
  * pb_migrations (MFA migration dropped so plain superuser auth works) with a scratch
- * SMTP->sink migration appended, and a temp --hooksDir holding only alerts.pb.js.
+ * SMTP->sink migration appended, and a temp --hooksDir holding only alerts.pb.js and the
+ * lib/routes.js it requires (the registry registers nothing by itself).
  */
 class Room {
   port: number;
@@ -259,6 +260,11 @@ class Room {
     );
     fs.mkdirSync(this.hooks_dir, { recursive: true });
     fs.copyFileSync(ALERTS_HOOK_SRC, path.join(this.hooks_dir, "alerts.pb.js"));
+    fs.mkdirSync(path.join(this.hooks_dir, "lib"));
+    fs.copyFileSync(
+      path.join(REPO_ROOT, "pb_hooks", "lib", "routes.js"),
+      path.join(this.hooks_dir, "lib", "routes.js"),
+    );
     this.proc = null;
   }
 

@@ -44,6 +44,21 @@ function check(label: string, got: any, expected: any): void {
   );
 }
 
+/** A 502 answers with the shared error body {status, message, data}. */
+function check_502_body(label: string, r: any): void {
+  const ok =
+    r?.status === 502 &&
+    typeof r.message === "string" &&
+    r.message !== "" &&
+    !!r.data &&
+    typeof r.data === "object" &&
+    !Array.isArray(r.data);
+  if (!ok) failures += 1;
+  console.log(
+    `  ${ok ? "✅" : "❌ MISMATCH"}  ${`${label}: the shared error body`.padEnd(64)} → ${py_repr(r)}`,
+  );
+}
+
 async function api(
   method: string,
   path: string,
@@ -191,20 +206,24 @@ try {
   // ══════════════════ 3. Upstream answers, but unusably ═══════════════════════
   console.log("\n── (3) a bad upstream RESPONSE is 502, never 400 ──");
   stub_state.mode = "status500";
-  [s] = await api("GET", "/api/tracker/inspire", alice);
+  [s, r] = await api("GET", "/api/tracker/inspire", alice);
   check("upstream returns 500", s, 502);
+  check_502_body("upstream returns 500", r);
   stub_state.mode = "notjson";
-  [s] = await api("GET", "/api/tracker/inspire", alice);
+  [s, r] = await api("GET", "/api/tracker/inspire", alice);
   check("upstream returns 200 with an unparseable body", s, 502);
+  check_502_body("upstream returns 200 with an unparseable body", r);
   stub_state.mode = "wrongshape";
-  [s] = await api("GET", "/api/tracker/inspire", alice);
+  [s, r] = await api("GET", "/api/tracker/inspire", alice);
   check("upstream returns 200 with JSON of the wrong shape", s, 502);
+  check_502_body("upstream returns 200 with JSON of the wrong shape", r);
 
   // ══════════════════ 4. The call throws before any response ══════════════════
   console.log("\n── (4) a THROWN upstream call is 502, never 400 (TASK-112) ──");
   stub_state.mode = "hangup";
-  [s] = await api("GET", "/api/tracker/inspire", alice);
+  [s, r] = await api("GET", "/api/tracker/inspire", alice);
   check("upstream closes the socket with no response", s, 502);
+  check_502_body("upstream closes the socket with no response", r);
 
   stub.close();
   check(
@@ -212,8 +231,9 @@ try {
     await roomkit.wait_for_port_free(STUB_PORT),
     true,
   );
-  [s] = await api("GET", "/api/tracker/inspire", alice);
+  [s, r] = await api("GET", "/api/tracker/inspire", alice);
   check("upstream address is dead (connection refused)", s, 502);
+  check_502_body("upstream address is dead (connection refused)", r);
 } finally {
   try {
     stub.close(); // the stub may already be stopped

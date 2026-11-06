@@ -536,7 +536,7 @@ const AUTH: Record<string, string> = {
 };
 
 const ERROR_SHAPE =
-  'Unless an answer documents another body, every error body is {"status": <code>, "message": "<reason>", "data": {}}; ' +
+  'Every error body is {"status": <code>, "message": "<reason>", "data": {}}; ' +
   "a validation error lists the offending fields under data.";
 
 function rate_limit_text(rate: RateRule): string {
@@ -586,10 +586,7 @@ function route_paths(rate: RateRule, docs: Replay["docs"]): [any, number] {
     if (!(spec.auth in AUTH)) throw new Error(`route ${key} has unknown auth ${spec.auth}`);
     const api = p.startsWith("/api/");
     const keys = spec.auth === "superuser" ? "" : KEY_TEXT[key_access(method, p)];
-    const refusals = Object.entries((spec.responses ?? {}) as Record<string, any>).map(
-      ([s, v]): [string, string, any] =>
-        typeof v === "string" ? [s, v, null] : [s, v.text, v.schema],
-    );
+    const refusals = Object.entries((spec.responses ?? {}) as Record<string, string>);
     const lead = spec.docs ? docs.get(spec.docs)?.body : spec.summary;
     if (!lead) throw new Error(`route ${key} names ${spec.docs}, which has no app_docs record`);
     const rest = [
@@ -620,10 +617,7 @@ function route_paths(rate: RateRule, docs: Replay["docs"]): [any, number] {
       responses["403"] = _error_resp("An API key was sent; API keys are refused here.");
     }
     if (api) responses["429"] = _error_resp("Too many requests; wait out the rate-limit window.");
-    for (const [s, text, schema] of refusals)
-      responses[s] = schema
-        ? { description: text, content: { "application/json": { schema } } }
-        : _error_resp(text);
+    for (const [s, text] of refusals) responses[s] = _error_resp(text);
 
     const op: any = {
       tags: [p.startsWith("/api/tracker/") ? "tracker" : "system"],
