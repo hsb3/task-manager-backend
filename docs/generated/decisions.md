@@ -42,6 +42,24 @@ Assigning a task grants nothing on its own. No rule or route admits a task assig
 - **Assignment is limited to members.** A validation hook in `pb_hooks/main.pb.js` refuses, with a 400, an assignee who is neither the workspace owner nor an active member of the task workspace, which a rule cannot express because an update rule denial answers 404. It checks only a changed assignee, so a task whose assignee is later suspended stays editable on other fields.
 - **Accepting an invitation never reactivates a suspended member**: an existing membership row is left as it is.
 
+## api-key-reads-refused
+
+- **Slug:** `decision:api-key-reads-refused`
+- **Title:** A key request that names the api_keys collection in its query string or realtime subscription is refused, so a key never reads key records.
+- **Ref:** `api_keys`
+
+This supersedes the first accepted limit of decision:api-keys, under which a key could read the name, scope, revoked and expires of its owner keys through `expand=api_keys_via_user` on users and through realtime. Prior art: a GitHub personal access token cannot list or inspect the tokens of its owner; token management stays in the signed-in account.
+
+- **Why not a rule.** A key request runs as its owner, so no api_keys rule can tell the two apart. PocketBase reads only id, collectionId, collectionName, email, emailVisibility and verified of the caller from memory and every other auth field from the database; a realtime client gets a freshly loaded auth record whenever its owner is updated; relation, back-relation and @collection filters apply no rule of the collection they join; and realtime subscription headers come from the client.
+- **The refusal.** A key request whose query string names api_keys, by name in any letter case or by collection id, answers 403 with code api_key_path, and so does a realtime subscription from a key whose topic or options name it. The text is checked raw, percent-decoded byte by byte as PocketBase decodes a query, and with JSON unicode escapes resolved. Every path into a key record from another collection is the back-relation api_keys_via_user or the api_keys topic, and each one names the collection; PocketBase already refuses an @collection filter from anyone but a superuser.
+- **Owner sessions are unchanged.** A password or OAuth session still lists, expands, subscribes to and manages its own keys.
+
+Accepted limits:
+
+- **A value that merely spells api_keys is refused too**, for example a filter on a workspace name equal to api_keys. A key client has no reason to send that text.
+
+`pb_hooks/api_keys.pb.js` and `pb_hooks/lib/api_keys.js` implement it and `tests/test_api_keys.ts` proves it. See collection:api_keys and concept:api-keys.
+
 ## api-keys
 
 - **Slug:** `decision:api-keys`
@@ -59,7 +77,7 @@ Agents need a long-lived credential that is not a password and not a session tok
 
 Accepted limits:
 
-- **A key can read the metadata of the keys of its owner.** Through `expand=api_keys_via_user` on users and through a realtime subscription to api_keys, a key sees name, scope, revoked and expires of its owner keys, never a key or a hash. Reading is not managing; closing it needs a marker on the request that a rule can see and that a realtime subscription cannot carry over.
+- **Superseded: a key reading the metadata of the keys of its owner.** decision:api-key-reads-refused closes it: a key request that names api_keys is refused.
 - **An invalid tmk_ key answers 401 before the rate limiter counts it.** A key carries about 238 bits of randomness and each attempt is one unique-index read, so guessing is not a practical attack.
 - **Write keys reach every non-admin tracker route**, including routes added later, and a new tracker route that only reads must be added to the read list by hand.
 - **A key survives a password change of its owner.** A key ends only by revoke, expiry or delete.
@@ -572,6 +590,26 @@ Signup stays open, but `users.approved` starts false and the `users` auth rule r
 Approval is an app-level power held by superusers and by accounts whose email is listed in the `APP_ADMIN_EMAILS` deployment setting. `GET /api/tracker/admin/pending-users` lists waiting accounts and `POST /api/tracker/admin/pending-users/{id}/approve` approves one. Custom routes skip collection rules, so both scope on the caller themselves, and both answer any other caller with 404, which reveals nothing about who is waiting.
 
 Owning or administering a workspace grants no approval power. Every signup provisions and owns its own workspace, so a workspace-tier power would let any stranger unlock any pending account. Approval is always a human act; nothing approves automatically.
+
+## signup-mail-off-request
+
+- **Slug:** `decision:signup-mail-off-request`
+- **Title:** A public signup answers without waiting for the mail server: a loopback request that answers before it sends delivers the verification email.
+- **Ref:** `users`
+
+Before this, the send in `pb_hooks/mail.pb.js` ran inside the users create request, so with the mail server unreachable a signup answered after about 75 seconds, and a client that timed out and retried was refused because the account already existed. Prior art: PocketBase sends its own request-verification email in the background and answers 204 at once.
+
+- **How.** A JSVM hook cannot start background work, so after the account is saved the create hook sends a POST to `/internal/signup-verification/{id}` on the address serve listens on, read from its --http flag (0.0.0.0 becomes 127.0.0.1), with a one-second timeout. That route answers 204 with Connection: close before it sends, so the caller neither waits nor reuses the busy connection. It then waits up to five seconds for the account to commit, because a batch signup commits only after its hook returns, and sends the email unless the account is already verified.
+- **Who can call it.** Only this server: the route answers 404 unless the request carries a secret drawn at every boot and held in memory. It sits outside /api/, so no rate limit rule counts it, and a client that spends the rate limit of the server address cannot stop the email; an API key gets 403 there, as on every route off its allowlist.
+- **Bound.** A signup answers in about the time it takes without mail. The tests hold it under 2 seconds with the mail server unroutable, and a batch signup still gets exactly one email.
+- **Failures.** A failed send, or a failed loopback call, keeps the account and logs signup verification email failed against the user id with the address redacted. POST /api/collections/users/request-verification sends again at once. The server does not retry by itself.
+
+Accepted limits:
+
+- **A loopback call that takes longer than one second is logged as failed** although the route may still send, so a client that then calls request-verification can receive two emails.
+- **A server reachable only through --https, or not on its --http address,** cannot call itself; every signup then logs the failure and sends nothing until request-verification is called.
+
+See collection:users and decision:verified-login. `tests/test_signup_verification.ts` proves it.
 
 ## soft-delete-trash
 

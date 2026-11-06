@@ -454,26 +454,100 @@ try {
     (await api("GET", `${USERS}/${alice_id}`, su))[1].name,
     "Alice",
   );
-  // Accepted limit (decision:api-keys): a key reads its owner key metadata, never key or hash.
-  [s, r] = await api("GET", `${USERS}/${alice_id}?expand=api_keys_via_user`, READ_KEY);
-  const via = r.expand?.api_keys_via_user ?? [];
+  console.log("\n── a key never reads api_keys records through another route (sq82) ──");
+  [s, r] = await api("GET", `${USERS}/${alice_id}?expand=api_keys_via_user`, alice);
   check(
-    "a key expands its owner api_keys metadata via users (accepted limit, pinned)",
-    tup(
-      s,
-      via.length > 0,
-      via.some((k: any) => "key" in k || "key_hash" in k),
-    ),
-    tup(200, true, false),
+    "control: Alice's session expands her own keys via users → 200, keys present",
+    tup(s, (r.expand?.api_keys_via_user ?? []).length > 0),
+    tup(200, true),
   );
-  const meta = new roomkit.SSEListener(BASE_URL, READ_KEY, "api_keys");
-  await meta.start();
   check(
-    "a key subscribes to api_keys realtime (accepted limit, pinned)",
-    await (meta as any)._subscribe(),
-    204,
+    "control: a key expands a relation that is not api_keys → 200",
+    (await api("GET", `/api/collections/user_settings/records?expand=user`, READ_KEY))[0],
+    200,
   );
-  meta.stop = true;
+  const named = (q: Record<string, string>) => urlencode(q);
+  for (const [label, url] of [
+    ["expand=api_keys_via_user on users/{alice}", `${USERS}/${alice_id}?expand=api_keys_via_user`],
+    ["expand by collection id", `${USERS}/${alice_id}?expand=${coll.id}_via_user`],
+    ["expand recased", `${USERS}/${alice_id}?expand=API_Keys_via_user`],
+    ["expand percent-encoded", `${USERS}/${alice_id}?expand=%61pi_keys_via_user`],
+    [
+      "percent-encoded filter beside a byte that is not UTF-8",
+      `${USERS}?filter=%61pi_keys_via_user.name~'x%FF'`,
+    ],
+    [
+      "nested expand through user_settings.user",
+      `/api/collections/user_settings/records?${named({ expand: "user.api_keys_via_user" })}`,
+    ],
+    [
+      "back-relation filter oracle on users",
+      `${USERS}?${named({ filter: "api_keys_via_user.name ~ 'alice'" })}`,
+    ],
+    [
+      "@collection.api_keys filter oracle",
+      `${WORKSPACES}?${named({ filter: "@collection.api_keys.scope = 'write'" })}`,
+    ],
+    ["back-relation sort on users", `${USERS}?${named({ sort: "api_keys_via_user.created" })}`],
+    // Declared cost of the textual refusal: a value that merely spells api_keys is refused too.
+    ["a filter value spelling api_keys", `${WORKSPACES}?${named({ filter: "name = 'api_keys'" })}`],
+  ]) {
+    check(
+      `key GET ${label} → 403 api_key_path`,
+      await refusal("GET", url, READ_KEY),
+      tup(403, "api_key_path"),
+    );
+  }
+  check(
+    "a key on the internal signup-mail route → 403 api_key_path",
+    await refusal("POST", `/internal/signup-verification/${alice_id}`, WRITE_KEY),
+    tup(403, "api_key_path"),
+  );
+  check(
+    "a key query with an undecodable pair is read as PocketBase reads it → 200",
+    (await api("GET", `${WORKSPACES}?x=50%`, READ_KEY))[0],
+    200,
+  );
+  check(
+    "…but an api_keys expand beside that pair is still refused",
+    await refusal("GET", `${USERS}/${alice_id}?x=50%&expand=api_keys_via_user`, READ_KEY),
+    tup(403, "api_key_path"),
+  );
+  const opts = (o: any) => `?options=${encodeURIComponent(JSON.stringify(o))}`;
+  for (const [label, topic] of [
+    ["api_keys", "api_keys"],
+    ["api_keys/* recased", "API_KEYS/*"],
+    ["the collection id", `${coll.id}/*`],
+    ["one key by id", `api_keys/${read_rec.id}`],
+    [
+      "users/{alice} with expand",
+      `users/${alice_id}${opts({ query: { expand: "api_keys_via_user" } })}`,
+    ],
+    [
+      "users/{alice} with a back-relation filter",
+      `users/${alice_id}${opts({ query: { filter: "api_keys_via_user.name != ''" } })}`,
+    ],
+    [
+      "users/* with a JSON-escaped expand",
+      `users/*?options=${encodeURIComponent('{"query":{"expand":"\\u0061pi_keys_via_user"}}')}`,
+    ],
+  ]) {
+    const meta = new roomkit.SSEListener(BASE_URL, READ_KEY, topic);
+    await meta.start();
+    check(`key realtime subscribe: ${label} → 403`, await (meta as any)._subscribe(), 403);
+    meta.stop = true;
+  }
+  const quiet = new roomkit.SSEListener(BASE_URL, READ_KEY, "api_keys");
+  await quiet.start();
+  await (quiet as any)._subscribe();
+  [s] = await api("PATCH", `${KEYS}/${read_rec.id}`, alice, { name: "alice read renamed" });
+  await Bun.sleep(500);
+  check(
+    "a key stream after the refused subscribe receives no api_keys event",
+    tup(s, quiet.events.filter((ev) => ev?.record?.collectionName === "api_keys").length),
+    tup(200, 0),
+  );
+  quiet.stop = true;
   check(
     "write key GET users/{alice} → 200 (users are read-only, not refused)",
     (await api("GET", `${USERS}/${alice_id}`, WRITE_KEY))[0],
