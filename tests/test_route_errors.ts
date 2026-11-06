@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Every error status the route registry documents (pb_hooks/lib/routes.js `responses`) is provoked live, and its body
- * matches the documented schema; a documented status with no recipe, or a recipe for an undocumented one, fails.
+ * is the shared Error body {status, message, data}; a documented status with no recipe, or a recipe for an undocumented one, fails.
  * Also provokes the malformed-JSON-body answer openapi.json's info states.
  *
  * Fully self-contained clean-room server. Port 8195 + PB_PORT_OFFSET. INSPIRE_UPSTREAM_URL aims at a closed port.
@@ -54,14 +54,6 @@ async function call(
   return [r.status, json];
 }
 
-/** Body matches a { type: "object", properties, required } schema, one level deep. */
-function fits(schema: any, body: any): boolean {
-  if (!body || typeof body !== "object" || Array.isArray(body)) return false;
-  return (schema.required ?? []).every((k: string) => {
-    const t = schema.properties?.[k]?.type;
-    return k in body && (t === undefined || typeof body[k] === (t === "integer" ? "number" : t));
-  });
-}
 const is_error = (code: number, b: any): boolean =>
   !!b &&
   b.status === code &&
@@ -109,7 +101,7 @@ try {
   }
 
   console.log(
-    "bounded: one cause provoked per documented status; a body is checked on its required top-level keys",
+    "bounded: one cause provoked per documented status; a body is checked on its top-level keys",
   );
   console.log("\n── fixtures: Alice (owner of her workspace and of a trashed one), Bob, Dave ──");
   const [, su_r] = await call("POST", "/api/collections/_superusers/auth-with-password", null, {
@@ -202,6 +194,19 @@ try {
     },
     "GET /api/tracker/project-items/counts": {
       400: (c) => call("GET", "/api/tracker/project-items/counts?group=nope", c.Alice),
+      500: async (c) => {
+        const [, col] = await call("GET", "/api/collections/project_items", c.su);
+        const [st] = await call("PATCH", "/api/collections/project_items", c.su, { listRule: "" });
+        check("(fixture) project_items listRule emptied", st === 200, String(st));
+        try {
+          return await call("GET", "/api/tracker/project-items/counts?group=status", c.Alice);
+        } finally {
+          const [back] = await call("PATCH", "/api/collections/project_items", c.su, {
+            listRule: col.listRule,
+          });
+          check("(fixture) project_items listRule restored", back === 200, String(back));
+        }
+      },
     },
     "GET /api/tracker/search": {
       400: (c) => call("GET", "/api/tracker/search?q=x&workspace=", c.Alice),
@@ -260,13 +265,11 @@ try {
     },
   };
 
-  console.log(
-    "\n── every documented status is provoked live; its body fits the documented schema ──",
-  );
+  console.log("\n── every documented status is provoked live; its body is the Error body ──");
   const bounds: string[] = [];
   for (const [key, spec] of Object.entries(ROUTES).sort(([a], [b]) => (a < b ? -1 : 1))) {
     if (spec.internal === true) continue;
-    const documented = (spec.responses ?? {}) as Record<string, any>;
+    const documented = (spec.responses ?? {}) as Record<string, string>;
     const recipes = RECIPES[key] ?? {};
     for (const status of Object.keys(recipes))
       if (!(status in documented))
@@ -275,7 +278,7 @@ try {
           false,
           "undocumented",
         );
-    for (const [status, v] of Object.entries(documented)) {
+    for (const status of Object.keys(documented)) {
       const recipe = recipes[status];
       if (!recipe) {
         check(`${key} ${status}: has a live recipe`, false, "no recipe");
@@ -288,10 +291,9 @@ try {
       }
       const [got, body] = await recipe(ctx);
       const code = Number(status);
-      const ok = typeof v === "string" ? is_error(code, body) : fits(v.schema, body);
       check(
-        `${key} ${status} → ${got} ${typeof v === "string" ? "Error" : "own"} body`,
-        got === code && ok,
+        `${key} ${status} → ${got} Error body`,
+        got === code && is_error(code, body),
         `${got} ${py_repr(body)}`,
       );
     }

@@ -3,7 +3,7 @@
 
 // auth: "any" = any signed-in auth record (user, API key or superuser) · "users" = a signed-in user (an API key acts as its user) · "superuser" = superusers only · "none" = no sign-in.
 // internal: true = reachable only by the server itself (loopback); left out of openapi.json on purpose.
-// request = the body the handler reads · query = the query parameters the handler reads · responses = the error statuses the handler itself returns, each one line (an Error body) or { text, schema } for a body of another shape · denies: ["superuser"] = refused in the handler with 403 · docs = the app_docs slug whose body leads the description.
+// request = the body the handler reads · query = the query parameters the handler reads · responses = the error statuses the handler itself returns, each one line, answered with the shared Error body · denies: ["superuser"] = refused in the handler with 403 · docs = the app_docs slug whose body leads the description.
 const ROUTES = {
   "GET /admin": {
     summary: "Redirects to the admin dashboard.",
@@ -153,14 +153,7 @@ const ROUTES = {
     auth: "any",
     docs: "route:tracker-inspire",
     responses: {
-      502: {
-        text: "The outside quote service could not be reached or gave no usable quote; try again later.",
-        schema: {
-          type: "object",
-          properties: { error: { type: "string" } },
-          required: ["error"],
-        },
-      },
+      502: "The outside quote service could not be reached or gave no usable quote; try again later.",
     },
     response: {
       status: 200,
@@ -374,7 +367,8 @@ const ROUTES = {
       },
     },
     responses: {
-      400: "The group is missing or not one of the listed ones, or the filter is longer than 3500 characters or reaches past the items' own fields.",
+      400: "The group is missing or not one of the listed ones, or the filter is longer than 3500 characters, reaches past the items' own fields, names a field the items do not have, or is not a valid filter.",
+      500: "The items' access rule is missing or cannot be applied per caller, so nothing can be counted.",
     },
     response: {
       status: 200,
@@ -961,4 +955,9 @@ function add(key, handler) {
     ...MIDDLEWARE[spec.auth](),
   );
 }
-module.exports = { ROUTES, add };
+// Middleware reaches the router only here (scripts/check_route_registry.ts refuses a routerUse elsewhere).
+function use(...args) {
+  routerUse(...args);
+}
+
+module.exports = { ROUTES, add, use };

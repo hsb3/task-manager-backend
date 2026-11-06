@@ -12,7 +12,7 @@ onRecordCreateRequest((e) => {
 }, "api_keys");
 
 // Priority -1030 runs before PB's loadAuthToken (-1020), which skips once e.auth is set.
-routerUse(
+require(`${__hooks}/lib/routes.js`).use(
   new Middleware(
     (e) => {
       const header = e.request.header

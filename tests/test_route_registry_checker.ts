@@ -286,27 +286,85 @@ check(
 check("every v2 field well-formed: CLI exits 0", cli(root) === 0);
 fs.rmSync(root, { recursive: true, force: true });
 
-console.log("\n── (m) query parameters and object-form responses ──");
+console.log("\n── (m) query parameters; a response is one line, never an object ──");
 expect_red(
   "query value with a type outside string|integer|boolean",
   (r) => plant_entry(r, PROBE, `{ ${BASE}, query: { q: { type: "number", description: "x" } } }`),
   [MAL("query")],
 );
 expect_red(
-  "object-form response without text",
-  (r) => plant_entry(r, PROBE, `{ ${BASE}, responses: { "502": { schema: { type: "object" } } } }`),
+  "object-form response { text, schema }",
+  (r) =>
+    plant_entry(
+      r,
+      PROBE,
+      `{ ${BASE}, responses: { "502": { text: "Upstream failed.", schema: { type: "object" } } } }`,
+    ),
   [MAL("responses")],
 );
 root = mirror();
 plant_entry(
   root,
   PROBE,
-  `{ ${BASE}, query: { q: { type: "string", description: "Text.", required: true }, n: { type: "integer", description: "Count.", enum: [1, 2] } }, responses: { "400": "Bad.", "502": { text: "Upstream failed.", schema: { type: "object" } } } }`,
+  `{ ${BASE}, query: { q: { type: "string", description: "Text.", required: true }, n: { type: "integer", description: "Count.", enum: [1, 2] } }, responses: { "400": "Bad." } }`,
 );
 check(
-  "query and object-form response well-formed: no offences",
+  "query and one-line response well-formed: no offences",
   offenders(root).length === 0,
   JSON.stringify(offenders(root)),
+);
+fs.rmSync(root, { recursive: true, force: true });
+
+console.log("\n── (n) string literals are blanked before comments are stripped ──");
+const RT = 'se.router.GET("/x", (e) => e.string(200, "x"))';
+const lit_line = (label: string, body: string, first_line = 1) => {
+  const r = mirror();
+  const at = plant_line(r, OTHER, body);
+  const got = offenders(r);
+  check(
+    `${label}: router token at the planted line`,
+    got.length === 1 && got[0].startsWith(`router token at ${OTHER}:${at + first_line - 1} `),
+    JSON.stringify(got),
+  );
+  fs.rmSync(r, { recursive: true, force: true });
+};
+lit_line("/* and */ inside two strings", `const a = "x/*y";\n${RT}\nconst b = "*/5 * * * *";`, 2);
+lit_line("// inside a double-quoted string", `const u = "a//b"; ${RT}`);
+lit_line("// inside a template literal", `const u = \`a//\${1}b\`; ${RT}`);
+lit_line("// inside a single-quoted string", `const u = 'a//b'; ${RT}`);
+root = mirror();
+append(root, OTHER, `const u = "a"; // it's "quoted\n/* an apostrophe ' in a comment */`);
+check(
+  "quotes inside comments: no offences",
+  offenders(root).length === 0,
+  JSON.stringify(offenders(root)),
+);
+fs.rmSync(root, { recursive: true, force: true });
+
+console.log("\n── (o) middleware goes through the registry's use() ──");
+expect_red(
+  "routerUse outside the registry",
+  (r) => append(r, HOST, "routerUse((e) => e.next());"),
+  [/^routerUse token at pb_hooks\/me\.pb\.js:\d+ — register through pb_hooks\/lib\/routes\.js$/u],
+);
+expect_red(
+  "second routerUse in the registry",
+  (r) => append(r, REGISTRY, "function extra() { routerUse((e) => e.next()); }"),
+  [/^pb_hooks\/lib\/routes\.js has 2 routerUse\( calls \(want 1\)$/u],
+);
+
+console.log("\n── (p) a registry key must be a string literal ──");
+root = mirror();
+const AT2 = plant_line(
+  root,
+  OTHER,
+  `const K = "GET /api/tracker/me"; require(\`\${__hooks}/lib/routes.js\`).add(K, (e) => e.json(200, {}));`,
+);
+const GOT2 = offenders(root);
+check(
+  "variable key: refused, naming file:line",
+  GOT2.some((g) => g === `${OTHER}:${AT2} add() key must be a string literal`),
+  JSON.stringify(GOT2),
 );
 fs.rmSync(root, { recursive: true, force: true });
 

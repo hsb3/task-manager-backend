@@ -135,16 +135,19 @@ require(`${__hooks}/lib/routes.js`).add(
       : substituted;
     // limit=0 -> no LIMIT clause: one query fetches every matching row, so the request count
     // stays flat as row count grows (PB core: limit<=0 means unbounded, record_query.go).
-    const rows = e.app.findRecordsByFilter(
-      "project_items",
-      combined,
-      "",
-      0,
-      0,
-      {
+    let rows;
+    try {
+      rows = e.app.findRecordsByFilter("project_items", combined, "", 0, 0, {
         authId: e.auth.id,
-      },
-    );
+      });
+    } catch (err) {
+      // PB prefixes every filter it cannot apply this way; a database failure stays a failure.
+      if (filter && String(err).indexOf("invalid filter expression") !== -1)
+        throw new BadRequestError(
+          "filter names a field the items do not have, or is not a valid filter",
+        );
+      throw err;
+    }
 
     const idList = function (raw) {
       // Defensive only: the view casts these columns to TEXT, so a decoded array never arrives.

@@ -2,7 +2,7 @@
 // GET project_items list: refuse a filter clause its field cannot answer and clamp paging, before PocketBase runs the query.
 
 // Middleware, not onRecordsListRequest: that hook fires after the query has already run.
-routerUse((e) => {
+require(`${__hooks}/lib/routes.js`).use((e) => {
   const m = /^\/api\/collections\/([^/]+)\/records\/?$/.exec(
     e.request.url.path,
   );

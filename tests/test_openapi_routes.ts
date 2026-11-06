@@ -2,7 +2,7 @@
 /**
  * Pin openapi.json to the route registry and app_docs: every non-internal route documented, every internal one absent, every operation described. No server (app_docs is replayed).
  *
- * `--spec PATH` checks another openapi.json (e.g. the one on HEAD, for a RED run).
+ * `--spec PATH` checks another openapi.json (e.g. the one on HEAD, for a RED run); `--client PATH` checks another api.generated.ts.
  */
 
 import fs from "node:fs";
@@ -90,12 +90,10 @@ for (const [key, spec] of live) {
 }
 for (const [key, spec] of live) {
   const op = op_of(key);
-  for (const [status, v] of Object.entries((spec.responses ?? {}) as Record<string, any>)) {
-    const text: string = typeof v === "string" ? v : v.text;
-    const want = typeof v === "string" ? { $ref: ERROR_REF } : v.schema;
+  for (const [status, text] of Object.entries((spec.responses ?? {}) as Record<string, string>)) {
     check(
-      `${key}: ${status} answer with its schema (${typeof v === "string" ? "Error" : "its own"}) and its text in the description`,
-      Bun.deepEquals(op?.responses?.[status]?.content?.["application/json"]?.schema, want) &&
+      `${key}: ${status} answer with the Error schema and its text in the description`,
+      op?.responses?.[status]?.content?.["application/json"]?.schema?.$ref === ERROR_REF &&
         op.responses[status].description === text &&
         (op.description ?? "").includes(text),
     );
@@ -205,7 +203,49 @@ for (const [p, ops] of Object.entries(PATHS)) {
 }
 
 console.log("── tm client: Paths carries every request body and query parameter ──");
-const CLIENT = read_text(path.join(REPO_ROOT, "clients", "tm", "src", "api.generated.ts"));
+const client_at = process.argv.indexOf("--client");
+const CLIENT = read_text(
+  client_at > 0
+    ? path.resolve(process.argv[client_at + 1]!)
+    : path.join(REPO_ROOT, "clients", "tm", "src", "api.generated.ts"),
+);
+/** The TS type text a schema fragment must render as; an object with properties is `{…}` (checked one level deep). */
+function expected_type(s: any): string {
+  if (!s || typeof s !== "object") return "unknown";
+  const prim: Record<string, string> = {
+    string: "string",
+    integer: "number",
+    number: "number",
+    boolean: "boolean",
+    null: "null",
+  };
+  let t: string;
+  if (s.$ref) t = String(s.$ref).split("/").pop()!;
+  else if (s.enum) t = s.enum.map((v: unknown) => JSON.stringify(v)).join("|");
+  else if (s.anyOf || s.oneOf) t = (s.anyOf ?? s.oneOf).map(expected_type).join("|");
+  else if (Array.isArray(s.type))
+    t = s.type.map((x: string) => expected_type({ ...s, type: x })).join("|");
+  else if (prim[s.type]) t = prim[s.type]!;
+  else if (s.type === "array") {
+    const item = expected_type(s.items);
+    t = item.includes("|") ? `(${item})[]` : `${item}[]`;
+  } else if (s.type === "object")
+    t = Object.keys(s.properties ?? {}).length ? "{…}" : "Record<string,unknown>";
+  else t = "unknown";
+  return s.nullable && t !== "unknown" ? `${t}|null` : t;
+}
+/** Rendered type text with whitespace dropped and every `{ … }` block collapsed to `{…}`. */
+function collapsed(text: string): string {
+  let out = "";
+  let depth = 0;
+  for (const c of text.replace(/\s+/gu, "")) {
+    if (c === "{") {
+      if (depth++ === 0) out += "{…}";
+    } else if (c === "}") depth--;
+    else if (depth === 0) out += c;
+  }
+  return out.replace(/^\|/u, "").replace(/;$/u, "");
+}
 /** Top-level members of the `{ ... }` starting at `at`: name → its type text. */
 function members(text: string, at: number): Map<string, string> {
   const out = new Map<string, string>();
@@ -232,6 +272,42 @@ for (const [p, ops] of Object.entries(PATHS)) {
     const at = PATHS_AT < 0 ? -1 : CLIENT.indexOf(`"${key}": {`, PATHS_AT);
     const entry = at < 0 ? new Map() : members(CLIENT, CLIENT.indexOf("{", at + key.length + 2));
     if (op.requestBody) check(`${key}: Paths entry has a body`, entry.has("body"));
+    // Typed pins: each rendered property's type against the spec, one level deep.
+    const pin = (what: string, schema: any, text: string | undefined): void => {
+      if (text === undefined) return;
+      const props = schema?.type === "object" && !schema.anyOf ? schema.properties : undefined;
+      if (props && text.trimStart().startsWith("{")) {
+        const got = members(text, text.indexOf("{"));
+        for (const [n, ps] of Object.entries(props))
+          check(
+            `${key}: ${what}.${n} renders as ${expected_type(ps)}`,
+            collapsed(got.get(n) ?? "") === expected_type(ps),
+          );
+      } else
+        check(
+          `${key}: ${what} renders as ${expected_type(schema)}`,
+          collapsed(text) === expected_type(schema),
+        );
+    };
+    for (const where of ["path", "query"]) {
+      const params = (op.parameters ?? []).filter((x: any) => x.in === where);
+      if (params.length)
+        pin(
+          where,
+          {
+            type: "object",
+            properties: Object.fromEntries(params.map((x: any) => [x.name, x.schema])),
+          },
+          entry.get(where),
+        );
+    }
+    if (op.requestBody)
+      pin("body", op.requestBody.content?.["application/json"]?.schema, entry.get("body"));
+    const ok = Object.keys(op.responses ?? {})
+      .sort()
+      .find((c) => c.startsWith("2"));
+    const answer = ok ? op.responses[ok].content?.["application/json"]?.schema : undefined;
+    if (answer) pin("response", answer, entry.get("response"));
     const names = (op.parameters ?? [])
       .filter((x: any) => x.in === "query")
       .map((x: any) => x.name);
@@ -245,6 +321,10 @@ for (const [p, ops] of Object.entries(PATHS)) {
     }
   }
 }
+
+console.log(
+  "  bounded: typed pins cover path/query params, body and the first 2xx JSON response one level deep (a nested object is checked only as `{…}`)",
+);
 
 console.log("── whole document ──");
 const bare: string[] = [];

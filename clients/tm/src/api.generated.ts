@@ -974,7 +974,7 @@ export interface Paths {
   };
   "POST /api/tracker/cycles/rollover": { response: { rolled: number } };
   "POST /api/tracker/export": {
-    body: { collections?: unknown; projects?: unknown; workspace: string };
+    body: { collections?: string[] | null; projects?: string[] | null; workspace: string };
     response: {
       data: Record<string, unknown>;
       exported_at: string;
@@ -999,7 +999,7 @@ export interface Paths {
   };
   "POST /api/tracker/invitations/{id}/accept": {
     path: { id: string };
-    response: { membership: unknown; role: string; status: string; workspace: string };
+    response: { membership: string | null; role: string; status: string; workspace: string };
   };
   "POST /api/tracker/invitations/{id}/decline": {
     path: { id: string };
@@ -1011,15 +1011,23 @@ export interface Paths {
       user: { id: string; name: string };
       workspaces: {
         capabilities: Record<string, unknown>;
-        counts: unknown;
+        counts: Record<string, unknown> | null;
         id: string;
-        name: unknown;
+        name: string | null;
         role: string;
         status: string;
       }[];
     };
   };
-  "GET /api/tracker/me/landing": { response: { landing: unknown } };
+  "GET /api/tracker/me/landing": {
+    response: {
+      landing: {
+        invitation: string | null;
+        reason: "owned" | "member" | "invitation" | "suspended";
+        workspace: string;
+      } | null;
+    };
+  };
   "POST /api/tracker/notifications/read-all": {
     query?: { workspace?: string };
     response: { updated: number };
@@ -1029,7 +1037,7 @@ export interface Paths {
       filter?: string;
       group: "project" | "status" | "priority" | "assignee" | "label" | "type";
     };
-    response: { items: { count: number; key: unknown }[]; total: number };
+    response: { items: { count: number; key: string | null }[]; total: number };
   };
   "GET /api/tracker/search": {
     query?: { q?: string; workspace?: string };
@@ -1058,7 +1066,21 @@ export interface Paths {
       time_zone?: string;
       workspace: string;
     };
-    response: unknown;
+    response:
+      | {
+          count: number;
+          items: {
+            collection: "tasks" | "decisions" | "documents" | "milestones";
+            has_priority: boolean;
+            purge_at: string;
+            purge_days: number;
+            record: TasksRecord | DecisionsRecord | DocumentsRecord | MilestonesRecord;
+          }[];
+          page: number;
+          perPage: number;
+          workspace: string;
+        }
+      | { items: { count: number; key: string | null }[]; total: number; workspace: string };
   };
   "POST /api/tracker/trash/purge": { response: { purged: number } };
   "GET /api/tracker/users/{id}/settings": {
@@ -1116,7 +1138,7 @@ export interface Paths {
     path: { id: string };
     response: {
       allowed: boolean;
-      invitation: unknown;
+      invitation: { expired: boolean; id: string } | null;
       reason: "not_found" | "suspended" | null;
       workspace: string;
     };

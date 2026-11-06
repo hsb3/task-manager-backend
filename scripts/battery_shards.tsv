@@ -107,6 +107,7 @@
 2	2	test_user_settings_me
 3	2	test_access_rule_holes
 4	2	test_notification_actor
+4	2	test_app_docs_seed_coverage
 1	1	test_app_docs_seed_idempotent
 1	1	test_tm_mcp
 1	1	test_tm_client_gen
@@ -136,5 +137,6 @@
 3	0	test_tierkit
 3	0	test_ts_source
 3	0	test_route_registry_checker
+1	0	test_route_statuses_checker
 3	0	test_openapi_routes
 4	0	test_universal_touches_checker

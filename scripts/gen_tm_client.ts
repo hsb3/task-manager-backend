@@ -22,12 +22,21 @@ const OUTPUT = path.join(REPO, "clients", "tm", "src", "api.generated.ts");
 
 const COLLECTION_PATH = /^\/api\/collections\/([a-z_]+)\/records$/;
 
-/** JSON Schema fragment -> TypeScript type text. Unknown shapes become `unknown`, never `any`. */
+/** JSON Schema fragment -> TypeScript type text. Type arrays, anyOf/oneOf and nullable render as unions; unknown shapes become `unknown`, never `any`. */
 export function ts_type(schema: any): string {
   if (!schema || typeof schema !== "object") return "unknown";
+  const t = ts_base(schema);
+  return schema.nullable && t !== "unknown" ? `${t} | null` : t;
+}
+
+function ts_base(schema: any): string {
   if (schema.$ref) return String(schema.$ref).split("/").pop()!;
   if (Array.isArray(schema.enum))
     return schema.enum.map((v: unknown) => JSON.stringify(v)).join(" | ");
+  const branches = schema.anyOf ?? schema.oneOf;
+  if (Array.isArray(branches)) return branches.map(ts_type).join(" | ");
+  if (Array.isArray(schema.type))
+    return schema.type.map((x: string) => ts_type({ ...schema, type: x })).join(" | ");
   switch (schema.type) {
     case "string":
       return "string";
@@ -39,7 +48,8 @@ export function ts_type(schema: any): string {
     case "null":
       return "null";
     case "array":
-      return `${ts_type(schema.items)}[]`;
+      const item = ts_type(schema.items);
+      return item.includes(" | ") ? `(${item})[]` : `${item}[]`;
     case "object": {
       const props = schema.properties ?? {};
       const required = new Set<string>(schema.required ?? []);

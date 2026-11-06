@@ -89,7 +89,7 @@ async function tm(args: string[], env: Record<string, string> = {}, stdin?: stri
   return { code, stdout, stderr, json };
 }
 
-// `tm` under a pseudo-terminal via macOS script(1); it refuses a socket stdin (Bun's pipes are sockets), so `cat |` hands it a real pipe.
+// `tm` under a pseudo-terminal via script(1) (BSD on macOS, util-linux on linux); it refuses a socket stdin (Bun's pipes are sockets), so `cat |` hands it a real pipe.
 async function tm_pty(
   tm_path: string,
   args: string[],
@@ -97,8 +97,12 @@ async function tm_pty(
   input: string,
 ): Promise<{ code: number; out: string }> {
   const { TM_API_KEY, TM_URL, ...clean } = process.env;
+  const argv = [process.execPath, tm_path, ...args];
+  const sh_quote = (a: string): string => `'${a.replaceAll("'", `'\\''`)}'`;
   const proc = Bun.spawn(
-    ["sh", "-c", 'cat | script -q /dev/null "$@"', "sh", process.execPath, tm_path, ...args],
+    process.platform === "linux"
+      ? ["sh", "-c", 'cat | script -q -c "$1" /dev/null', "sh", argv.map(sh_quote).join(" ")]
+      : ["sh", "-c", 'cat | script -q /dev/null "$@"', "sh", ...argv],
     { cwd: S, env: { ...clean, HOME: S, ...env }, stdin: "pipe", stdout: "pipe", stderr: "pipe" },
   );
   const timer = setTimeout(() => {
@@ -537,8 +541,8 @@ try {
   }
 
   console.log("\n── login at a terminal: the pasted key is never echoed ──");
-  if (process.platform !== "darwin" || !Bun.which("script")) {
-    console.log("  ⏭  skipped: needs macOS script(1) to drive a pseudo-terminal");
+  if (!["darwin", "linux"].includes(process.platform) || !Bun.which("script")) {
+    console.log("  ⏭  skipped: needs script(1) on macOS or linux to drive a pseudo-terminal");
   } else {
     const PTY_XDG = path.join(S, "pty-xdg");
     const pty = await tm_pty(

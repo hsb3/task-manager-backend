@@ -619,6 +619,17 @@ try {
     [s, body] = await counts(alice, "status", filt);
     check(`accepted: ${label}`, s, 200);
   }
+  for (const [label, filt] of [
+    ["an unknown column", "nope = 1"],
+    ["a filter PB cannot parse", "status = = 1"],
+  ]) {
+    [s, body] = await counts(alice, "status", filt);
+    check(
+      `refused with a named 400: ${label}`,
+      tup(s, body?.message),
+      tup(400, "Filter names a field the items do not have, or is not a valid filter."),
+    );
+  }
 
   // A crafted `") || ("` closes the rule's own group early and re-opens a fresh one, turning
   // `&&` into `||` — `(rule) && (id != "") || (id != "")` counts every row in the DB regardless
