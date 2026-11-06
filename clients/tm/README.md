@@ -1,0 +1,56 @@
+# tm — the task tracker from your terminal
+
+`tm` lists, shows, searches, creates, edits and comments on the tasks, documents, decisions and
+milestones you can see, using an API key. Every verb takes `--json` for machine-readable output,
+so it works as well inside a script or an agent as it does by hand.
+
+## Set up once
+
+Create an API key in the app (a read key can only read; a write key can also create, edit and
+comment). Then paste it:
+
+```bash
+bun clients/tm/tm.ts login --url https://your-server.example
+```
+
+To call it as plain `tm`, link it onto your PATH once, for example
+`ln -s "$PWD/clients/tm/tm.ts" ~/.local/bin/tm`.
+
+The key is saved to a file only you can read, and the command prints where. To skip the file,
+set `TM_URL` and `TM_API_KEY` in the environment instead; they win over the saved login.
+
+## Use it
+
+```bash
+tm list                                  # newest items you can see
+tm list --project <id> --kind task       # one project, one kind
+tm show <id>
+tm search "launch checklist"
+tm create "Write the launch checklist" --project <id>
+tm create "Launch" --kind milestone --project <id>
+tm create "Notes" --kind document --workspace <id> --set body="First draft"
+tm edit <id> --title "Write the launch checklist v2" --set description="..."
+tm comment <id> "Done, see the attached draft"
+```
+
+Kinds are `task` (the default), `document`, `decision` and `milestone`. `--set field=value` sets
+any other text field the server accepts for that kind; the server's own validation applies, and
+a yes/no field cannot be set this way yet.
+
+Add `--json` to any verb to get the server's answer as JSON with the field names the API uses,
+plus a `kind` naming the kind. `list` prints each item's id first; that id is what `show`,
+`edit` and `comment` take.
+
+## When something goes wrong
+
+- Exit code 0: it worked.
+- Exit code 1: the server refused. Its message is on stderr, and with details when it named the
+  offending fields. A read-only key that tries to write exits this way.
+- Exit code 2: the command line was wrong; the usage text follows the message.
+
+Nothing is printed on stdout when a command fails, so `--json` output is either complete or absent.
+
+## Rate limits
+
+The server allows about 300 requests per minute per client address; past that it answers with a
+"Too Many Requests" error. Wait a minute and retry.

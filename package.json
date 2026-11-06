@@ -1,11 +1,11 @@
 {
   "name": "task-manager-infra",
   "private": true,
-  "description": "Root manifest: the Railway IaC SDK (deploy/railway/railway.ts) and the Bun/TypeScript gate (typecheck + prettier) for e2e/, scripts/ and tests/.",
+  "description": "Root manifest: the Railway IaC SDK (deploy/railway/railway.ts) and the Bun/TypeScript gate (typecheck + prettier) for clients/, e2e/, scripts/ and tests/.",
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "format:check": "prettier --check \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\"",
-    "format": "prettier --write \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\""
+    "format:check": "prettier --check \"clients/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\"",
+    "format": "prettier --write \"clients/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\""
   },
   "devDependencies": {
     "@types/bun": "1.4.3",
