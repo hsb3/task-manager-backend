@@ -58,6 +58,7 @@ onRecordDeleteRequest(
 // Superusers stay exempt: their writes are the documented way to backdate or repair trash.
 onRecordUpdateRequest(
   (e) => {
+    require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
     if (e.auth && e.auth.isSuperuser()) return e.next();
     var orig = e.record.original();
     var stillTrashed = String(e.record.get("trashed") || "") !== "";
@@ -789,6 +790,7 @@ onRecordCreateRequest((e) => {
 
 // ── tasks: restore-conflict guard — KEEP IN SYNC with decisions/documents/milestones ──
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   var wasTrashed = String(e.record.original().get("trashed")) !== "";
   var nowTrashed = String(e.record.get("trashed")) !== "";
   if (!(wasTrashed && !nowTrashed)) return e.next();
@@ -812,6 +814,7 @@ onRecordUpdateRequest((e) => {
 
 // ── decisions: restore-conflict guard — KEEP IN SYNC with tasks/documents/milestones ──
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   var wasTrashed = String(e.record.original().get("trashed")) !== "";
   var nowTrashed = String(e.record.get("trashed")) !== "";
   if (!(wasTrashed && !nowTrashed)) return e.next();
@@ -835,6 +838,7 @@ onRecordUpdateRequest((e) => {
 
 // ── documents: restore-conflict guard — KEEP IN SYNC with tasks/decisions/milestones ──
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   var wasTrashed = String(e.record.original().get("trashed")) !== "";
   var nowTrashed = String(e.record.get("trashed")) !== "";
   if (!(wasTrashed && !nowTrashed)) return e.next();
@@ -858,6 +862,7 @@ onRecordUpdateRequest((e) => {
 
 // ── milestones: restore-conflict guard — KEEP IN SYNC with tasks/decisions/documents ──
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   var wasTrashed = String(e.record.original().get("trashed")) !== "";
   var nowTrashed = String(e.record.get("trashed")) !== "";
   if (!(wasTrashed && !nowTrashed)) return e.next();

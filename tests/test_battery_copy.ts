@@ -25,7 +25,12 @@ const MFA_FIXTURE = "1799999999_superuser_mfa.js";
 const shlex_quote = (s: string): string =>
   /^[\w@%+=:,./-]+$/.test(s) ? s : "'" + s.replace(/'/g, `'"'"'`) + "'";
 
-function run_case(holder: string, kind: string, mfa_names: string[] = [MFA_FIXTURE]): void {
+function run_case(
+  holder: string,
+  kind: string,
+  mfa_names: string[] = [MFA_FIXTURE],
+  port_plan: "ok" | "refused" = "ok",
+): void {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "battery-copy-test-"));
   try {
     const root = temp;
@@ -36,6 +41,11 @@ function run_case(holder: string, kind: string, mfa_names: string[] = [MFA_FIXTU
     fs.writeFileSync(path.join(scripts, "verification-env.sh"), ":\n");
     // The battery's startup helpers (offset parse, copy-source refusal) import it.
     fs.copyFileSync(path.join(REPO, "scripts/_py.ts"), path.join(scripts, "_py.ts"));
+    // The battery runs the port-plan checker before anything else; a stub stands in for the real one.
+    fs.writeFileSync(
+      path.join(scripts, "check_port_collisions.ts"),
+      port_plan === "ok" ? "" : 'console.log("stub: port plan refused");\nprocess.exit(1);\n',
+    );
     run_checked(["git", "init", "-q", repo], { env: ENV });
     assert.ok(
       fs.statSync(path.join(repo, ".git"), { throwIfNoEntry: false })?.isDirectory(),
@@ -101,6 +111,13 @@ exec ` +
     delete env.KEEP_SCRATCH;
     const result = Bun.spawnSync(["bash", script], { env, stdout: "pipe", stderr: "pipe" });
     const output = result.stdout.toString() + result.stderr.toString();
+    if (port_plan === "refused") {
+      assert.ok(result.exitCode !== 0, output);
+      assert.ok(output.includes("port plan refused"), output);
+      assert.ok(!fs.existsSync(copy_log), `${holder}: a refused port plan still copied`);
+      console.log(`✅ RED→GREEN ${holder}: a refused port plan stops the battery before any copy`);
+      return;
+    }
     if (mfa_names.length !== 1) {
       assert.ok(result.exitCode !== 0, output);
       assert.ok(output.includes(`found ${mfa_names.length}`), output);
@@ -207,5 +224,6 @@ if (!argv.includes("--hook-environment-check")) {
   for (const mfa_names of [[], [MFA_FIXTURE, "1799999998_superuser_mfa.js"]]) {
     run_case("pb_migrations", "ordinary", mfa_names);
   }
+  run_case("pb_hooks", "ordinary", [MFA_FIXTURE], "refused");
 }
 if (!argv.includes("--hook-fixture")) check_hook_environment();

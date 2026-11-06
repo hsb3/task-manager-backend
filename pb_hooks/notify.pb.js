@@ -575,6 +575,7 @@ onRecordUpdateRequest((e) => {
 // reactions is a JSON object emoji → [user ids]; the value may arrive as an object or a
 // JSON string (defensive parse), null/absent = {}. Runs before persist (validation).
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   if (e.auth && e.auth.isSuperuser()) {
     return e.next();
   }

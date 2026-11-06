@@ -41,6 +41,7 @@ onRecordCreateRequest((e) => {
 // so this compares against a re-fetched original (scope.pb.js D4 idiom).
 // KEEP IN SYNC: author-immutability block (decisions / documents / milestones / tasks / comments).
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("decisions", e.record.id);
   if (orig.get("author") !== e.record.get("author")) {
     throw new BadRequestError("author is immutable");
@@ -49,6 +50,7 @@ onRecordUpdateRequest((e) => {
 }, "decisions");
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("documents", e.record.id);
   if (orig.get("author") !== e.record.get("author")) {
     throw new BadRequestError("author is immutable");
@@ -57,6 +59,7 @@ onRecordUpdateRequest((e) => {
 }, "documents");
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("milestones", e.record.id);
   if (orig.get("author") !== e.record.get("author")) {
     throw new BadRequestError("author is immutable");
@@ -65,6 +68,7 @@ onRecordUpdateRequest((e) => {
 }, "milestones");
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("tasks", e.record.id);
   if (orig.get("author") !== e.record.get("author")) {
     throw new BadRequestError("author is immutable");
@@ -73,6 +77,7 @@ onRecordUpdateRequest((e) => {
 }, "tasks");
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const orig = e.app.findRecordById("comments", e.record.id);
   if (orig.get("author") !== e.record.get("author")) {
     throw new BadRequestError("author is immutable");
@@ -85,6 +90,7 @@ onRecordUpdateRequest((e) => {
 // row for an item they can no longer open. Withdrawal is Trash.
 // KEEP IN SYNC: publish-one-way block (decisions / documents / milestones).
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // decision:draft-private-publish-one-way refuses this direction for every authenticated caller, including one writing
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
@@ -134,6 +140,7 @@ onRecordUpdateRequest((e) => {
 }, "decisions");
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // decision:draft-private-publish-one-way refuses this direction for every authenticated caller, including one writing
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
@@ -183,6 +190,7 @@ onRecordUpdateRequest((e) => {
 }, "documents");
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // decision:draft-private-publish-one-way refuses this direction for every authenticated caller, including one writing
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
@@ -234,6 +242,7 @@ onRecordUpdateRequest((e) => {
 // draft is a boolean on create: PocketBase would cast "yes" to false and publish; refuse it.
 // KEEP IN SYNC: draft-type create block (decisions / documents / milestones); the update blocks above read the value the same way.
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
   // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
   const rq = e.requestEvent.request;
@@ -270,6 +279,7 @@ onRecordCreateRequest((e) => {
 }, "decisions");
 
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
   // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
   const rq = e.requestEvent.request;
@@ -306,6 +316,7 @@ onRecordCreateRequest((e) => {
 }, "documents");
 
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
   // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
   const rq = e.requestEvent.request;

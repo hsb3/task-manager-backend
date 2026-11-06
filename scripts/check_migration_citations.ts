@@ -120,24 +120,31 @@ export function assert_shape(names: string[]): void {
 }
 
 /** Basenames in the tagged v1 tree, read ONCE — never a git call per citation. */
-export function tagged_migrations(root: string): Set<string> {
+export function tagged_migrations(root: string): { names: Set<string>; source: string } {
   const [status, out] = git(root, "ls-tree", "-r", "--name-only", TAG, `${MIGRATIONS_DIR}/`);
   // This repo was imported without history, so the tag is absent; its file list is vendored.
   const vendored = path.join(root, "scripts", "migrations-v1.txt");
   if ((status !== 0 || !py_strip(out)) && fs.existsSync(vendored)) {
-    return new Set(splitlines(read_text(vendored)).filter((line) => py_strip(line)));
+    return {
+      names: new Set(splitlines(read_text(vendored)).filter((line) => py_strip(line))),
+      source: "scripts/migrations-v1.txt",
+    };
   }
   if (status !== 0 || !py_strip(out)) {
     throw new SystemExit(
-      `❌ check_migration_citations: ${TAG} tag not in this checkout — ` +
-        `run: git fetch --tags origin`,
+      `❌ check_migration_citations: ${TAG} tag not in this checkout and no ` +
+        `scripts/migrations-v1.txt list — the tag lives in hsb3/task-manager and cannot be ` +
+        `fetched here`,
     );
   }
-  return new Set(
-    splitlines(out)
-      .filter((line) => py_strip(line))
-      .map((line) => path.basename(line)),
-  );
+  return {
+    names: new Set(
+      splitlines(out)
+        .filter((line) => py_strip(line))
+        .map((line) => path.basename(line)),
+    ),
+    source: `the ${TAG} tag`,
+  };
 }
 
 export function tracked_files(root: string): string[] {
@@ -202,6 +209,7 @@ export class Report {
   exempt = 0;
   pruned = 0;
   nontext = 0;
+  v1_source = "";
 }
 
 /** (directory prefixes, exact paths) of the artifacts .gitattributes marks as generated. */
@@ -233,7 +241,8 @@ export function audit(root: string): Report {
   const report = new Report();
   const current = new Set(on_disk_migrations(root));
   assert_shape([...current].sort(by_code_point));
-  const tagged = tagged_migrations(root);
+  const { names: tagged, source } = tagged_migrations(root);
+  report.v1_source = source;
 
   const [gen_prefixes, gen_exact] = generated_artifacts(root);
   const prune = [...PRUNE_REL_PREFIXES, ...gen_prefixes];
@@ -338,7 +347,7 @@ export function main(): number {
   console.log(
     `✅ check_migration_citations: ${report.scanned} tracked file(s) scanned — ` +
       `${report.v1 + report.v2} versioned citation(s) resolve ` +
-      `(${report.v1} v1 via the ${TAG} tag, ${report.v2} v2 on disk), ` +
+      `(${report.v1} v1 via ${report.v1_source}, ${report.v2} v2 on disk), ` +
       `${report.exempt} filename(s) exempted as the whole content of a quoted string ` +
       `(a functional value, not a citation), ` +
       `${report.pruned} file(s) skipped as generated or under ${MIGRATIONS_DIR}/, ` +

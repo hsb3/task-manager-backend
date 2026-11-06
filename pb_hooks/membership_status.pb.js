@@ -5,6 +5,7 @@
 // suspended, reassigned or removed. A superuser is exempt: operator repair and the fixtures that prove the rest.
 // KEEP IN SYNC: the owner-row refusal on update and on delete below.
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   if (e.auth && e.auth.isSuperuser()) return e.next();
   const o = e.record.original();
   const owner = e.app
@@ -49,6 +50,7 @@ onRecordCreateRequest((e) => {
 }, "workspace_members");
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // An empty stored status is the backfill convention for active.
   const from = e.record.original().getString("status") || "active";
   const to = e.record.getString("status") || "active";
@@ -109,9 +111,8 @@ onRecordUpdateExecute((e) => {
           );
       throw new BadRequestError("Failed to update record.", data);
     }
-    // A member who was just suspended must not self-reactivate via a pending invitation to
-    // their own address (security audit R-1) — an invitation minted AFTER this point (a
-    // deliberate re-admission) is untouched since it does not exist yet.
+    // Revoke pending invitations to the suspended member's address (security audit R-1); re-admission
+    // is the status flip back to active, since accepting an invitation never reactivates a suspended row.
     if (claim.s === "suspended" && (claim.os || "active") !== "suspended") {
       let emailKey = "";
       try {

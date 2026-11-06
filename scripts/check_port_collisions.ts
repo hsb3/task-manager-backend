@@ -14,8 +14,11 @@
  * named in ports.md must be one of that suite's shifted literals, and no port may be named for
  * two suites. No server, no ports.
  *
+ * With an offset (--offset N, else PB_PORT_OFFSET in the environment) it also refuses any default (shell
+ * `$((port + PB_PORT_OFFSET))` ones included) that offset would land on a local Postgres/Redis/MySQL/MongoDB port; without one it says nothing.
+ *
  * Usage:
- *     bun scripts/check_port_collisions.ts [--repo DIR] [--ports-doc FILE]
+ *     bun scripts/check_port_collisions.ts [--repo DIR] [--ports-doc FILE] [--offset N]
  *     bun scripts/check_port_collisions.ts --print-globs   # scanned path families, one per line
  */
 
@@ -23,7 +26,16 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { parse_args } from "./_argparse.ts";
-import { by_code_point, print, py_join, py_repr, py_str, read_text, truthy } from "./_py.ts";
+import {
+  by_code_point,
+  print,
+  py_int,
+  py_join,
+  py_repr,
+  py_str,
+  read_text,
+  truthy,
+} from "./_py.ts";
 import { parse_ts } from "./_ts_source.ts";
 
 const REPO = path.dirname(import.meta.dir);
@@ -183,6 +195,40 @@ export function claim_errors(repo: string, decls: [string, number, number][]): s
   return errors;
 }
 
+// Local services a developer's machine commonly runs: Postgres, Redis, MySQL, MongoDB.
+export const SERVICE_PORTS = new Map<number, string>([
+  [5432, "Postgres"],
+  [6379, "Redis"],
+  [3306, "MySQL"],
+  [27017, "MongoDB"],
+]);
+
+/** Defaults an explicit offset would shift onto a well-known local service port. */
+export function offset_errors(decls: [string, number, number][], offset: number): string[] {
+  return decls
+    .filter(([, , port]) => SERVICE_PORTS.has(port + offset))
+    .map(
+      ([rel, lineno, port]) =>
+        `${rel}:${lineno} default ${port} + offset ${offset} = ${port + offset}, ` +
+        `${SERVICE_PORTS.get(port + offset)}'s port — pick another offset`,
+    );
+}
+
+const SHELL_DEFAULT_RE = /\$\(\(\s*([0-9]{4,5})\s*\+\s*PB_PORT_OFFSET\b/g;
+
+/** (relpath, lineno, port) for each `$((<port> + PB_PORT_OFFSET))` in scripts/*.sh. */
+export function shell_declarations(repo: string): [string, number, number][] {
+  const found: [string, number, number][] = [];
+  for (const file of new Bun.Glob("scripts/*.sh").scanSync({ cwd: repo })) {
+    read_text(py_join(repo, file))
+      .split("\n")
+      .forEach((text, i) => {
+        for (const m of text.matchAll(SHELL_DEFAULT_RE)) found.push([file, i + 1, Number(m[1])]);
+      });
+  }
+  return found.sort((a, b) => by_code_point(a[0], b[0]) || a[1] - b[1]);
+}
+
 export function duplicate_errors(decls: [string, number, number][]): string[] {
   const by_port = new Map<number, [string, number][]>();
   for (const [rel, lineno, port] of decls) {
@@ -260,7 +306,7 @@ export function doc_errors(
 }
 
 const HELP = `usage: check_port_collisions.ts [-h] [--repo REPO] [--ports-doc PORTS_DOC]
-                                [--print-globs]
+                                [--offset OFFSET] [--print-globs]
 
 Gate: no two suite defaults bind the same port, and every port claim tells the
 truth. A default is an integer literal ADDED to the offset — a name containing
@@ -284,6 +330,8 @@ options:
   --repo REPO           repo root to scan (default: this checkout)
   --ports-doc PORTS_DOC
                         ports.md path (default: <repo>/.agents/rules/ports.md)
+  --offset OFFSET       refuse defaults this offset lands on 5432/6379/3306/27017
+                        (default: PB_PORT_OFFSET from the environment, else none)
   --print-globs`;
 
 export function main(argv: string[] = process.argv.slice(2)): number {
@@ -293,9 +341,10 @@ export function main(argv: string[] = process.argv.slice(2)): number {
     [
       ["--repo", "store", "repo"],
       ["--ports-doc", "store", "ports_doc"],
+      ["--offset", "store", "offset", false, "int"],
       ["--print-globs", "store_true", "print_globs"],
     ],
-    { repo: REPO, ports_doc: null, print_globs: false },
+    { repo: REPO, ports_doc: null, offset: null, print_globs: false },
     argv,
   );
   if (args.print_globs) {
@@ -307,11 +356,21 @@ export function main(argv: string[] = process.argv.slice(2)): number {
     ? path.resolve(args.ports_doc)
     : path.join(repo, ".agents", "rules", "ports.md");
 
+  let offset: number;
+  try {
+    offset = args.offset ?? py_int(process.env.PB_PORT_OFFSET || "0");
+  } catch {
+    print(
+      `❌ check_port_collisions: PB_PORT_OFFSET must be a decimal integer, got ${py_repr(process.env.PB_PORT_OFFSET)}`,
+    );
+    return 2;
+  }
   const decls = declarations(repo);
   const errors = [
     ...duplicate_errors(decls),
     ...claim_errors(repo, decls),
     ...doc_errors(repo, ports_doc, decls),
+    ...offset_errors([...decls, ...shell_declarations(repo)], offset),
   ];
 
   if (errors.length) {

@@ -10,6 +10,7 @@
 // runtime, so concurrent requests share it and PocketBase panics (measured on create, update, delete).
 // ponytail: no priority, so another file's validator may refuse a stale-and-invalid write first (400, not 409); nothing is written either way.
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const expected = (e.requestInfo().body || {}).expected_updated_at;
   // Absent is the only way to opt out; a caller that SENDS the key believes it is guarded,
   // so a value that cannot be compared is refused rather than dropped to last-write-wins.
@@ -24,6 +25,7 @@ onRecordCreateRequest((e) => {
 });
 
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const expected = (e.requestInfo().body || {}).expected_updated_at;
   // Absent is the only way to opt out; a caller that SENDS the key believes it is guarded,
   // so a value that cannot be compared is refused rather than dropped to last-write-wins.

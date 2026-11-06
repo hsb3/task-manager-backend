@@ -4,6 +4,7 @@
 // Request tier: an API caller other than a superuser cannot choose its place (0 = unset below);
 // programmatic saves never reach this hook and keep their value.
 onRecordCreateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   // A move places an existing task; a new one has no place yet to move from.
   if ((e.requestInfo().body || {}).move !== undefined) {
     const msg = "A new task cannot be moved. Create it, then move it.";
@@ -58,6 +59,7 @@ onRecordAfterCreateSuccess((e) => {
 // validators, and concurrent moves are serialized by the single writer.
 // Request tier: a programmatic save carries no request body to read a move from.
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const move = (e.requestInfo().body || {}).move;
   if (move === undefined) return e.next();
   const refuse = (code, msg) =>

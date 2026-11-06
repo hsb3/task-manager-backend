@@ -96,6 +96,7 @@ onRecordCreateRequest((e) => {
 // Cross-workspace status (or a bogus/not-found status id) → 400. Self-contained
 // top-level fn registered directly for both events (legal — see note above).
 function validateTaskStatusWs(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const statusId = e.record.get("status");
   if (statusId) {
     const project = e.record.get("project");
@@ -141,6 +142,7 @@ onRecordUpdateRequest(validateTaskStatusWs, "tasks");
 // stored value alone. Empty/unset priority is always allowed. Self-contained top-level fn
 // registered directly for both events (legal — see note above validateTaskStatusWs).
 function validateTaskPriorityWs(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const priority = e.record.get("priority");
   const touchesPriority = priority !== e.record.original().get("priority");
   if (priority && touchesPriority) {
@@ -253,6 +255,7 @@ onRecordUpdateRequest((e) => {
 // exists, reject. decision:tasks-have-no-default-assignee: an item created without an assignee is Unassigned —
 // nothing fills the field, so an empty assignee is simply never validated.
 function validateTaskAssignee(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const assignee = e.record.get("assignee");
   // Only an assignee CHANGE is validated (original() is empty on create, so a create always
   // validates): re-checking an untouched assignee would 400 every unrelated edit to a task
@@ -326,6 +329,7 @@ onRecordUpdateRequest(validateTaskAssignee, "tasks");
 // against this task's DIRECT children (one findRecordsByFilter) per the contract's
 // "never contains a child of this item".
 function validateTaskItemRelations(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const selfId = e.record.id;
   let tProject = e.record.get("project");
   const tWs = e.record.get("workspace");
@@ -760,6 +764,7 @@ onRecordAfterDeleteSuccess((e) => {
 // app.save (provision/backfill) never reaches here — Request hooks fire only on
 // the API pipeline. Live-verified (RC-2): cross-workspace -> 400, own -> 200.
 function validateDefaultProject(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   require(`${__hooks}/lib/workspace_rules.js`).validateDefaultProject(
     e.app,
     e.record,
@@ -786,6 +791,7 @@ onRecordUpdateRequest(validateDefaultProject, "workspaces");
 // a word — "None" would otherwise become a real vocabulary entry rendered beside the
 // built-in clear column.
 function validateWorkspacePriorities(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   require(`${__hooks}/lib/workspace_rules.js`).validateWorkspacePriorities(
     e.record,
   );

@@ -297,6 +297,14 @@ try {
     check(`(fixture) Ari saves a ${scope} view there`, s, 200);
     views[scope] = rec.id ?? "";
   }
+  [s, rec] = await api("POST", "/api/collections/saved_views/records", su, {
+    name: "su-ownerless-personal",
+    workspace: BWS,
+    scope: "personal",
+    owner: "",
+  });
+  check("(fixture) a superuser saves an ownerless personal view", s, 200);
+  const stray = rec.id ?? "";
   async function listed_views(token: string): Promise<string[]> {
     const qs = urlencode({ filter: `workspace='${BWS}'`, perPage: 200 });
     const [, r] = await api("GET", `/api/collections/saved_views/records?${qs}`, token);
@@ -343,6 +351,11 @@ try {
     (await api("GET", `/api/collections/saved_views/records/${views.personal}`, su))[0],
     404,
   );
+  check(
+    "D4: a superuser's ownerless personal view survives Ari's delete",
+    (await api("GET", `/api/collections/saved_views/records/${stray}`, su))[0],
+    200,
+  );
 
   // ══════════ (5) after a hand-over, the old owner's delete keeps the shadow project ══
   console.log(
@@ -378,6 +391,11 @@ try {
   check(
     "(fixture) Cy owns it now",
     (await api("GET", `/api/collections/workspaces/records/${BWS}`, su))[1].owner ?? null,
+    cy_id,
+  );
+  check(
+    "(fixture) the shadow project's owner followed the hand-over to Cy",
+    (await api("GET", `/api/collections/projects/records/${SHADOW}`, su))[1].owner ?? null,
     cy_id,
   );
   [s] = await api("DELETE", `/api/collections/users/records/${bea_id}`, bea);

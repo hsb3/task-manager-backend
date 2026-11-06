@@ -62,10 +62,11 @@ export const ALIAS_RE = /^@collection\.workspace_members:([A-Za-z0-9_]+)\.([^\n]
 export const COLUMN_RE = /^(?:\[\[)?([A-Za-z_][A-Za-z0-9_]*)(?:\]\])?$/;
 export const PLACEHOLDER_RE = /^\{:([A-Za-z_][A-Za-z0-9_]*)\}$/;
 export const WORD_RE = new RegExp(`[A-Za-z_]${W}*`, "gu");
-// Any call passing "workspace_members" as its FIRST argument — derived, so a new finder name
+// Any call passing "workspace_members" as its first argument, or after leading plain-identifier
+// arguments (a helper's `earliest(app, "workspace_members", …)`) — derived, so a new finder name
 // is covered without editing this file.
 export const CALL_RE = new RegExp(
-  `(?<callee>[A-Za-z_$][${W.slice(1, -1)}$]*(?:\\.[A-Za-z_$][${W.slice(1, -1)}$]*)*)\\s*\\(\\s*"workspace_members"\\s*,`,
+  `(?<callee>[A-Za-z_$][${W.slice(1, -1)}$]*(?:\\.[A-Za-z_$][${W.slice(1, -1)}$]*)*)\\s*\\(\\s*(?:[A-Za-z_$][${W.slice(1, -1)}$.]*\\s*,\\s*)*"workspace_members"\\s*,`,
   "gdu",
 );
 // A SQL membership predicate is assembled by concatenation, so it is matched against the
@@ -102,6 +103,21 @@ export const ALLOWLIST_RULES: Allowlist = new Map();
 // Keyed on [file, callee, resolved filter] — a line number goes stale on any edit above the
 // site, turning an unrelated change red and training readers to bump numbers reflexively.
 export const ALLOWLIST_HOOKS: Allowlist = new Map([
+  [
+    JSON.stringify(["lib/landing.js", "earliest", "<unresolved filter: earliest(...)>"]),
+    "pinned: the active-member lookup interpolates the file's ACTIVE constant (status 'active' or " +
+      "empty), a template the resolver cannot expand (card 1y92)",
+  ],
+  [
+    JSON.stringify(["lib/landing.js", "earliest", "user = {:u} && workspace.trashed = ''"]),
+    "not a grant: the landing fallback looks up the caller's suspended rows on purpose, to report " +
+      "reason 'suspended' instead of 'not found'; it returns no workspace access (card 1y92)",
+  ],
+  [
+    JSON.stringify(["lib/landing.js", "earliest", "workspace = {:w} && user = {:u}"]),
+    "not a grant: both reads fetch the caller's row in ANY status — the invitation walk must see a " +
+      "suspended row, and switchCheck tests status in code before allowing (card 1y92)",
+  ],
   [
     JSON.stringify([
       "me.pb.js",
@@ -848,14 +864,17 @@ function _column_detail(sites: HookSite[]): string[] {
 
 /** Flag every workspace_members hook filter granting on `user` without a status pin. */
 export function scan_hooks(hooks_dir: string, allowlist: Allowlist): HookScan {
-  const paths = glob_sorted(hooks_dir, ".js");
+  const paths = [
+    ...glob_sorted(hooks_dir, ".js"),
+    ...glob_sorted(path.join(hooks_dir, "lib"), ".js"),
+  ];
   if (!paths.length) throw new SetupError(`no *.js under ${hooks_dir}`);
 
   const scan = new HookScan();
   scan.files_scanned = paths.length;
   const found: HookSite[] = [];
   for (const file of paths) {
-    const name = path.basename(file);
+    const name = path.relative(hooks_dir, file);
     let raw: string;
     try {
       raw = read_text(file);
@@ -872,7 +891,9 @@ export function scan_hooks(hooks_dir: string, allowlist: Allowlist): HookScan {
       const callee = call.groups!.callee!;
       scan.callees.add(callee);
       const scope = new Map(assigns.filter(([off]) => off < call.index).map(([, n, v]) => [n, v]));
-      const args = split_args(src, src.indexOf("(", call.indices!.groups!.callee![1]));
+      const all = split_args(src, src.indexOf("(", call.indices!.groups!.callee![1]));
+      const at = all?.findIndex((a) => a.trim() === '"workspace_members"') ?? -1;
+      const args = all && at >= 0 ? all.slice(at) : all;
       found.push(_site(name, line, callee, args, scope));
     }
 
@@ -929,7 +950,7 @@ options:
 SCOPE BOUNDS: half A reads the generated schema/ — five CRUD rules per base
 collection, listRule/viewRule per view — and recognizes two membership
 spellings, the <prefix>.workspace_members_via_workspace back-relation and the
-@collection.workspace_members:<alias> join. Half B reads pb_hooks/*.js in two
+@collection.workspace_members:<alias> join. Half B reads pb_hooks/*.js and pb_hooks/lib/*.js in two
 passes: calls whose FIRST argument is the string literal "workspace_members",
 and \`FROM|JOIN workspace_members <alias>\` predicates in the SQL those files
 build by string concatenation. Half C reads each view's generated viewQuery: a
@@ -1102,7 +1123,7 @@ gate.
   );
   print(
     `  • hooks: ${hooks.sites.length} workspace_members call site(s) across ` +
-      `${hooks.files_scanned} pb_hooks/*.js files, of which ${hooks.sql_sites} are raw-SQL ` +
+      `${hooks.files_scanned} pb_hooks/{,lib/}*.js files, of which ${hooks.sql_sites} are raw-SQL ` +
       `predicates; call sites seen: ${[...hooks.callees].sort(by_code_point).join(", ")}`,
   );
   print(

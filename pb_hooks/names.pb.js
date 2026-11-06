@@ -6,6 +6,7 @@
 // One shared body, never a per-collection copy: a self-contained top-level fn passed DIRECTLY
 // as the handler is legal under the pooled-JSVM law (house idiom, main.pb.js:120).
 function rejectBlankName(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   require(`${__hooks}/lib/workspace_rules.js`).rejectBlankName(
     e.record.collection(),
     e.requestInfo().body || {},
@@ -47,6 +48,7 @@ onRecordUpdateRequest(rejectBlankName, "workspaces");
 
 // decision:user-settings-write-checks: users.name is optional, so rejectBlankName (required fields only) never sees it.
 function refuseBlankUserName(e) {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const body = e.requestInfo().body || {};
   if (typeof body.name !== "string") return e.next();
   e.record.set(

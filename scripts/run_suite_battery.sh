@@ -47,6 +47,7 @@ PB_PORT_OFFSET="${PB_PORT_OFFSET:-0}"
 PB_PORT_OFFSET="$(bun -e 'const { py_int } = await import(process.argv[1]); process.stdout.write(String(py_int(process.argv[2])))' "$REPO_ROOT/scripts/_py.ts" "$PB_PORT_OFFSET")" \
   || { echo "❌ BATTERY FAILED: PB_PORT_OFFSET must be a decimal integer"; exit 1; }
 export PB_PORT_OFFSET                          # export: self-booting suites must inherit it
+bun "$REPO_ROOT/scripts/check_port_collisions.ts" >/dev/null || { bun "$REPO_ROOT/scripts/check_port_collisions.ts"; echo "❌ BATTERY FAILED: port plan refused (see above)"; exit 1; }
 LEGACY_PORT=$((8091 + PB_PORT_OFFSET))
 EMAIL_PORT=$((8092 + PB_PORT_OFFSET))
 HARD_PORT=$((8093 + PB_PORT_OFFSET))

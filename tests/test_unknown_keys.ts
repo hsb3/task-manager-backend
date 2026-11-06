@@ -103,6 +103,14 @@ try {
   server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, roomkit.hooks_dir(S));
   const su = await superuser_token();
 
+  console.log("\n── the room's appURL follows its own port ──");
+  const [, settings] = await api("GET", "/api/settings", su);
+  check(
+    "meta.appURL is this room's URL",
+    settings?.meta?.appURL,
+    process.env.PB_PUBLIC_URL || BASE_URL,
+  );
+
   console.log("\n── seed: alice/bob/carol fixtures (scripts/seed.ts) ──");
   const seed_proc = Bun.spawn([process.execPath, "scripts/seed.ts"], {
     cwd: REPO_ROOT,
@@ -264,6 +272,98 @@ try {
     "batch PATCH naming an unknown key → 400 naming it",
     tup(s, JSON.stringify(r).includes(KEY)),
     tup(400, true),
+  );
+
+  console.log("\n── a request breaking two rules answers the unknown key first ──");
+  const own_ws = (await find_by_filter("workspaces", `owner="${alice_id}"`, su))[0];
+  const own_project = (await find_by_filter("projects", `workspace="${own_ws.id}"`, su))[0];
+  [s, r] = await api("POST", URL("tasks"), alice, {
+    workspace: own_ws.id,
+    project: own_project.id,
+    title: "   ",
+    [KEY]: 1,
+  });
+  check(
+    "tasks POST {unknown key, blank title} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  const base_task = {
+    workspace: own_ws.id,
+    project: own_project.id,
+    title: "ok",
+    [KEY]: 1,
+  };
+  const own_task = (await find_by_filter("tasks", `workspace="${own_ws.id}"`, su))[0];
+  const shadow = (
+    await find_by_filter("projects", `workspace="${own_ws.id}" && shadow=true`, su)
+  )[0];
+  const roster = new Set(
+    (await find_by_filter("workspace_members", `workspace="${own_ws.id}"`, su)).map((m) => m.user),
+  );
+  const outsider = (await find_by_filter("users", "", su)).find((u) => !roster.has(u.id));
+  [s, r] = await api("POST", URL("tasks"), alice, { ...base_task, status: "zzzzzzzzzzzzzzz" });
+  check(
+    "tasks POST {unknown key, bad status} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  [s, r] = await api("PATCH", `${URL("tasks")}/${own_task.id}`, alice, {
+    status: "zzzzzzzzzzzzzzz",
+    [KEY]: 1,
+  });
+  check(
+    "tasks PATCH {unknown key, bad status} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  [s, r] = await api("POST", URL("tasks"), alice, { ...base_task, project: shadow.id });
+  check(
+    "tasks POST {unknown key, shadow project} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  [s, r] = await api("POST", URL("tasks"), alice, { ...base_task, assignee: outsider.id });
+  check(
+    "tasks POST {unknown key, outsider assignee} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  const own_row = (
+    await find_by_filter("workspace_members", `workspace="${own_ws.id}" && user="${alice_id}"`, su)
+  )[0];
+  [s, r] = await api("PATCH", `${URL("workspace_members")}/${own_row.id}`, alice, {
+    role: "member",
+    [KEY]: 1,
+  });
+  check(
+    "owner's member row PATCH {unknown key, role} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  [s, r] = await api("PATCH", `${URL("users")}/${alice_id}`, alice, { name: "   ", [KEY]: 1 });
+  check(
+    "users PATCH self {unknown key, blank name} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  [s, r] = await api("PATCH", `${URL("workspaces")}/${own_ws.id}`, alice, {
+    default_project: "nope",
+    [KEY]: 1,
+  });
+  check(
+    "workspaces PATCH {unknown key, bogus default_project} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
+  );
+  [s, r] = await api("PATCH", `${URL("workspaces")}/${own_ws.id}`, alice, {
+    priorities: ["", 7],
+    [KEY]: 1,
+  });
+  check(
+    "workspaces PATCH {unknown key, bad priorities} → 400 naming the key",
+    tup(s, names(r)),
+    tup(400, tup(true, true)),
   );
 
   console.log("\n── keys a hook reads are not unknown ──");
