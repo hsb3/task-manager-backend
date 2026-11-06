@@ -670,6 +670,7 @@ run_suite "test_app_docs_down_up_checker" bun tests/test_app_docs_down_up_checke
 run_suite "test_historical_migration_guard" bun tests/test_historical_migration_guard.ts
 run_suite "test_keep_in_sync_checker" bun tests/test_keep_in_sync_checker.ts
 run_suite "test_route_registry_checker" bun tests/test_route_registry_checker.ts
+run_suite "test_field_help_checker" bun tests/test_field_help_checker.ts
 run_suite "test_openapi_routes" bun tests/test_openapi_routes.ts
 run_suite "test_route_errors" bun tests/test_route_errors.ts
 run_suite "test_py_helpers" bun tests/test_py_helpers.ts

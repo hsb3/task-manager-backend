@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The account this key acts as; leave it empty and the server fills the signed-in caller, while naming another user is refused.",
       "hidden": false,
       "id": "relation4200600001",
       "maxSelect": 1,
@@ -33,7 +33,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "A label to tell your keys apart, up to 200 characters, stored trimmed; it may be renamed later.",
       "hidden": false,
       "id": "text4200600002",
       "max": 200,
@@ -47,7 +47,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "What the key may do: read allows only reads, write also allows changes; chosen at create and fixed afterwards.",
       "hidden": false,
       "id": "select4200600003",
       "maxSelect": 1,
@@ -63,7 +63,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced and a later change is refused.",
       "hidden": true,
       "id": "text4200600004",
       "max": 64,
@@ -77,7 +77,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "When the key stops working, or empty for a key that never expires; it can be set only at create.",
       "hidden": false,
       "id": "date4200600005",
       "max": "",
@@ -89,7 +89,7 @@
       "type": "date"
     },
     {
-      "help": "",
+      "help": "Set to true to switch the key off for good; a revoked key cannot be switched back on.",
       "hidden": false,
       "id": "bool4200600006",
       "name": "revoked",

@@ -19,7 +19,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The name of the setting, such as trash_retention_days; unique, and read-only for clients.",
       "hidden": false,
       "id": "text2000000100",
       "max": 0,
@@ -33,7 +33,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The value of the setting as JSON, usually a number such as 30; every signed-in user may read it and no client may change it.",
       "hidden": false,
       "id": "json2000000101",
       "maxSize": 100000,

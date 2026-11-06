@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace of this membership; set when an invitation is accepted and cannot be changed.",
       "hidden": false,
       "id": "relation2000000011",
       "maxSelect": 1,
@@ -34,7 +34,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The member; set when an invitation is accepted and cannot be changed.",
       "hidden": false,
       "id": "relation2000000012",
       "maxSelect": 1,
@@ -66,7 +66,7 @@
       "type": "autodate"
     },
     {
-      "help": "",
+      "help": "What the member may do: admin also manages configuration, member edits work, viewer only reads; only the workspace owner may change it.",
       "hidden": false,
       "id": "select2000000100",
       "maxSelect": 1,
@@ -82,7 +82,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "Whether the membership grants access: active does and suspended does not; the owner or an active admin may switch between the two, except on the row of the workspace owner.",
       "hidden": false,
       "id": "select2000000101",
       "maxSelect": 1,

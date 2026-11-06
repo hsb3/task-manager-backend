@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The recipient of the notification, set by the server; a change sent is refused.",
       "hidden": false,
       "id": "relation3000030001",
       "maxSelect": 1,
@@ -34,7 +34,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_2602490748",
-      "help": "",
+      "help": "The task the notification is about, set by the server; a change sent is refused.",
       "hidden": false,
       "id": "relation3000030002",
       "maxSelect": 1,
@@ -46,7 +46,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "What happened: an assignment, a comment, a task completed, a mention, or a change of workspace owner; set by the server.",
       "hidden": false,
       "id": "select3000030003",
       "maxSelect": 1,
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "Whether the recipient has read the notification; the recipient may set it to true or false.",
       "hidden": false,
       "id": "bool3000030004",
       "name": "read",
@@ -74,7 +74,7 @@
       "type": "bool"
     },
     {
-      "help": "",
+      "help": "A time until which the recipient sets the notification aside; the recipient may set or clear it.",
       "hidden": false,
       "id": "date3000030005",
       "max": "",
@@ -108,7 +108,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100004",
-      "help": "",
+      "help": "The comment that raised the notification, on comment rows and on mentions made in a comment; set by the server.",
       "hidden": false,
       "id": "relation3000030006",
       "maxSelect": 1,
@@ -121,7 +121,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The first 140 characters of the comment when the notification was written; set by the server and not updated by later edits.",
       "hidden": false,
       "id": "text3000030007",
       "max": 140,
@@ -136,7 +136,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The name of the status the task moved into, on a completed-task notification; set by the server.",
       "hidden": false,
       "id": "text3000030008",
       "max": 100,
@@ -152,7 +152,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100006",
-      "help": "",
+      "help": "The document the notification is about, set by the server; a change sent is refused.",
       "hidden": false,
       "id": "relation3000030009",
       "maxSelect": 1,
@@ -166,7 +166,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100005",
-      "help": "",
+      "help": "The decision the notification is about, set by the server; a change sent is refused.",
       "hidden": false,
       "id": "relation3000030010",
       "maxSelect": 1,
@@ -180,7 +180,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace the notification concerns, set by the server; filter on it to show the inbox of one workspace.",
       "hidden": false,
       "id": "relation3000030011",
       "maxSelect": 1,
@@ -192,7 +192,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "True once the recipient dismisses the notification, which hides it from the inbox; setting it back to false shows it again.",
       "hidden": false,
       "id": "bool3000030012",
       "name": "dismissed",
@@ -204,7 +204,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user whose action raised the notification, empty when a superuser acted; set by the server.",
       "hidden": false,
       "id": "relation3000030013",
       "maxSelect": 1,
@@ -216,7 +216,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "When the notification was last marked read; the server sets it and clears it when marked unread, and a value sent is refused.",
       "hidden": false,
       "id": "date3000030014",
       "max": "",

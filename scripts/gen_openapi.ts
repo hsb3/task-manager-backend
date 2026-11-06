@@ -19,6 +19,7 @@ import path from "node:path";
 import { parse_args } from "./_argparse.ts";
 import { by_code_point, json_dumps, read_text, sqlite_connect, py_get } from "./_py.ts";
 import { migrate_up, pb_bin_path } from "./pb_migrate.ts";
+import { VIEW_FIELD_HELP } from "./view_field_help.ts";
 
 const REPO = path.dirname(path.dirname(path.resolve(import.meta.path)));
 const PB = pb_bin_path(REPO);
@@ -34,6 +35,17 @@ const OPENAPI_VERSION = "3.1.0";
 // description so generated types don't mislead callers.
 const HIDDEN_NOTE = "Hidden system field — not returned in API responses.";
 const EMAIL_NOTE = "Only returned when the record's emailVisibility flag is true.";
+// Server-owned fields carry no per-collection help (the migration sets help on every other field; check_field_help gates it).
+const SERVER_FIELD_NOTE: Record<string, string> = {
+  id: "Record id, assigned by the server.",
+  created: "When the record was created; set by the server.",
+  updated: "When the record last changed; set by the server.",
+  email: "Sign-in email address of the account.",
+  emailVisibility: "Whether other users can see the email of this account.",
+  verified: "Whether the email address has been confirmed; set by the server.",
+  password: "Account password; write-only.",
+  tokenKey: "Server-kept token secret.",
+};
 
 // ----------------------------------------------------------------------------
 // Schema extraction (migration replay)
@@ -141,6 +153,10 @@ function _multi(f: any): boolean {
 function field_schema(f: any, id_to_name: Map<string, string>): any {
   const t = f.type;
   const notes: string[] = [];
+  const help = String(f.help ?? "").trim();
+  if (help) notes.push(help);
+  else if (f.system || t === "autodate")
+    notes.push(SERVER_FIELD_NOTE[f.name] ?? "Set by the server.");
   let schema: any;
   let item: any;
 
@@ -194,11 +210,27 @@ function field_schema(f: any, id_to_name: Map<string, string>): any {
 function record_schema(col: any, id_to_name: Map<string, string>, body: string): any {
   const props: any = {};
   const required: string[] = [];
-  for (const f of col.fields) {
+  // A view rebuilds its fields from its query on every boot, so their text lives in scripts/view_field_help.ts.
+  const view_help = col.type === "view" ? { ...(VIEW_FIELD_HELP[col.name] ?? {}) } : null;
+  for (let f of col.fields) {
+    if (view_help && f.name !== "id") {
+      const help = view_help[f.name];
+      if (!help)
+        throw new Error(
+          `${col.name}.${f.name}: view column without help text in scripts/view_field_help.ts`,
+        );
+      delete view_help[f.name];
+      f = { ...f, help };
+    }
     props[f.name] = field_schema(f, id_to_name);
     // never mark a hidden credential field required — it's absent from responses.
     if (f.required && !f.hidden) required.push(f.name);
   }
+  const stale = Object.keys(view_help ?? {});
+  if (stale.length)
+    throw new Error(
+      `${col.name}: scripts/view_field_help.ts names no such column: ${stale.join(", ")}`,
+    );
 
   const schema: any = {
     type: "object",
@@ -216,11 +248,11 @@ function list_result_schema(col: any): any {
     type: "object",
     description: `Paginated list of \`${col.name}\` records.`,
     properties: {
-      page: { type: "integer" },
-      perPage: { type: "integer" },
-      totalItems: { type: "integer" },
-      totalPages: { type: "integer" },
-      items: { type: "array", items: { $ref: ref } },
+      page: { type: "integer", description: "The page returned, counting from 1." },
+      perPage: { type: "integer", description: "Records per page." },
+      totalItems: { type: "integer", description: "Records matching the filter across all pages." },
+      totalPages: { type: "integer", description: "Pages at this page size." },
+      items: { type: "array", items: { $ref: ref }, description: "The records of this page." },
     },
     required: ["page", "perPage", "totalItems", "totalPages", "items"],
   };
@@ -668,8 +700,8 @@ function build_spec({ cols, docs, rate }: Replay): any {
     type: "object",
     description: "Response from the users auth endpoints.",
     properties: {
-      token: { type: "string" },
-      record: { $ref: "#/components/schemas/UsersRecord" },
+      token: { type: "string", description: "Auth token to send in the Authorization header." },
+      record: { $ref: "#/components/schemas/UsersRecord", description: "The signed-in user." },
     },
     required: ["token", "record"],
   };
@@ -678,8 +710,8 @@ function build_spec({ cols, docs, rate }: Replay): any {
     type: "object",
     description: "The body of every error answer.",
     properties: {
-      status: { type: "integer" },
-      message: { type: "string" },
+      status: { type: "integer", description: "HTTP status of the answer." },
+      message: { type: "string", description: "What was refused and why." },
       data: { type: "object", description: "Offending fields of a validation error; else empty." },
     },
     required: ["status", "message", "data"],

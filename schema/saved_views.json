@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this view belongs to; required at create and cannot be changed afterwards.",
       "hidden": false,
       "id": "relation3070000001",
       "maxSelect": 1,
@@ -34,7 +34,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who owns the view; leave it empty and the server fills the caller, and naming anyone else at create is refused.",
       "hidden": false,
       "id": "relation3070000002",
       "maxSelect": 1,
@@ -47,7 +47,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The view name, stored trimmed; a name of only spaces is refused.",
       "hidden": false,
       "id": "text3070000003",
       "max": 200,
@@ -61,7 +61,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The saved filter as a JSON array of clause objects, each with field, op and value.",
       "hidden": false,
       "id": "json3070000004",
       "maxSize": 2000000,
@@ -72,7 +72,7 @@
       "type": "json"
     },
     {
-      "help": "",
+      "help": "Who can see the view: personal for its owner only, workspace for every active member of the workspace.",
       "hidden": false,
       "id": "select3070000005",
       "maxSelect": 1,
@@ -108,7 +108,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "Optional text describing what the view shows.",
       "hidden": false,
       "id": "text3070000006",
       "max": 2000,
@@ -122,7 +122,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The visible columns as an ordered JSON array of column keys.",
       "hidden": false,
       "id": "json3070000007",
       "maxSize": 2000000,
@@ -133,7 +133,7 @@
       "type": "json"
     },
     {
-      "help": "",
+      "help": "The row spacing of the view; empty means cozy.",
       "hidden": false,
       "id": "select3070000008",
       "maxSelect": 1,
@@ -148,7 +148,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "Whether the view shows a list or a board; empty means list.",
       "hidden": false,
       "id": "select3070000009",
       "maxSelect": 1,
@@ -163,7 +163,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "What the rows are grouped by; empty means none.",
       "hidden": false,
       "id": "select3070000010",
       "maxSelect": 1,
@@ -181,7 +181,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "The sort order as a JSON object with a field and an order.",
       "hidden": false,
       "id": "json3070000011",
       "maxSize": 2000000,
@@ -192,7 +192,7 @@
       "type": "json"
     },
     {
-      "help": "",
+      "help": "A number placing this view among the saved views.",
       "hidden": false,
       "id": "number3070000012",
       "max": null,
@@ -207,7 +207,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_484305853",
-      "help": "",
+      "help": "The project the view is limited to, which must be a project of the same workspace; leave it empty to span the whole workspace.",
       "hidden": false,
       "id": "relation3070000013",
       "maxSelect": 1,

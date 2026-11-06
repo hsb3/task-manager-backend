@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user these settings belong to; it must be the signed-in user and cannot be changed.",
       "hidden": false,
       "id": "relation2000000110",
       "maxSelect": 1,
@@ -32,7 +32,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "The color scheme the app should use; system follows the device.",
       "hidden": false,
       "id": "select2000000111",
       "maxSelect": 1,
@@ -48,7 +48,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "The typeface family the app should use.",
       "hidden": false,
       "id": "select2000000112",
       "maxSelect": 1,
@@ -84,7 +84,7 @@
       "type": "autodate"
     },
     {
-      "help": "",
+      "help": "The text size as a whole number from 12 to 24; 0 means unset.",
       "hidden": false,
       "id": "number2000000113",
       "max": 24,
@@ -99,7 +99,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_300200007",
-      "help": "",
+      "help": "The saved view to open by default, which must be one the user can read; it is cleared if that view is deleted.",
       "hidden": false,
       "id": "relation2000000114",
       "maxSelect": 1,
@@ -113,7 +113,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_484305853",
-      "help": "",
+      "help": "The project to open by default, which must be one the user can read; it is cleared if that project is deleted.",
       "hidden": false,
       "id": "relation2000000115",
       "maxSelect": 1,
@@ -126,7 +126,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "An IANA time zone name such as Europe/Paris that sets the day for this user; empty means none, and Local is refused.",
       "hidden": false,
       "id": "text2000000116",
       "max": 64,

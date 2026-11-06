@@ -18,7 +18,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "Whether the row records an invitation sent (mint) or declined (decline); written by the server and never readable by clients.",
       "hidden": false,
       "id": "select4200000001",
       "maxSelect": 1,
@@ -35,7 +35,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who sent the invitation, on a mint row; written by the server and never readable by clients.",
       "hidden": false,
       "id": "relation4200000002",
       "maxSelect": 1,
@@ -49,7 +49,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace the invitation was for, emptied if that workspace is deleted; written by the server and never readable by clients.",
       "hidden": false,
       "id": "relation4200000003",
       "maxSelect": 1,
@@ -62,7 +62,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The normalised invited address used to count sends and declines; written by the server and never readable by clients.",
       "hidden": false,
       "id": "text4200000004",
       "max": 0,

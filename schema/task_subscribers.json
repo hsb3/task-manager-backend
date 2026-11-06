@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_2602490748",
-      "help": "",
+      "help": "The task to follow; it must be a task the caller can see, outside the trash.",
       "hidden": false,
       "id": "relation3000020001",
       "maxSelect": 1,
@@ -34,7 +34,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The subscribed user; a client may subscribe only itself, so send the id of the signed-in user.",
       "hidden": false,
       "id": "relation3000020002",
       "maxSelect": 1,

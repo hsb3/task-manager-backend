@@ -19,7 +19,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The task title, stored trimmed; a title of only spaces is refused.",
       "hidden": false,
       "id": "text724990059",
       "max": 300,
@@ -35,7 +35,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_484305853",
-      "help": "",
+      "help": "The project this task belongs to, in the same workspace; when omitted a subtask takes the project of its parent and any other task lands in the hidden project for unfiled items.",
       "hidden": false,
       "id": "relation800313582",
       "maxSelect": 1,
@@ -49,7 +49,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user responsible for the task, who must be the workspace owner or an active member; it stays empty unless sent.",
       "hidden": false,
       "id": "relation2090728460",
       "maxSelect": 1,
@@ -61,7 +61,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "The day the task is due; optional.",
       "hidden": false,
       "id": "date3742343818",
       "max": "",
@@ -95,7 +95,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_300100003",
-      "help": "",
+      "help": "The milestone this task counts toward, which must be in the same project as the task.",
       "hidden": false,
       "id": "relation2000000061",
       "maxSelect": 1,
@@ -109,7 +109,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_2602490748",
-      "help": "",
+      "help": "The task this one is a subtask of, which must be in the same project and cannot be the task itself.",
       "hidden": false,
       "id": "relation2000000062",
       "maxSelect": 1,
@@ -121,7 +121,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "The place of the task in its board column; the server sets it at create, ignoring a value sent, and a client may change it later.",
       "hidden": false,
       "id": "number2000000063",
       "max": null,
@@ -134,7 +134,7 @@
       "type": "number"
     },
     {
-      "help": "",
+      "help": "The checklist of the task as a JSON array of objects, each with text and done.",
       "hidden": false,
       "id": "json2000000064",
       "maxSize": 100000,
@@ -147,7 +147,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_2602490748",
-      "help": "",
+      "help": "The tasks that block this one; each must be in the same project and cannot be this task, its parent or one of its subtasks.",
       "hidden": false,
       "id": "relation2000000065",
       "maxSelect": 999,
@@ -159,7 +159,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "Up to 10 images or PDFs of 10 MB each; downloading one needs a short-lived file token.",
       "hidden": false,
       "id": "file2000000066",
       "maxSelect": 10,
@@ -184,7 +184,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The task text; an @mention of a workspace member notifies them.",
       "hidden": false,
       "id": "text2000000070",
       "max": 0,
@@ -199,7 +199,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The id of an entry in the priority list of the workspace, or empty for no priority; a priority name is refused.",
       "hidden": false,
       "id": "text2000000072",
       "max": 50,
@@ -214,7 +214,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "A free-text category for the task, up to 50 characters; optional, and any text is accepted.",
       "hidden": false,
       "id": "text2000000073",
       "max": 50,
@@ -228,7 +228,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "When the task was moved to the trash, set by the server on DELETE; send it empty only to restore the task, any other change is refused.",
       "hidden": false,
       "id": "date3000000102",
       "max": "",
@@ -242,7 +242,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this task belongs to; it may be omitted when a project is sent, and it cannot be changed afterwards.",
       "hidden": false,
       "id": "relation4000000100",
       "maxSelect": 1,
@@ -256,7 +256,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_300200002",
-      "help": "",
+      "help": "The workflow status, which must be a status of the same workspace; the workspace default is used when it is omitted.",
       "hidden": false,
       "id": "relation3200000001",
       "maxSelect": 1,
@@ -270,7 +270,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_300200001",
-      "help": "",
+      "help": "The labels on the task, each of which must be a label of the same workspace.",
       "hidden": false,
       "id": "relation3200000002",
       "maxSelect": 999,
@@ -282,7 +282,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "When the task entered a completed status; the server sets and clears it as the status changes, so a client should not send it.",
       "hidden": false,
       "id": "date3200000004",
       "max": "",
@@ -296,7 +296,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who moved the task to the trash, set by the server; a value sent at create is dropped, and it may only be cleared on restore.",
       "hidden": false,
       "id": "relation3110000001",
       "maxSelect": 1,
@@ -309,7 +309,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The display key such as ENG-42, assigned by the server and fixed for life, empty outside a project; a value sent is ignored at create and refused later.",
       "hidden": false,
       "id": "text4300000010",
       "max": 32,
@@ -325,7 +325,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_300200008",
-      "help": "",
+      "help": "The cycle the task is planned in, which must be a cycle of the same workspace; an unfinished task moves on when its cycle ends.",
       "hidden": false,
       "id": "relation3000000806",
       "maxSelect": 1,
@@ -339,7 +339,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who created the task, filled by the server from the signed-in caller; a value sent is replaced and a later change is refused.",
       "hidden": false,
       "id": "relation4000000204",
       "maxSelect": 1,

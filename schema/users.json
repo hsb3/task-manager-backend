@@ -80,7 +80,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The display name, stored trimmed; optional at signup, but changing it to an empty name is refused.",
       "hidden": false,
       "id": "text1579384326",
       "max": 255,
@@ -94,7 +94,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "A public profile picture of up to 5 MB; only the account owner can change it.",
       "hidden": false,
       "id": "file376926767",
       "maxSelect": 1,
@@ -138,7 +138,7 @@
       "type": "autodate"
     },
     {
-      "help": "",
+      "help": "Whether an app administrator has approved the account, which signing in requires; a value sent by a user is refused.",
       "hidden": false,
       "id": "bool2086131741",
       "name": "approved",
@@ -149,7 +149,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The normalised email address that stops duplicate accounts; the server computes it on every save, it is never shown, and a value sent is replaced.",
       "hidden": true,
       "id": "text5290000001",
       "max": 255,
