@@ -1,0 +1,383 @@
+#!/usr/bin/env bun
+/**
+ * tm CLI (clients/tm): login stores the key, every verb answers --json, create/show round-trip,
+ * a read key's write exits 1 naming api_key_scope (decision:api-keys).
+ *
+ * Fully self-contained clean-room server; runs the CLI as a subprocess. Port 8193 + PB_PORT_OFFSET.
+ */
+
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { py_repr, run_checked, tup, urlencode } from "../scripts/_py.ts";
+import * as roomkit from "./roomkit.ts";
+
+const REPO_ROOT = roomkit.REPO_ROOT;
+const PB_BIN = roomkit.pb_bin();
+const REAL_MIGRATIONS_DIR = path.join(REPO_ROOT, "pb_migrations");
+const TM = path.join(REPO_ROOT, "clients", "tm", "tm.ts");
+
+const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
+const PORT = 8193 + PORT_OFFSET;
+const BASE_URL = `http://127.0.0.1:${PORT}`;
+const SU_EMAIL = "probe@example.com";
+const SU_PASSWORD = "probe123456";
+
+let failures = 0;
+
+function check(label: string, got: any, expected: any): void {
+  const ok = Bun.deepEquals(got, expected, true);
+  if (!ok) failures += 1;
+  console.log(
+    `  ${ok ? "✅" : "❌ MISMATCH"}  ${label.padEnd(72)} → ${py_repr(got)} (want ${py_repr(expected)})`,
+  );
+}
+
+async function api(
+  method: string,
+  url: string,
+  token: string | null = null,
+  body: any = null,
+): Promise<[number, any]> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = token;
+  const r = await fetch(BASE_URL + url, {
+    method,
+    headers,
+    body: body !== null ? JSON.stringify(body) : undefined,
+  });
+  const text = await r.text();
+  return [r.status, text ? JSON.parse(text) : {}];
+}
+
+const S = fs.mkdtempSync(path.join(os.tmpdir(), "pb-tm-cli-test-"));
+const MIG_DIR = path.join(S, "pb_migrations");
+const DATA_DIR = path.join(S, "pb_data");
+const XDG = path.join(S, "xdg");
+fs.mkdirSync(DATA_DIR, { recursive: true });
+fs.mkdirSync(XDG, { recursive: true });
+fs.cpSync(REAL_MIGRATIONS_DIR, MIG_DIR, { recursive: true, dereference: true });
+for (const name of fs.readdirSync(MIG_DIR)) {
+  if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_DIR, name));
+}
+
+type Run = { code: number; stdout: string; stderr: string; json: any };
+
+/** Run the CLI as a user would: env for the key and URL, XDG config dir in scratch. */
+async function tm(args: string[], env: Record<string, string> = {}, stdin?: string): Promise<Run> {
+  const { TM_API_KEY, TM_URL, ...clean } = process.env;
+  const proc = Bun.spawn([process.execPath, TM, ...args], {
+    cwd: S, // never the repo: a CLI must not depend on where it is run from
+    env: { ...clean, HOME: S, XDG_CONFIG_HOME: XDG, ...env },
+    stdin: stdin === undefined ? "ignore" : new Response(stdin),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const timer = setTimeout(() => proc.kill(), 15_000); // a hang (e.g. waiting on stdin) is a failure
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  clearTimeout(timer);
+  let json: any = null;
+  try {
+    json = JSON.parse(stdout);
+  } catch {}
+  return { code, stdout, stderr, json };
+}
+
+let server: roomkit.Room | null = null;
+try {
+  run_checked(
+    [
+      PB_BIN,
+      "superuser",
+      "upsert",
+      SU_EMAIL,
+      SU_PASSWORD,
+      "--dir",
+      DATA_DIR,
+      "--migrationsDir",
+      MIG_DIR,
+    ],
+    { cwd: REPO_ROOT, capture_output: true },
+  );
+  server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, roomkit.hooks_dir(S));
+  const [, su_r] = await api("POST", "/api/collections/_superusers/auth-with-password", null, {
+    identity: SU_EMAIL,
+    password: SU_PASSWORD,
+  });
+  const su: string = su_r.token;
+  if (!su) throw new roomkit.SystemExit(`superuser auth failed: ${py_repr(su_r)}`);
+
+  console.log(
+    "\n── fixtures: Alice, her provisioned workspace and project, a write key and a read key ──",
+  );
+  let [s, r] = await api("POST", "/api/collections/users/records", su, {
+    email: "alice@example.com",
+    password: "test123456",
+    passwordConfirm: "test123456",
+    name: "Alice",
+    verified: true,
+    approved: true,
+  });
+  check("fixture Alice created", s, 200);
+  [s, r] = await api("POST", "/api/collections/users/auth-with-password", null, {
+    identity: "alice@example.com",
+    password: "test123456",
+  });
+  check("Alice signs in", s, 200);
+  const alice: string = r.token;
+  [, r] = await api(
+    "GET",
+    `/api/collections/projects/records?${urlencode({ filter: "name != ''", perPage: 5 })}`,
+    alice,
+  );
+  const project = r.items?.find((p: any) => p.name) ?? null;
+  check("Alice has a provisioned project", Boolean(project?.id && project?.workspace), true);
+  const PROJECT: string = project.id;
+  const WS: string = project.workspace;
+  [s, r] = await api("POST", "/api/collections/api_keys/records", alice, {
+    name: "cli write",
+    scope: "write",
+  });
+  check("write key minted", tup(s, /^tmk_/.test(r.key ?? "")), tup(200, true));
+  const WRITE_KEY: string = r.key;
+  [s, r] = await api("POST", "/api/collections/api_keys/records", alice, {
+    name: "cli read",
+    scope: "read",
+  });
+  check("read key minted", tup(s, /^tmk_/.test(r.key ?? "")), tup(200, true));
+  const READ_KEY: string = r.key;
+  const W = { TM_URL: BASE_URL, TM_API_KEY: WRITE_KEY };
+  const R = { TM_URL: BASE_URL, TM_API_KEY: READ_KEY };
+
+  console.log("\n── tm login: stores the pasted key, prints where, never echoes it ──");
+  let o = await tm(["login", "--url", BASE_URL], {}, `${WRITE_KEY}\n`);
+  const cfg = path.join(XDG, "tm", "config.json");
+  check("login exits 0", tup(o.code, o.stderr), tup(0, ""));
+  check("login names the config file it wrote", o.stdout.includes(cfg), true);
+  check("login does not echo the key", (o.stdout + o.stderr).includes(WRITE_KEY), false);
+  const saved = fs.existsSync(cfg) ? JSON.parse(fs.readFileSync(cfg, "utf8")) : {};
+  check(
+    "config file holds the url and the key",
+    tup(saved.url ?? null, saved.key === WRITE_KEY),
+    tup(BASE_URL, true),
+  );
+  check(
+    "config file is private to the user",
+    fs.existsSync(cfg) ? (fs.statSync(cfg).mode & 0o777).toString(8) : null,
+    "600",
+  );
+  o = await tm(["login"], {}, WRITE_KEY);
+  check(
+    "login again, piped without a trailing newline, keeps the saved url",
+    tup(o.code, o.stdout.includes(cfg)),
+    tup(0, true),
+  );
+  o = await tm(["login"], {}, "");
+  check("login with empty input → exit 2", tup(o.code, o.stderr.includes("no key")), tup(2, true));
+  o = await tm(["list", "--json"]);
+  check(
+    "list --json from the stored config alone → exit 0, a JSON array",
+    tup(o.code, Array.isArray(o.json)),
+    tup(0, true),
+  );
+
+  console.log("\n── create → show round-trip, then edit, comment, search, list ──");
+  o = await tm(["create", "zephyr quiet task", "--project", PROJECT, "--json"], W);
+  check("create --json exits 0", tup(o.code, o.stderr), tup(0, ""));
+  const ID: string = o.json?.id ?? "";
+  check(
+    "create --json returns id, kind, title, project, workspace",
+    tup(Boolean(ID), o.json?.kind, o.json?.title, o.json?.project, o.json?.workspace),
+    tup(true, "task", "zephyr quiet task", PROJECT, WS),
+  );
+  o = await tm(["show", ID, "--json"], W);
+  check(
+    "show --json round-trips the created task",
+    tup(o.code, o.json?.id, o.json?.kind, o.json?.title),
+    tup(0, ID, "task", "zephyr quiet task"),
+  );
+  check(
+    "show --json carries the server key",
+    typeof o.json?.key === "string" && o.json.key.length > 0,
+    true,
+  );
+  o = await tm(["show", ID], W);
+  check(
+    "show (human) exits 0 and names the title",
+    tup(o.code, o.stdout.includes("zephyr quiet task")),
+    tup(0, true),
+  );
+
+  o = await tm(
+    ["edit", ID, "--title", "zephyr loud task", "--set", "description=now described", "--json"],
+    W,
+  );
+  check(
+    "edit --json exits 0 with the new title",
+    tup(o.code, o.json?.title, o.json?.description),
+    tup(0, "zephyr loud task", "now described"),
+  );
+  o = await tm(["show", ID, "--json"], W);
+  check("show after edit", o.json?.title, "zephyr loud task");
+
+  o = await tm(["comment", ID, "zephyr says hello", "--json"], W);
+  check(
+    "comment --json exits 0 with body and task",
+    tup(o.code, o.json?.body, o.json?.task),
+    tup(0, "zephyr says hello", ID),
+  );
+  [s, r] = await api(
+    "GET",
+    `/api/collections/comments/records?${urlencode({ filter: `task='${ID}'` })}`,
+    alice,
+  );
+  check(
+    "the comment is on the server",
+    tup(s, r.items?.length, r.items?.[0]?.body),
+    tup(200, 1, "zephyr says hello"),
+  );
+
+  o = await tm(["search", "zephyr", "--json"], W);
+  check(
+    "search --json finds the task",
+    tup(
+      o.code,
+      o.json?.results?.some((x: any) => x.id === ID),
+    ),
+    tup(0, true),
+  );
+  o = await tm(["search", "zephyr"], W);
+  check(
+    "search (human) names the task",
+    tup(o.code, o.stdout.includes("zephyr loud task")),
+    tup(0, true),
+  );
+
+  o = await tm(["list", "--project", PROJECT, "--json"], W);
+  check(
+    "list --project --json includes the task",
+    tup(
+      o.code,
+      o.json?.some((x: any) => x.id === ID && x.kind === "task"),
+    ),
+    tup(0, true),
+  );
+  o = await tm(["list", "--kind", "document", "--json"], W);
+  check(
+    "list --kind document --json excludes it",
+    tup(
+      o.code,
+      o.json?.some((x: any) => x.id === ID),
+    ),
+    tup(0, false),
+  );
+  o = await tm(["list"], W);
+  check(
+    "list (human) exits 0, names the task and prints its id",
+    tup(o.code, o.stdout.includes("zephyr loud task"), o.stdout.includes(ID)),
+    tup(0, true, true),
+  );
+
+  console.log("\n── the other item kinds create and show through the same verbs ──");
+  o = await tm(["create", "zephyr memo", "--kind", "document", "--workspace", WS, "--json"], W);
+  check(
+    "create --kind document",
+    tup(o.code, o.json?.kind, o.json?.title),
+    tup(0, "document", "zephyr memo"),
+  );
+  const DOC: string = o.json?.id ?? "";
+  o = await tm(["show", DOC, "--json"], W);
+  check("show a document", tup(o.code, o.json?.kind), tup(0, "document"));
+  o = await tm(["list", "--kind", "document", "--json"], W);
+  check(
+    "list --kind document includes the document and not the task",
+    tup(
+      o.code,
+      o.json?.some((x: any) => x.id === DOC),
+      o.json?.some((x: any) => x.id === ID),
+    ),
+    tup(0, true, false),
+  );
+  o = await tm(["create", "zephyr typed", "--project", PROJECT, "--set", "type=bug", "--json"], W);
+  check(
+    "a task's own type field is reported as the server holds it",
+    tup(o.code, o.json?.kind, o.json?.type),
+    tup(0, "task", "bug"),
+  );
+  o = await tm(["create", "zephyr m1", "--kind", "milestone", "--project", PROJECT, "--json"], W);
+  check(
+    "create --kind milestone",
+    tup(o.code, o.json?.kind, o.json?.name),
+    tup(0, "milestone", "zephyr m1"),
+  );
+
+  console.log("\n── errors: exit 1, the server's message on stderr ──");
+  o = await tm(["create", "zephyr denied", "--project", PROJECT, "--json"], R);
+  check("read key create → exit 1, nothing on stdout", tup(o.code, o.stdout), tup(1, ""));
+  check(
+    "stderr names api_key_scope and the server's message",
+    tup(o.stderr.includes("api_key_scope"), o.stderr.includes("read-only")),
+    tup(true, true),
+  );
+  o = await tm(["show", ID, "--json"], R);
+  check("read key show → exit 0 (reads are allowed)", tup(o.code, o.json?.id), tup(0, ID));
+  o = await tm(["show", "nope00000000000", "--json"], W);
+  check("unknown id → exit 1", tup(o.code, o.stdout), tup(1, ""));
+  o = await tm(["list", "--json"], { TM_URL: BASE_URL, TM_API_KEY: `tmk_${"A".repeat(40)}` });
+  check(
+    "forged key → exit 1 with the server's 401 message",
+    tup(o.code, o.stderr.includes("invalid")),
+    tup(1, true),
+  );
+  o = await tm(["list", "--json"], {
+    TM_URL: BASE_URL,
+    HOME: path.join(S, "nohome"),
+    XDG_CONFIG_HOME: path.join(S, "noxdg"),
+  });
+  check(
+    "no key anywhere → exit 1, stderr says to run tm login",
+    tup(o.code, o.stderr.includes("tm login")),
+    tup(1, true),
+  );
+  o = await tm(["frobnicate"], W);
+  check("unknown verb → exit 2 (usage)", o.code, 2);
+  o = await tm(["--help"]);
+  check("--help → exit 0", o.code, 0);
+  o = await tm(["list", "--limit", "0", "--json"], W);
+  check("--limit 0 → exit 2", o.code, 2);
+  o = await tm(["list", "--json"], { TM_URL: "not-a-url", TM_API_KEY: WRITE_KEY });
+  check(
+    "a non-URL server → exit 1, a message, no stack trace",
+    tup(o.code, o.stderr.includes("not a URL"), o.stderr.includes("    at ")),
+    tup(1, true, false),
+  );
+  const BROKEN = path.join(S, "broken-xdg");
+  fs.mkdirSync(path.join(BROKEN, "tm"), { recursive: true });
+  fs.writeFileSync(path.join(BROKEN, "tm", "config.json"), "null\n");
+  o = await tm(["list", "--json"], { XDG_CONFIG_HOME: BROKEN });
+  check(
+    "a broken config file → exit 1 naming the file, no stack trace",
+    tup(
+      o.code,
+      o.stderr.includes(path.join(BROKEN, "tm", "config.json")),
+      o.stderr.includes("    at "),
+    ),
+    tup(1, true, false),
+  );
+} finally {
+  if (server !== null) await roomkit.stop(server);
+  fs.rmSync(S, { recursive: true, force: true });
+}
+
+console.log();
+if (failures) {
+  console.log(`❌ ${failures} check(s) FAILED`);
+  process.exit(1);
+} else {
+  console.log("✅ all tm CLI proofs passed");
+  process.exit(0);
+}

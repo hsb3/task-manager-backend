@@ -39,6 +39,7 @@
 2	6	test_roles
 3	6	test_agent_probe
 3	5	test_api_keys
+3	5	test_tm_cli
 4	5	test_auth_rules
 1	5	test_bulk_load_projects
 3	5	test_gen_decisions

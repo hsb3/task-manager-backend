@@ -504,6 +504,7 @@ run_suite "test_templates"          bun tests/test_templates.ts
 run_suite "test_saved_views"        bun tests/test_saved_views.ts
 run_suite "test_owner_defaults"     bun tests/test_owner_defaults.ts
 run_suite "test_api_keys"           bun tests/test_api_keys.ts
+run_suite "test_tm_cli"             bun tests/test_tm_cli.ts
 run_suite "test_path_scope"         bun tests/test_path_scope.ts
 run_suite "test_search"             bun tests/test_search.ts
 run_suite "test_export"             bun tests/test_export.ts

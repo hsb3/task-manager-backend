@@ -1,0 +1,11 @@
+{
+  "name": "tm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Command-line client for the task tracker: list, show, search, create, edit and comment on items with an API key.",
+  "type": "module",
+  "bin": { "tm": "./tm.ts" },
+  "scripts": {
+    "generate": "bun ../../scripts/gen_tm_client.ts"
+  }
+}

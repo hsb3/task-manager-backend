@@ -47,7 +47,7 @@ test_saved_views · 8133 = test_stale_write · 8134 = test_subscribers_notificat
 8138 = test_fresh_workspace · 8139 = test_rescope_guard · 8140 = test_priority_vocab ·
 8141 = test_inspire · 8142 = test_notifications_trash_cascade · 8143 = test_counts_route · 8144 =
 test_invite_mirror · 8145 = test_mutation_proof · 8146 = test_api_keys · 8149 = test_invitations · 8150 = test_invitation_limits · 8151 = test_workspace_save_tx · 8152 = test_agent_probe · 8153 = test_write_hygiene · 8154 = test_user_settings_me · 8155 = test_signup_verification · 8156 = test_access_rule_holes · 8158 = test_item_write_refusals · 8159 = test_item_list_filters · 8160 = test_e2e_world · 8165 = test_path_scope · 8166 = test_owner_defaults · 8170 = test_due_window · 8171 = test_counts_type_trash · 8172 = test_next_milestone · 8173 = test_unknown_keys · 8174 = test_owner_row · 8175 = test_trash_entry · 8176 = test_delete_impact · 8185 = test_invitation_expiry_list · 8186 = test_landing · 8177 = test_me_route · 8178 = test_notification_actor · 8179 = test_notifications_suspended · 8147 =
-test_pb_refusal_statuses · 8148 = test_draft_publish. SMTP sinks:
+test_pb_refusal_statuses · 8148 = test_draft_publish · 8193 = test_tm_cli. SMTP sinks:
 2526 battery email · 2527 battery hardening · 2528-2531 test_observability · 2532
 test_collab_flow · 2533 test_subscribers_notifications · 2534 test_signup_verification. `scripts/check_port_collisions.ts`
 prints the ports shared by design (the dev port, the probe band, the one hardening sink).

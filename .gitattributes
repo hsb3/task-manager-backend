@@ -1,5 +1,6 @@
 # GENERATED FILE — DO NOT EDIT BY HAND. Regenerate with: bun scripts/gen_gitattributes.ts
 .gitattributes merge=binary
+clients/tm/src/api.generated.ts merge=binary
 docs/generated/decisions.md merge=binary
 openapi.json merge=binary
 pb_hooks/field_patterns.json merge=binary
