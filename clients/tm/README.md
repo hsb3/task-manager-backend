@@ -41,6 +41,28 @@ Add `--json` to any verb to get the server's answer as JSON with the field names
 plus a `kind` naming the kind. `list` prints each item's id first; that id is what `show`,
 `edit` and `comment` take.
 
+## As an MCP server
+
+`tm mcp` offers the same verbs to an AI agent as tools (`tm_list`, `tm_show`, `tm_search`,
+`tm_create`, `tm_edit`, `tm_comment`), over the agent's standard input and output. It uses the key
+`tm login` saved, or `TM_URL` and `TM_API_KEY` when set. Add this server entry, with your own paths
+and key, to Claude Code's `.mcp.json` (or pass the same to `claude mcp add-json tm '...'`) or to
+Claude Desktop's `claude_desktop_config.json` under `mcpServers`. Write `bun` as the full path
+`which bun` prints: a desktop app does not search your shell's PATH.
+
+```json
+{
+  "tm": {
+    "command": "/opt/homebrew/bin/bun",
+    "args": ["/absolute/path/to/clients/tm/tm.ts", "mcp"],
+    "env": { "TM_URL": "https://your-server.example", "TM_API_KEY": "tmk_..." }
+  }
+}
+```
+
+A read key lets the agent list, show and search; a write key also lets it create, edit and
+comment. A refused action comes back to the agent as the server's own message.
+
 ## When something goes wrong
 
 - Exit code 0: it worked.

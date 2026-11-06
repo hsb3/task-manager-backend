@@ -106,6 +106,7 @@
 3	2	test_access_rule_holes
 4	2	test_notification_actor
 1	1	test_app_docs_seed_idempotent
+1	1	test_tm_mcp
 3	1	test_check_pb_pin
 1	1	test_decision_citations_checker
 2	1	test_historical_migration_guard

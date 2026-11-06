@@ -14,6 +14,7 @@ const HELP = `usage: tm <verb> [options]
   create <title> (--project ID | --workspace ID) [--kind KIND] [--set field=value]...
   edit <id> [--title TEXT] [--set field=value]...
   comment <id> <text>
+  mcp                               serve the verbs as tools to an AI agent over stdio
 
   KIND is task (default), document, decision or milestone.
   --json prints the server's answer as JSON; errors go to stderr and exit 1.
@@ -130,6 +131,10 @@ async function main(argv: string[]): Promise<number> {
     return 0;
   }
   const cfg = load_config();
+  if (verb === "mcp") {
+    await (await import("./src/mcp.ts")).serve(cfg); // loaded here only: the other verbs need no SDK
+    return 0;
+  }
   const kind = v.kind === undefined ? undefined : verbs.item_kind(v.kind);
   let data: unknown;
   switch (verb) {
