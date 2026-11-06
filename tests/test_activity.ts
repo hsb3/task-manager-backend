@@ -826,13 +826,18 @@ try {
   const hidden_created: Record<string, any> = {};
   for (const [coll, field, needle] of CREATE_BODIES) {
     let made: any;
+    // Only a superuser can still put a row under a trashed project (an API create is refused, card 6nrc).
     [s, made] = await api(
       "POST",
       `/api/collections/${coll}/records`,
-      alice,
+      su,
       create_body(coll, field, needle, ptrash.id ?? null),
     );
-    check(`(fixture) Alice creates a ${coll.slice(0, -1)} inside the TRASHED project`, s, 200);
+    check(
+      `(fixture) a superuser creates a ${coll.slice(0, -1)} inside the TRASHED project`,
+      s,
+      200,
+    );
     hidden_created[coll] = made.id ?? null;
   }
   const live_created: Record<string, any> = {};

@@ -49,8 +49,8 @@ capabilities:
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status
       ?= "active") || project.workspace.owner = @request.auth.id || (project.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && project.workspace.workspace_members_via_workspace.role ?!= "viewer" && project.workspace.workspace_members_via_workspace.status
-      ?= "active")) && (workspace = "" || workspace.trashed = "") && (project = "" || project.workspace.trashed
-      = "")'
+      ?= "active")) && (workspace = "" || workspace.trashed = "") && (project = "" || (project.workspace.trashed
+      = "" && project.trashed = ""))'
     actors:
     - workspace-owner
     - active-workspace-writer
@@ -59,7 +59,7 @@ capabilities:
     authRequired: guard
     record_state:
     - workspace = "" || workspace.trashed = ""
-    - project = "" || project.workspace.trashed = ""
+    - project = "" || (project.workspace.trashed = "" && project.trashed = "")
   update:
     verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status
