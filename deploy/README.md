@@ -17,6 +17,10 @@ Run these commands from the repository root. Application images remain defined b
 `Dockerfile`. Railway configuration
 and its preview/apply commands are in [railway/README.md](railway/README.md).
 
+## Local
+
+`make local-up` builds the `Dockerfile` image and runs it at `http://127.0.0.1:8090` (`+ PB_PORT_OFFSET`), with `pb_data` in a named volume; `make local-logs` follows the log and `make local-down` removes the container. Drop the data too with `docker compose -f deploy/local/compose.yaml down -v`. No superuser, mail, S3 or OAuth is configured. Files: [local/compose.yaml](local/compose.yaml).
+
 ## Bootstrapping a new Railway project
 
 On a new project, `railway config apply` creates the services, the volume and the buckets, but
