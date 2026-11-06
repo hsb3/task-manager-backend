@@ -220,6 +220,43 @@ try {
         if (trashed[0] !== 404) return trashed;
         return call("GET", "/api/tracker/trash?workspace=nope", c.Alice);
       },
+      500: async (c) => {
+        const q = (coll: string) =>
+          call(
+            "GET",
+            `/api/collections/${coll}/records?filter=${encodeURIComponent(`workspace = "${c.ws}"`)}`,
+            c.Alice,
+          );
+        const [, projects] = await q("projects");
+        const [, statuses] = await q("statuses");
+        const [mk, task] = await call("POST", "/api/collections/tasks/records", c.Alice, {
+          title: "trash 500 fixture",
+          project: projects.items?.[0]?.id,
+          status: statuses.items?.[0]?.id,
+        });
+        check("(fixture) task created", mk === 200, py_repr(task));
+        const [, col] = await call("GET", "/api/collections/project_items", c.su);
+        // PB validates a view by running it, so it is rigged while no row is trashed
+        const boom =
+          "abs(CASE WHEN u.trashed != '' THEN -9223372036854775808 ELSE 0 END) AS boom, ";
+        const viewQuery = col.viewQuery.replace(/^(\s*SELECT\s+)/i, `$1${boom}`);
+        const [st, pr] = await call("PATCH", "/api/collections/project_items", c.su, { viewQuery });
+        check("(fixture) project_items viewQuery rigged", st === 200, py_repr(pr));
+        try {
+          const [del] = await call("DELETE", `/api/collections/tasks/records/${task.id}`, c.Alice);
+          check("(fixture) task trashed", del === 204, String(del));
+          return await call(
+            "GET",
+            `/api/tracker/trash?workspace=${c.ws}&filter=${encodeURIComponent('title != ""')}`,
+            c.Alice,
+          );
+        } finally {
+          const [back] = await call("PATCH", "/api/collections/project_items", c.su, {
+            viewQuery: col.viewQuery,
+          });
+          check("(fixture) project_items viewQuery restored", back === 200, String(back));
+        }
+      },
     },
     "GET /api/tracker/users/{id}/settings": {
       404: (c) => call("GET", `/api/tracker/users/${c.Bob_id}/settings`, c.Alice),

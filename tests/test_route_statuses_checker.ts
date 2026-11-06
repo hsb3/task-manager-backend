@@ -166,6 +166,10 @@ expect("a throw after a `//` inside a string on the same line", (r) => {
   const at = plant_probe(r, BASE, '  const u = "a//b"; throw new ApiError(418, "x", {});');
   return [new RegExp(`^${esc(PROBE)} throws 418 at ${esc(HOST)}:${at} `, "u")];
 });
+expect("a throw after a regex literal holding a quote", (r) => {
+  const at = plant_probe(r, BASE, '  const re = /"/; throw new ApiError(418, "x", {});');
+  return [new RegExp(`^${esc(PROBE)} throws 418 at ${esc(HOST)}:${at} `, "u")];
+});
 expect("a status inside a string literal", (r) => {
   plant_probe(r, BASE, '  const m = "new NotFoundError( and e.json(500, ...)";');
   return [];

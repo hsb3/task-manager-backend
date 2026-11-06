@@ -509,6 +509,7 @@ const ROUTES = {
       400: "The workspace is missing or blank, or the filter, sort, group or time zone is refused: a filter longer than 3500 characters, a filter or sort that reaches past the items' own fields, a group outside the listed ones, or a time zone that is not an IANA name.",
       403: "The caller is a superuser, who is no member of any workspace; the same refusal the other member-only workspace routes answer.",
       404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member; its owner gets 404 for a trashed workspace too.",
+      500: "The trashed items could not be read for a reason other than the filter or sort.",
     },
     response: {
       status: 200,

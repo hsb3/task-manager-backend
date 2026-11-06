@@ -255,6 +255,19 @@ The relation columns that list queries filter on carry indexes, among them `idx_
 
 Request logs keep five days by default and flush asynchronously, so a reader polls the log rather than reading it once.
 
+## every-database-boots-from-the-migration-set
+
+- **Slug:** `decision:every-database-boots-from-the-migration-set`
+- **Title:** Every database boots from the current migration set, written for an empty database, so a backfill is historical and a migration never repairs rows.
+
+Why. The development database, every test room, the continuous-integration replay and production all apply the same migration directory, from empty or from whatever they already hold, and nothing else writes schema or seed data. A migration that repairs rows for the production data of one day runs again on every fresh database, where the rows it means to repair never existed, so its only lasting effect is a read and a write pass paid once by every fresh database, with the universal hooks firing on each write, and a text that describes data no reader of the migration set can see.
+
+Options weighed. (a) Backfills as first-class migrations that repair rows, the production-first habit: refused, because the set applies to many databases from empty, so a repair is a no-op everywhere but the one database it was written for while its cost is paid everywhere. (b) A gate that refuses any migration writing rows: refused, because two legitimate shapes write rows. The data seeds carry the app_docs and app_settings corpus, which every database must hold, and the field-type-change recipe (add the new field, copy the rows, detach any view that names the old column, remove the old field and rename) is the one way to change a field type, since a migration cannot change one in place. A gate that cannot tell a repair from those two shapes refuses the corpus and the recipe, or admits the repair. (c) Historical only: a backfill belongs to the history, a migration already applied everywhere it will ever apply; the current set is read as what an empty database becomes; a row repair for production data is an operation run against production, by hand or by script, never a migration. Chosen.
+
+Decision. Every database, development, test rooms, the continuous-integration replay, staging when one exists, and production, boots from the current migration set, and the set is written for an empty database. A migration never repairs rows. The one exception is the field-type-change recipe, whose row copy is part of a schema change and runs correctly on an empty database, where it copies nothing. A migration that must touch rows for any other reason is a sign that the fix belongs elsewhere: in a hook that keeps the invariant on every write, or in a one-off operation against the one database that holds the rows. No gate enforces this, by this decision: the review of a migration that writes rows asks which of the two admitted shapes it is, the replay of every migration into an empty database with the hooks loaded, at commit time and on every pull request, catches a repair the hooks refuse, and the backup replay job catches one that production data refuses.
+
+Prior art. Rails: the migrations guide states that migrations are not the authoritative source for the database schema, that a new database is created faster and with fewer errors by loading the schema file than by replaying the migration history, and that modifying data in a migration is to be approached with caution (Active Record Migrations guide: Schema Dumping and You; Migrations and Seed Data). Prisma: each migration records the state it starts from and the state it ends at, so the history is a chain of named versions and a database applies only the migrations it still lacks, and seeding is a separate command run only when invoked (Prisma Migrate: the migration graph; Seeding).
+
 ## file-storage-s3-from-env
 
 - **Slug:** `decision:file-storage-s3-from-env`

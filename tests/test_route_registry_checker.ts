@@ -332,6 +332,23 @@ lit_line("/* and */ inside two strings", `const a = "x/*y";\n${RT}\nconst b = "*
 lit_line("// inside a double-quoted string", `const u = "a//b"; ${RT}`);
 lit_line("// inside a template literal", `const u = \`a//\${1}b\`; ${RT}`);
 lit_line("// inside a single-quoted string", `const u = 'a//b'; ${RT}`);
+lit_line("regex holding a double quote", `const re = /"/; ${RT}`);
+lit_line("regex holding a single quote", `const re = /'/g; ${RT} 'x'`);
+lit_line("regex holding // in a class", `const re = /[//]/; ${RT}`);
+lit_line("regex holding /* in a class", `const re = /[/*]/; ${RT}\n/* c */`);
+lit_line("regex after return", `return /x"y/.test(s); ${RT}`);
+lit_line("nested template in a hole", `const u = \`a\${\`\${1}\`}b\`; ${RT} \`x\``);
+lit_line("object literal in a hole", `const u = \`x\${ {a:1}.a }y\`; ${RT} \`x\``);
+lit_line("division is not a regex", `const x = a / b / c; ${RT}`);
+lit_line("parenthesised division is not a regex", `const y = (a + b) / 2; ${RT}`);
+lit_line(
+  "division after a postfix increment is not a regex",
+  `const r = i++ / 2; ${RT}; const s = j / 3;`,
+);
+lit_line(
+  "division after a keyword-named property is not a regex",
+  `const r = box.in / 2; ${RT}; const s = j / 3;`,
+);
 root = mirror();
 append(root, OTHER, `const u = "a"; // it's "quoted\n/* an apostrophe ' in a comment */`);
 check(
