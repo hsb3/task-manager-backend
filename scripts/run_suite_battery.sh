@@ -607,6 +607,10 @@ run_suite "test_pb_refusal_statuses" bun tests/test_pb_refusal_statuses.ts
 
 # ── agent probe: one normal member drives the API end to end, friction asserted as it behaves now — self-booting.
 run_suite "test_agent_probe"        bun tests/test_agent_probe.ts
+run_suite "test_agent_probe_world"  bun tests/test_agent_probe.ts --world 22
+
+# ── e2e kit: the seed-fixed world generator and its public-API seeder (e2e/) — self-booting.
+run_suite "test_e2e_world"          bun tests/test_e2e_world.ts
 
 # ── operator tooling: the one-time project bulk loader (scripts/bulk_load_projects.ts) — self-booting.
 run_suite "test_bulk_load_projects" bun tests/test_bulk_load_projects.ts
