@@ -299,19 +299,19 @@ try {
 
   // ══════════ (4) the OTHER trash path: a direct PATCH of `trashed` ══════════
   // COVERS: hook:trash.pb.js#onRecordAfterUpdateSuccess:workspaces
-  // The DELETE hook trashes with a programmatic save, so an owner PATCHing `trashed`
-  // reaches the same state without ever entering it.
-  console.log("\n── (4) owner PATCH-trashes a workspace: the same rows are dropped ──");
+  // The DELETE hook trashes with a programmatic save, so a superuser PATCHing
+  // `trashed` (the only writer an update may trash for) reaches the same state without it.
+  console.log("\n── (4) superuser PATCH-trashes a workspace: the same rows are dropped ──");
   const [PATCH_WS, PATCH_PROJECT] = await make_workspace("patchws");
   const PATCH_TASK = await notified_task(PATCH_PROJECT, "patchtask");
   const PATCH_ROW = await row_id(PATCH_TASK, mia_id);
   check("the PATCH-path task carries {Mia,assigned}", await rows_for_task(PATCH_TASK), [
     tup(mia_id, "assigned"),
   ]);
-  [s] = await api("PATCH", `/api/collections/workspaces/records/${PATCH_WS}`, olive, {
+  [s] = await api("PATCH", `/api/collections/workspaces/records/${PATCH_WS}`, su, {
     trashed: TRASH_TS,
   });
-  check("Olive PATCHes trashed=<timestamp> → 200", s, 200);
+  check("a superuser PATCHes trashed=<timestamp> → 200", s, 200);
   check(
     "the workspace really is trashed",
     (await api("GET", `/api/collections/workspaces/records/${PATCH_WS}`, su))[1].trashed ?? null,
@@ -448,10 +448,10 @@ try {
     (await inbox(mia)).includes(XPATCH_NOTICE!),
     true,
   );
-  [s] = await api("PATCH", `/api/collections/workspaces/records/${XPATCH_WS}`, mia, {
+  [s] = await api("PATCH", `/api/collections/workspaces/records/${XPATCH_WS}`, su, {
     trashed: TRASH_TS,
   });
-  check("Mia (the NEW owner) PATCHes trashed=<timestamp> → 200", s, 200);
+  check("a superuser PATCHes trashed=<timestamp> → 200", s, 200);
   check(
     "the workspace really is trashed",
     (await api("GET", `/api/collections/workspaces/records/${XPATCH_WS}`, su))[1].trashed ?? null,

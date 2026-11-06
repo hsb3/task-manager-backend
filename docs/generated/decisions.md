@@ -550,7 +550,7 @@ Six collections carry a `trashed` date, empty on a live row: `workspaces`, `proj
 
 PocketBase evaluates the delete rule before the hook, so the item delete rules admit every active non-viewer member, who may trash, while purging stays with the owner and admins.
 
-**Restore** is a plain PATCH clearing `trashed` under the existing update rule. `GET /api/tracker/trash` lists the trash of a workspace for any active member, with a `purge_at` for each row.
+**Restore** is a plain PATCH clearing `trashed` under the existing update rule. Only a delete moves a row into the trash: an update that sets or re-dates `trashed`, or changes `trashed_by` while the row stays in the trash, is refused with 400, so an update can only restore; a superuser is exempt (card te4g). `GET /api/tracker/trash` lists the trash of a workspace for any active member, with a `purge_at` for each row.
 
 **Reads.** A trashed item, or an item in a trashed or missing project, is hidden from list and view on its own collection, from `project_items`, from every expand that points at it and from `POST /api/tracker/export`. Comments, activity, subscriptions and notifications hanging off it are hidden with it. `project_stats` excludes trashed rows in its query. Trashing a project stamps nothing on its items; the item rules hide them while it is in the trash (decision:dual-scope-items). Trashing a workspace cascades to its contents (decision:workspace-trash-cascades).
 
@@ -695,4 +695,4 @@ When a workspace is trashed, an after-update-success hook on `workspaces` in `pb
 
 It is not a transaction because the pooled script runtime shares the app binding of an event across in-flight requests: pointing it at a transaction corrupts unrelated concurrent requests, and running the cleanup on the write path holds that path and turns concurrent trashes into failures. Both effects are measured. If a half-finished cleanup is ever seen, the remedy is a purge-time sweep that drops notifications pointing into a trashed workspace.
 
-An active admin may trash the workspace too, and when it is the last live workspace of its owner, the owner gets the fresh workspace. That is the invariant that every user keeps a live workspace, not an action taken on the authority of the admin, who is not a member of the new workspace and gains nothing. Prior art: Linear lets admins as well as owners delete a workspace.
+Only the owner moves a workspace into the trash through the API, with a DELETE; an update that sets `trashed` is refused for the owner and an active admin alike (card te4g). A superuser can still trash one with an update, and when that is the last live workspace of its owner, the owner gets the fresh workspace, because every user keeps a live workspace. Prior art: Linear lets admins as well as owners delete a workspace. Here deletion stays with the owner, through the owner-only delete rule (decision:soft-delete-trash).

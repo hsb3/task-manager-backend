@@ -1650,19 +1650,15 @@ try {
     true,
   );
 
-  console.log("\n── (10c) PATCH-trashing a last workspace replaces it, exactly once ──");
+  console.log("\n── (10c) trashing a last workspace replaces it, exactly once ──");
   const [dan, dan_id] = await make_user("Dan", "dan@example.com");
   const dan_first = await live_workspaces(dan_id);
   check("(10c) a fresh account starts with one live workspace", dan_first.length, 1);
   const DAN_WS = getitem(dan_first[0], "id");
   check(
-    "(10c) Dan PATCH-trashes his only workspace",
-    (
-      await api("PATCH", `/api/collections/workspaces/records/${DAN_WS}`, dan, {
-        trashed: now_ts(),
-      })
-    )[0],
-    200,
+    "(10c) Dan trashes his only workspace (DELETE)",
+    (await api("DELETE", `/api/collections/workspaces/records/${DAN_WS}`, dan))[0],
+    204,
   );
   const dan_after = await live_workspaces(dan_id);
   check("(10c) he is left with exactly one live workspace", dan_after.length, 1);
@@ -1706,13 +1702,9 @@ try {
   });
   check("(10d) Dee creates a second workspace", s, 200);
   check(
-    "(10d) Dee puts her first one in the trash",
-    (
-      await api("PATCH", `/api/collections/workspaces/records/${DEE_FIRST}`, dee, {
-        trashed: now_ts(),
-      })
-    )[0],
-    200,
+    "(10d) Dee puts her first one in the trash (DELETE)",
+    (await api("DELETE", `/api/collections/workspaces/records/${DEE_FIRST}`, dee))[0],
+    204,
   );
   check("(10d) one live workspace is left", (await live_workspaces(dee_id)).length, 1);
   check(

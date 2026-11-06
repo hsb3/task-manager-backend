@@ -119,13 +119,6 @@ async function stop_server(proc: roomkit.Room | null): Promise<void> {
   await roomkit.stop(proc);
 }
 
-function now_ts(): string {
-  return new Date()
-    .toISOString()
-    .replace("T", " ")
-    .replace(/\.\d+Z$/, ".000Z");
-}
-
 function search(term: string, token: string | null): Promise<[number, any]> {
   const qs = urlencode({ q: term });
   return api("GET", `/api/tracker/search?${qs}`, token);
@@ -550,10 +543,8 @@ try {
     check(`${coll}: live row IS found before trash`, live.has(rid), true);
   }
   for (const [coll, rid] of Object.entries(own)) {
-    [s] = await api("PATCH", `/api/collections/${coll}/records/${rid}`, alice, {
-      trashed: now_ts(),
-    });
-    check(`${coll}: PATCH trashed → 200`, s, 200);
+    [s] = await api("DELETE", `/api/collections/${coll}/records/${rid}`, alice);
+    check(`${coll}: DELETE trashes the row → 204`, s, 204);
   }
   const gone = await hits("trashme-uniqtok", alice, "after trash");
   for (const [coll, rid] of Object.entries(own)) {
