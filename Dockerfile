@@ -25,6 +25,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 # PB 0.40.4 exits 1 on a refused migration, so the preflight refuses on that and never
 # serves a half-migrated database. KEEP IN SYNC: scripts/pb_migrate.ts, same `--migrationsDir`.
 
+# KEEP IN SYNC: scripts/replay_backup.sh, same `migrate up` and `--hooksDir`; its env -u list strips the S3 vars this preflight must keep.
 # Before `superuser create`, which otherwise writes a superuser into a database that can
 # never be served. --hooksDir matches serve's, so migrations apply in the same environment and a bad cron variable is refused here too.
 CMD ["/bin/sh", "-c", "\
