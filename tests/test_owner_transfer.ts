@@ -16,8 +16,8 @@ are minted via superuser and cleaned up at the end, each isolating one refusal c
 a denial by TENANCY can never read as a denial by ROLE.
 
 Both membership-row cases are exercised: §4/§5 UPDATE the outgoing owner's existing row,
-§6 MINTS one for a workspace created straight through the collections API (which has no
-roster row for its own owner — only the users-create auto-provision makes one).
+§6 MINTS one for a workspace whose owner row an operator removed (every workspace create gives
+its owner an admin row, and only a superuser can take it away).
 
 §9 and §10 fire two transfers by one owner SIMULTANEOUSLY: they go red on a route whose reads
 sit outside the transaction, because both callers are then told 200 and the loser rewrites the
@@ -213,6 +213,16 @@ async function roster_rows(ws: string, user: string, token: string | null): Prom
   const qs = urlencode({ filter: `(workspace='${ws}' && user='${user}')`, perPage: 5 });
   const [, r] = await api("GET", `/api/collections/workspace_members/records?${qs}`, token);
   return r.items || [];
+}
+
+/** Every workspace create gives its owner an admin row; only an operator can remove it. */
+async function su_drop_owner_row(ws: string, user: string, label: string): Promise<void> {
+  const [st] = await api(
+    "DELETE",
+    `/api/collections/workspace_members/records/${(await roster_rows(ws, user, su))[0]?.id}`,
+    su,
+  );
+  check(`${label}: fixture — superuser removes the owner's provisioned row`, st, 204);
 }
 
 /** (role, status) of the (ws, user) membership row, or None when there is none. */
@@ -537,8 +547,16 @@ await val_viewer.done();
 console.log("\n── §4 TRANSFER to an active ADMIN (outgoing owner's roster row already EXISTS) ──");
 // Every post-transfer assertion below rides the owner flip, so removing the route turns it
 // RED: a row whose value is the same before and after would pass against no route at all.
+// Every workspace now gives its owner an admin row, so the operator sets it to member first to keep the rewrite observable.
+[s] = await api(
+  "PATCH",
+  `/api/collections/workspace_members/records/${(await roster_rows(ALICE_WORKSPACE, alice_id, su))[0].id}`,
+  su,
+  { role: "member" },
+);
+check("transfer→admin: fixture — superuser sets Alice's own row to member", s, 200);
 check(
-  "transfer→admin: before — Alice member/active (auto-provisioned), Dana admin/active",
+  "transfer→admin: before — Alice member/active (set by the operator), Dana admin/active",
   tup(await roster(ALICE_WORKSPACE, alice_id, su), await dana_admin.standing()),
   tup(tup("member", "active"), tup("admin", "active")),
 );
@@ -701,6 +719,7 @@ check_in(
   [200, 201],
 );
 const DIRECT_WS: string = r.id ?? null;
+await su_drop_owner_row(DIRECT_WS, alice_id, "minted-row");
 check(
   "minted-row: premise — a directly-created workspace has NO roster row for its owner",
   await roster(DIRECT_WS, alice_id, su),
@@ -801,6 +820,7 @@ console.log("\n── §9 CONCURRENCY: two simultaneous transfers by ONE owner o
 });
 check_in("concurrent: Alice creates a second direct workspace", s, [200, 201]);
 const RACE_WS: string = r.id ?? null;
+await su_drop_owner_row(RACE_WS, alice_id, "concurrent");
 const [amy_id] = await su_create_user("Amy");
 await su_add_member(RACE_WS, amy_id, "admin", "active", "Amy");
 const [ben_id] = await su_create_user("Ben");
@@ -845,16 +865,16 @@ check(
 );
 
 console.log("\n── §10 CONCURRENCY on a workspace whose owner ALREADY has a roster row ──");
-// §9 races the MINT path; only the users-create auto-provision leaves the owner a row, so an
-// auto-provisioned workspace is what races the UPDATE path — the one that can mint a SECOND row.
+// §9 races the MINT path; a workspace whose owner keeps their provisioned row races the UPDATE
+// path — the one that can mint a SECOND row.
 const [rex_id, rex_email] = await su_create_user("Rex");
 const [rex] = await login(rex_email);
 const REX_WS = (await find_id("workspaces", "owner", rex_id, su))!;
 const rex_rows_before = await roster_rows(REX_WS, rex_id, su);
 check(
-  "provisioned-race: premise — Rex's own roster row exists, exactly one, member/active",
+  "provisioned-race: premise — Rex's own roster row exists, exactly one, admin/active",
   tup(rex_rows_before.length, await roster(REX_WS, rex_id, su)),
-  tup(1, tup("member", "active")),
+  tup(1, tup("admin", "active")),
 );
 const [sal_id] = await su_create_user("Sal");
 await su_add_member(REX_WS, sal_id, "admin", "active", "Sal");
@@ -1041,9 +1061,17 @@ const [ollie_id] = await su_create_user("Ollie");
 const OLLIE_WS = (await find_id("workspaces", "owner", ollie_id, su))!;
 const [nina_id] = await su_create_user("Nina");
 await su_add_member(OLLIE_WS, nina_id, "member", "active", "Nina");
+// The operator sets Ollie's provisioned admin row to member so the rewrite to admin is observable.
+[s] = await api(
+  "PATCH",
+  `/api/collections/workspace_members/records/${(await roster_rows(OLLIE_WS, ollie_id, su))[0].id}`,
+  su,
+  { role: "member" },
+);
+check("superuser: fixture — superuser sets Ollie's own row to member", s, 200);
 const ollie_before = (await roster_stamp(OLLIE_WS, ollie_id, su))!;
 check(
-  "superuser: before — Ollie owns it and holds his auto-provisioned member/active row",
+  "superuser: before — Ollie owns it and holds a member/active row",
   tup(await owner_of(OLLIE_WS, su), tup(...ollie_before.slice(0, 2))),
   tup(ollie_id, tup("member", "active")),
 );
@@ -1157,6 +1185,7 @@ check_in(
   [200, 201],
 );
 const SU_DIRECT_WS: string = r.id ?? null;
+await su_drop_owner_row(SU_DIRECT_WS, ursa_id, "superuser-mint");
 check(
   "superuser-mint: premise — that workspace has NO roster row for its owner Ursa",
   await roster(SU_DIRECT_WS, ursa_id, su),

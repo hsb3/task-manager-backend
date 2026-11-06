@@ -608,9 +608,9 @@ const ivy_email = `role-ivy-${randomBytes(4).toString("hex")}@example.com`;
 let ivy_id = await su_create_user("Ivy", ivy_email);
 THROWAWAYS.push(ivy_id);
 const [ivy] = await login(ivy_email);
-// A workspace created through the public API gets NO membership row (only the
-// users-create provision hook writes one) — that empty back-relation join is the
-// "" an anonymous caller's empty @request.auth.id used to match.
+// A workspace with NO membership row — its empty back-relation join is the "" an anonymous
+// caller's empty @request.auth.id used to match. Every create gives the owner a row, so the
+// operator removes it.
 [s, ivy_ws] = await api("POST", "/api/collections/workspaces/records", ivy, {
   name: "role-test: zero-member workspace",
   owner: ivy_id,
@@ -618,6 +618,9 @@ const [ivy] = await login(ivy_email);
 check_in("setup: Ivy creates a workspace through the public API", s, [200, 201]);
 const IVY_WS = ivy_ws["id"];
 let qs = urlencode({ filter: `workspace='${esc(IVY_WS)}'` });
+[, r] = await api("GET", `/api/collections/workspace_members/records?${qs}`, su);
+[s] = await api("DELETE", `/api/collections/workspace_members/records/${r.items?.[0]?.id}`, su);
+check("setup: superuser removes the owner's provisioned row", s, 204);
 [, r] = await api("GET", `/api/collections/workspace_members/records?${qs}`, su);
 check(
   "project_stats anon read-guard: the new workspace has ZERO workspace_members rows",

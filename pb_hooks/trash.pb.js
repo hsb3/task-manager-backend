@@ -652,7 +652,6 @@ onRecordAfterUpdateSuccess((e) => {
       );
     } catch (_) {
       var wsCol = e.app.findCollectionByNameOrId("pbc_300100001"); // workspaces
-      var memCol = e.app.findCollectionByNameOrId("pbc_300100002"); // workspace_members
       var projCol = e.app.findCollectionByNameOrId("pbc_484305853"); // projects
       var ws = new Record(wsCol);
       ws.set("name", "My Workspace");
@@ -664,14 +663,6 @@ onRecordAfterUpdateSuccess((e) => {
       // G1 (#74) + decision:default-priority-vocabulary: default vocab (5 statuses + 3 core labels + priorities) is
       // seeded by the single onRecordAfterCreateSuccess("workspaces") seeder in main.pb.js —
       // which fires on THIS programmatic save too — so NO inline seeding here.
-      var mem = new Record(memCol);
-      mem.set("workspace", ws.id);
-      mem.set("user", ownerId);
-      // role + status are required — omit either and this save throws,
-      // which the catch below swallows into an orphaned workspace.
-      mem.set("role", "member");
-      mem.set("status", "active");
-      e.app.save(mem);
       var proj = new Record(projCol);
       proj.set("name", "My Project");
       proj.set("owner", ownerId);

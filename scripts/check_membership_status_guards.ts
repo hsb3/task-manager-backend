@@ -104,6 +104,15 @@ export const ALLOWLIST_RULES: Allowlist = new Map();
 export const ALLOWLIST_HOOKS: Allowlist = new Map([
   [
     JSON.stringify([
+      "owner.pb.js",
+      "e.app.findFirstRecordByFilter",
+      "workspace = {:w} && user = {:u}",
+    ]),
+    "not a grant: the workspaces after-create provision asks whether the new owner already holds " +
+      "a roster row before minting their admin row, so a re-fire leaves exactly one row (card 06sf)",
+  ],
+  [
+    JSON.stringify([
       "routes.pb.js",
       "txApp.findFirstRecordByFilter",
       "workspace = {:w} && user = {:u}",

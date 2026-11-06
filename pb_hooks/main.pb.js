@@ -270,11 +270,8 @@ function validateTaskAssignee(e) {
       }
     }
     if (!workspaceId) return e.next();
-    // The workspace OWNER is implicitly assignable even without a
-    // workspace_members row — the m10 backfill seeds self-memberships, but a
-    // workspace created later has none, so without this short-circuit an owner
-    // assigning a task to themselves there would 400.
-    // (The API rules already treat the owner specially the same way.)
+    // The workspace OWNER is assignable on ownership alone, whatever their roster row says
+    // (the API rules already treat the owner specially the same way).
     const workspace = e.app.findRecordById("workspaces", workspaceId);
     if (workspace.get("owner") === assignee) {
       return e.next();
@@ -438,7 +435,7 @@ onRecordUpdateRequest(validateTaskItemRelations, "tasks");
 // migration time (decision:auto-provision-workspace), so every account minted
 // since dead-ended with no board (#36). This hook is that backfill's find-or-create
 // loop for the RUNTIME cohort: when a users record is created, give it a default
-// workspace + self-membership + a default project (#57 — without a project a fresh
+// workspace (owner.pb.js gives it the owner's admin row) + a default project (#57 — without a project a fresh
 // approved account still lands on an empty board until it finds Settings → project
 // CRUD; the default project heals that).
 //
@@ -460,7 +457,7 @@ onRecordUpdateRequest(validateTaskItemRelations, "tasks");
 // _logs (dashboard Logs view), NOT stdout. Collection ids: workspaces pbc_300100001,
 // workspace_members pbc_300100002, projects pbc_484305853.
 //
-// #38 forward-compat: this hook makes the user both owner AND member; the
+// #38 forward-compat: the user is both owner AND (owner.pb.js) a roster admin; the
 // validateTaskAssignee short-circuit on workspace.owner keeps a self-assignment
 // working with or without the membership row — do NOT remove that short-circuit.
 //
@@ -484,7 +481,6 @@ onRecordAfterCreateSuccess((e) => {
   } catch (_) {
     try {
       const wsCol = e.app.findCollectionByNameOrId("pbc_300100001"); // workspaces
-      const memCol = e.app.findCollectionByNameOrId("pbc_300100002"); // workspace_members
       const projCol = e.app.findCollectionByNameOrId("pbc_484305853"); // projects
       const ws = new Record(wsCol);
       ws.set("name", "My Workspace");
@@ -496,14 +492,6 @@ onRecordAfterCreateSuccess((e) => {
       // G1 (#74) + decision:default-priority-vocabulary: default vocab (5 statuses + 3 core labels + priorities) is
       // seeded by the single onRecordAfterCreateSuccess("workspaces") seeder above — which
       // fires on THIS programmatic e.app.save(ws) too — so NO inline seeding here.
-      const mem = new Record(memCol);
-      mem.set("workspace", ws.id);
-      mem.set("user", e.record.id);
-      // role + status are required — omit either and this save throws,
-      // which the catch below swallows into an orphaned workspace.
-      mem.set("role", "member");
-      mem.set("status", "active");
-      e.app.save(mem);
       // #57: seed a default project so the board is never empty on first login. We
       // only reach here when the user owned NO workspace (outer guard), so the
       // workspace above is brand-new and has zero projects — creating one here is
@@ -717,7 +705,6 @@ onRecordAfterDeleteSuccess((e) => {
   } catch (_) {
     try {
       const wsCol = e.app.findCollectionByNameOrId("pbc_300100001"); // workspaces
-      const memCol = e.app.findCollectionByNameOrId("pbc_300100002"); // workspace_members
       const projCol = e.app.findCollectionByNameOrId("pbc_484305853"); // projects
       const ws = new Record(wsCol);
       ws.set("name", "My Workspace");
@@ -729,14 +716,6 @@ onRecordAfterDeleteSuccess((e) => {
       // G1 (#74) + decision:default-priority-vocabulary: default vocab (5 statuses + 3 core labels + priorities) is
       // seeded by the single onRecordAfterCreateSuccess("workspaces") seeder above — which
       // fires on THIS programmatic e.app.save(ws) too — so NO inline seeding here.
-      const mem = new Record(memCol);
-      mem.set("workspace", ws.id);
-      mem.set("user", owner.id);
-      // role + status are required — omit either and this save throws,
-      // which the catch below swallows into an orphaned workspace.
-      mem.set("role", "member");
-      mem.set("status", "active");
-      e.app.save(mem);
       const proj = new Record(projCol);
       proj.set("name", "My Project");
       proj.set("owner", owner.id);

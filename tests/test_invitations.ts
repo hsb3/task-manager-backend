@@ -499,7 +499,12 @@ try {
     `${MEMBERS}?filter=` + quote(`workspace='${WS}' && user='${owner_id}'`),
     su,
   );
-  check("no membership row was created for the owner", getitem(roster_owner, "items"), []);
+  check(
+    "accepting wrote nothing: the owner keeps only the admin row their workspace gave them",
+    getitem(roster_owner, "items").map((m: any) => [m.role, m.status]),
+    [["admin", "active"]],
+  );
+  check("the reply names the owner", tup(acc_owner.membership, acc_owner.role), tup(null, "owner"));
   check("the owner's invitation is gone", await has_invite(WS, inv_owner), false);
 
   console.log("\n── R3: accept on an EXISTING (suspended) membership leaves it unchanged ──");

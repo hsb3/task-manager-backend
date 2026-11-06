@@ -90,6 +90,8 @@
 1	2	test_owner_defaults
 4	2	test_item_list_filters
 2	2	test_item_write_refusals
+1	2	test_owner_row
+2	2	test_unknown_keys
 3	2	test_pb_migrate
 2	2	test_pb_refusal_statuses
 4	2	test_rescope_guard_checker

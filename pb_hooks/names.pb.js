@@ -48,20 +48,14 @@ onRecordUpdateRequest(rejectBlankName, "workspaces");
 // ── Refuse an update whose body names no field of the collection ───
 
 function refuseEmptyUpdate(e) {
-  const fields = e.record.collection().fields;
   const body = e.requestInfo().body || {};
+  // Any key but the stale-write guard, and any file part, is a change, a tasks `move`, or an
+  // unknown key that schema_guards.pb.js refuses by name (PB has already folded `labels+` into `labels`).
   for (const key of Object.keys(body)) {
-    // KEEP IN SYNC: ordinal.pb.js — a tasks `move` reorders the task without naming a field.
-    if (key === "move" && e.collection.name === "tasks") return e.next();
-    // `labels+` / `labels-` modify the `labels` field.
-    if (fields.getByName(key.replace(/[+-]$/, ""))) return e.next();
+    if (key !== "expected_updated_at") return e.next();
   }
-  for (let i = 0; i < fields.length; i++) {
-    if (fields[i].type() !== "file") continue;
-    try {
-      if (e.findUploadedFiles(fields[i].name).length) return e.next();
-    } catch (_) {} // throws when the request carries no file for the field
-  }
+  const form = e.requestEvent.request.multipartForm;
+  if (form && form.file && Object.keys(form.file).length) return e.next();
   throw new BadRequestError("No changes were supplied.");
 }
 

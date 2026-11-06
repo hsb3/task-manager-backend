@@ -26,6 +26,44 @@ onRecordCreateRequest((e) => {
   e.next();
 }, "saved_views");
 
+// A new workspace gives its owner an active admin roster row beneath workspaces.owner. Universal
+// after-create tier, so a signup provision, a reprovision and a direct API create all reach it; it
+// never throws, because this tier also fires for a migration's own save and a throw there aborts the boot.
+onRecordAfterCreateSuccess((e) => {
+  const ownerId = e.record.getString("owner");
+  try {
+    if (ownerId) {
+      try {
+        e.app.findFirstRecordByFilter(
+          "workspace_members",
+          "workspace = {:w} && user = {:u}",
+          { w: e.record.id, u: ownerId },
+        );
+      } catch (_) {
+        const mem = new Record(
+          e.app.findCollectionByNameOrId("workspace_members"),
+        );
+        mem.set("workspace", e.record.id);
+        mem.set("user", ownerId);
+        mem.set("role", "admin");
+        mem.set("status", "active");
+        e.app.save(mem);
+      }
+    }
+  } catch (err) {
+    e.app
+      .logger()
+      .error(
+        "owner membership provision failed",
+        "workspace",
+        e.record.id,
+        "err",
+        String(err),
+      );
+  }
+  e.next();
+}, "workspaces");
+
 // An account delete empties saved_views.owner (kata bwpj); a personal view is readable only by its
 // owner, so an emptied one is unreachable. Universal tier: the purge cron deletes programmatically.
 onRecordAfterDeleteSuccess((e) => {

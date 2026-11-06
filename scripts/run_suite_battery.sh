@@ -557,6 +557,12 @@ run_suite "test_counts_type_trash"   bun tests/test_counts_type_trash.ts
 # ── project_stats names each project's next milestone.
 run_suite "test_next_milestone"      bun tests/test_next_milestone.ts
 
+# ── the owner row: every workspace gives its owner an admin row the owner and admins cannot demote, suspend or remove.
+run_suite "test_owner_row"           bun tests/test_owner_row.ts
+
+# ── unknown keys: every record write refuses a body key its collection does not define, naming it.
+run_suite "test_unknown_keys"        bun tests/test_unknown_keys.ts
+
 # ── security: a trashed workspace is unreadable but owner-enumerable and owner-restorable — self-booting.
 run_suite "test_workspace_trash"    bun tests/test_workspace_trash.ts
 
