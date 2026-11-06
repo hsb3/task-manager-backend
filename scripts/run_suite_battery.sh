@@ -569,6 +569,12 @@ run_suite "test_trash_entry"         bun tests/test_trash_entry.ts
 # ── deletion impact: the owner reads what deleting a workspace takes with it in one call.
 run_suite "test_delete_impact"       bun tests/test_delete_impact.ts
 
+# ── invitations: an admin's sent-invitations list carries the same expiry the invitee's own route reports.
+run_suite "test_invitation_expiry_list" bun tests/test_invitation_expiry_list.ts
+
+# ── landing: the workspace a user lands in, and whether a named workspace can be switched to.
+run_suite "test_landing"             bun tests/test_landing.ts
+
 # ── security: a trashed workspace is unreadable but owner-enumerable and owner-restorable — self-booting.
 run_suite "test_workspace_trash"    bun tests/test_workspace_trash.ts
 

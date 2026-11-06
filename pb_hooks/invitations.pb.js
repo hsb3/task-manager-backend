@@ -4,27 +4,7 @@
 // Universal, not *Request: the invite route's programmatic save and a direct collection create
 // must reach the same key, and the (workspace, email_key) unique index is the backstop.
 onRecordCreate((e) => {
-  // Nested, not top-level: the pooled JSVM cannot share a helper across callbacks.
-  // An app_settings.value reads back either a plain number or a JSVM byte-array.
-  function readIntSetting(key, fallback) {
-    try {
-      const raw = e.app
-        .findFirstRecordByFilter("app_settings", "key = {:k}", { k: key })
-        .get("value");
-      let parsed = NaN;
-      if (Array.isArray(raw) && raw.length && typeof raw[0] === "number") {
-        let text = "";
-        for (let i = 0; i < raw.length; i++)
-          text += String.fromCharCode(raw[i]);
-        parsed = parseInt(text, 10);
-      } else {
-        parsed = parseInt(String(raw), 10);
-      }
-      return !isNaN(parsed) && parsed >= 0 ? parsed : fallback;
-    } catch (_) {
-      return fallback;
-    }
-  }
+  const invLib = require(`${__hooks}/lib/invitations.js`);
   // ── INLINED FOLD (invitation copy) — KEEP IN SYNC: pb_hooks/oauth.pb.js `googlemail.com`; the
   // pooled JSVM cannot share a top-level helper.
   const raw = String(e.record.getString("email") || "");
@@ -48,11 +28,7 @@ onRecordCreate((e) => {
   if (e.record.get("invitationLimitExempt") === true) return e.next();
   const inviter = e.record.getString("invited_by");
   const wsId = e.record.getString("workspace");
-  // KEEP IN SYNC: pb_hooks/invitation_expiry.pb.js `invitation_expiry_days`
-  const days = readIntSetting("invitation_expiry_days", 7);
-  const declineCutoff = new Date(Date.now() - days * 86400000)
-    .toISOString()
-    .replace("T", " ");
+  const declineCutoff = invLib.daysAgo(invLib.expiryDays(e.app));
   const tombstones = e.app.findRecordsByFilter(
     "invitation_events",
     "workspace = {:w} && email_key = {:k} && kind = 'decline' && created > {:c}",
@@ -73,7 +49,11 @@ onRecordCreate((e) => {
     throw new BadRequestError(
       "This invitation could not be sent. Please try again.",
     );
-  const limit = readIntSetting("invitation_mint_limit_per_day", 50);
+  const limit = invLib.readIntSetting(
+    e.app,
+    "invitation_mint_limit_per_day",
+    50,
+  );
   const now = new Date();
   const eventId = $security.randomStringWithAlphabet(
     15,
@@ -148,28 +128,8 @@ routerAdd(
   "/api/tracker/invitations/mine",
   (e) => {
     const key = e.auth.getString("email_key");
-    // ── INLINED EXPIRY DAYS (mine copy) — KEEP IN SYNC: pb_hooks/invitation_expiry.pb.js `invitation_expiry_days` ──
-    let days = 7;
-    try {
-      const raw = e.app
-        .findFirstRecordByFilter("app_settings", "key = {:k}", {
-          k: "invitation_expiry_days",
-        })
-        .get("value");
-      let parsed = NaN;
-      if (Array.isArray(raw) && raw.length && typeof raw[0] === "number") {
-        let text = "";
-        for (let i = 0; i < raw.length; i++)
-          text += String.fromCharCode(raw[i]);
-        parsed = parseInt(text, 10);
-      } else {
-        parsed = parseInt(String(raw), 10);
-      }
-      if (!isNaN(parsed) && parsed >= 0) days = parsed;
-    } catch (_) {
-      days = 7;
-    }
-    // ── END INLINED EXPIRY DAYS (mine copy) ──
+    const invLib = require(`${__hooks}/lib/invitations.js`);
+    const days = invLib.expiryDays(e.app);
     const items = [];
     if (!key) return e.json(200, { items: items });
     const rows = e.app.findRecordsByFilter(
@@ -180,7 +140,6 @@ routerAdd(
       0,
       { k: key },
     );
-    const now = Date.now();
     for (let i = 0; i < rows.length; i++) {
       let ws;
       try {
@@ -190,15 +149,15 @@ routerAdd(
       }
       if (String(ws.get("trashed")) !== "") continue;
       const created = rows[i].getString("created");
-      const expiresMs = Date.parse(created.replace(" ", "T")) + days * 86400000;
+      const ex = invLib.expiry(created, days);
       items.push({
         id: rows[i].id,
         workspace: ws.id,
         workspace_name: ws.getString("name"),
         role: rows[i].getString("role"),
         created: created,
-        expires_at: new Date(expiresMs).toISOString().replace("T", " "),
-        expired: now >= expiresMs,
+        expires_at: ex.expires_at,
+        expired: ex.expired,
       });
     }
     return e.json(200, { items: items });
@@ -239,31 +198,9 @@ routerAdd(
       throw new ForbiddenError(
         "Confirm your email address before accepting an invitation.",
       );
-    // ── INLINED EXPIRY DAYS (accept copy) — KEEP IN SYNC: pb_hooks/invitation_expiry.pb.js `invitation_expiry_days` ──
-    let days = 7;
-    try {
-      const raw = e.app
-        .findFirstRecordByFilter("app_settings", "key = {:k}", {
-          k: "invitation_expiry_days",
-        })
-        .get("value");
-      let parsed = NaN;
-      if (Array.isArray(raw) && raw.length && typeof raw[0] === "number") {
-        let text = "";
-        for (let i = 0; i < raw.length; i++)
-          text += String.fromCharCode(raw[i]);
-        parsed = parseInt(text, 10);
-      } else {
-        parsed = parseInt(String(raw), 10);
-      }
-      if (!isNaN(parsed) && parsed >= 0) days = parsed;
-    } catch (_) {
-      days = 7;
-    }
-    // ── END INLINED EXPIRY DAYS (accept copy) ──
-    const expiresMs =
-      Date.parse(inv.getString("created").replace(" ", "T")) + days * 86400000;
-    if (Date.now() >= expiresMs) {
+    const invLib = require(`${__hooks}/lib/invitations.js`);
+    const days = invLib.expiryDays(e.app);
+    if (invLib.expiry(inv.getString("created"), days).expired) {
       // The row stays until the sweep takes it, so the invitee's list shows it as expired.
       const msg = "This invitation has expired.";
       throw new ApiError(410, msg, {
@@ -386,34 +323,11 @@ routerAdd(
 
 // Every collection read of an invitation carries the backend-computed expiry (decision:backend-owns-business-rules); the collection rules stay the only authorization.
 onRecordEnrich((e) => {
-  // ── INLINED EXPIRY DAYS (enrich copy) — KEEP IN SYNC: pb_hooks/invitation_expiry.pb.js `invitation_expiry_days` ──
-  let days = 7;
-  try {
-    const raw = e.app
-      .findFirstRecordByFilter("app_settings", "key = {:k}", {
-        k: "invitation_expiry_days",
-      })
-      .get("value");
-    let parsed = NaN;
-    if (Array.isArray(raw) && raw.length && typeof raw[0] === "number") {
-      let text = "";
-      for (let i = 0; i < raw.length; i++) text += String.fromCharCode(raw[i]);
-      parsed = parseInt(text, 10);
-    } else {
-      parsed = parseInt(String(raw), 10);
-    }
-    if (!isNaN(parsed) && parsed >= 0) days = parsed;
-  } catch (_) {
-    days = 7;
-  }
-  // ── END INLINED EXPIRY DAYS (enrich copy) ──
-  const created = e.record.getString("created");
-  const expiresMs = Date.parse(created.replace(" ", "T")) + days * 86400000;
+  const invLib = require(`${__hooks}/lib/invitations.js`);
+  const days = invLib.expiryDays(e.app);
+  const ex = invLib.expiry(e.record.getString("created"), days);
   e.record.withCustomData(true);
-  e.record.set(
-    "expires_at",
-    new Date(expiresMs).toISOString().replace("T", " "),
-  );
-  e.record.set("expired", Date.now() >= expiresMs);
+  e.record.set("expires_at", ex.expires_at);
+  e.record.set("expired", ex.expired);
   e.next();
 }, "workspace_invitations");
