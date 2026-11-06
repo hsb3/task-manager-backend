@@ -13,6 +13,7 @@
 3	33	test_app_admin_approval
 2	30	test_project_items_view
 4	24	load_smoketest
+2	24	test_invitation_mail
 3	21	test_observability
 1	16	test_comments
 2	16	test_stale_write

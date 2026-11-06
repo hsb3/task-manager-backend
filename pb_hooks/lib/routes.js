@@ -656,7 +656,7 @@ const ROUTES = {
   },
   "POST /api/tracker/workspaces/{id}/resolve-member-email": {
     summary:
-      "Invites an email address to the workspace with a role, answering the same whether or not the address has an account.",
+      "Invites an email address to the workspace with a role, or sends a pending invitation to it again, answering the same whether or not the address has an account.",
     auth: "any",
     request: {
       type: "object",
@@ -680,14 +680,21 @@ const ROUTES = {
       400: "The email is missing or blank, the role is not admin, member or viewer, a caller who is not the owner asked for an admin or a viewer, or the body carries expected_updated_at.",
       404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin.",
       409: "The address recently declined an invitation to this workspace; invite it again later.",
-      429: "The daily invitation limit of the inviter is reached, or the rate-limit window is exhausted; wait before inviting again.",
+      429: "The daily invitation limit of the inviter is reached, or the same pending invitation was sent again less than a minute ago; wait before inviting again.",
     },
     response: {
       status: 200,
       schema: {
         type: "object",
-        properties: { invited: { type: "boolean" } },
-        required: ["invited"],
+        properties: {
+          invited: { type: "boolean" },
+          mail_sent: {
+            type: "boolean",
+            description:
+              "True when the invitation email is being sent; false when no mail server is configured.",
+          },
+        },
+        required: ["invited", "mail_sent"],
       },
     },
   },
@@ -821,6 +828,13 @@ const ROUTES = {
           "expand carries statuses_via_workspace (by position) and labels_via_workspace (by creation).",
       },
     },
+  },
+  "POST /internal/invitation-mail/{id}": {
+    summary:
+      "Sends an invitation email; called by the server itself after an invitation is created and refuses any other caller.",
+    auth: "none",
+    internal: true,
+    response: { status: 204, schema: null },
   },
   "POST /internal/signup-verification/{id}": {
     summary:

@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// workspace_invitations: the server-side fold on create, and the invitee's list/accept/decline routes (decision:invitation-keyed-by-email).
+// workspace_invitations: the server-side fold on create, the invitation mail, and the invitee's list/accept/decline routes (decision:invitation-keyed-by-email).
 
 // Universal, not *Request: the invite route's programmatic save and a direct collection create
 // must reach the same key, and the (workspace, email_key) unique index is the backstop.
@@ -104,8 +104,136 @@ onRecordCreateRequest((e) => {
   // A custom key, never a field: a request body cannot set it (only collection fields load).
   if (e.auth && e.auth.isSuperuser())
     e.record.set("invitationLimitExempt", true);
+  // Custom data set before e.next() reaches the create response and no later read.
+  e.record.withCustomData(true);
+  e.record.set(
+    "mail_sent",
+    !(e.auth && e.auth.isSuperuser()) && e.app.settings().smtp.enabled,
+  );
   return e.next();
 }, "workspace_invitations");
+
+// Per-boot secret that lets only this server call the invitation mail route below.
+onBootstrap((e) => {
+  e.next();
+  e.app.store().set("invitationMailSecret", $security.randomString(40));
+});
+
+// Universal, not *Request: the invite route's programmatic save must mail too (decision:invitation-mail-and-resend).
+onRecordAfterCreateSuccess((e) => {
+  e.next();
+  if (e.record.get("invitationLimitExempt") === true) return;
+  // With SMTP off PB falls back to the host's sendmail, which would deliver real mail.
+  if (!e.app.settings().smtp.enabled) {
+    e.app
+      .logger()
+      .warn(
+        "invitation email skipped: SMTP disabled",
+        "invitation",
+        e.record.id,
+      );
+    return;
+  }
+  const failure = require(`${__hooks}/lib/invitations.js`).dispatchMail(
+    e.app,
+    e.record.id,
+  );
+  if (failure) {
+    e.app
+      .logger()
+      .error(
+        "invitation email failed",
+        "invitation",
+        e.record.id,
+        "err",
+        failure.split(e.record.getString("email")).join("[address]"),
+      );
+  }
+}, "workspace_invitations");
+
+// Answers 204 before sending, so the create that called it never waits on SMTP.
+require(`${__hooks}/lib/routes.js`).add(
+  "POST /internal/invitation-mail/{id}",
+  (e) => {
+    const secret = e.app.store().get("invitationMailSecret");
+    if (
+      !secret ||
+      !$security.equal(e.request.header.get("X-Invitation-Mail"), secret)
+    ) {
+      throw new NotFoundError();
+    }
+    // Close: the caller would otherwise reuse this connection while the send still holds it.
+    e.response.header().set("Connection", "close");
+    e.response.writeHeader(204);
+    e.flush();
+
+    // A batch create commits only after its hook returns, so wait for the row.
+    const id = e.request.pathValue("id");
+    let inv = null;
+    for (let i = 0; i < 50 && !inv; i++) {
+      try {
+        inv = e.app.findRecordById("workspace_invitations", id);
+      } catch (_) {
+        sleep(100);
+      }
+    }
+    if (!inv) return;
+    const email = inv.getString("email");
+    try {
+      const invLib = require(`${__hooks}/lib/invitations.js`);
+      const settings = e.app.settings();
+      const appURL = settings.meta.appURL;
+      const wsName = e.app
+        .findRecordById("workspaces", inv.getString("workspace"))
+        .getString("name");
+      let inviter = "";
+      try {
+        inviter = e.app
+          .findRecordById("users", inv.getString("invited_by"))
+          .getString("name");
+      } catch (_) {
+        inviter = "";
+      }
+      const ex = invLib.expiry(
+        inv.getString("created"),
+        invLib.expiryDays(e.app),
+      );
+      const text = [
+        `${inviter || "Someone"} invited you to join the workspace ${wsName} on Task Tracker with the role ${inv.getString("role")}.`,
+        "",
+        `Sign in at ${appURL} with this email address: ${email}`,
+        "If you do not have an account yet, create one with this address first; a new account is confirmed by email and then approved by an administrator before it can sign in.",
+        "",
+        `Invitation id: ${inv.id}`,
+        `To accept it: POST ${appURL}/api/tracker/invitations/${inv.id}/accept`,
+        `To decline it: POST ${appURL}/api/tracker/invitations/${inv.id}/decline`,
+        "",
+        `This invitation expires on ${ex.expires_at.slice(0, 16)} UTC.`,
+      ].join("\n");
+      e.app.newMailClient().send(
+        new MailerMessage({
+          from: {
+            address: settings.meta.senderAddress,
+            name: settings.meta.senderName || "Task Tracker",
+          },
+          to: [{ address: email }],
+          subject: "[Task Tracker] You are invited to join " + wsName,
+          text: text,
+        }),
+      );
+    } catch (err) {
+      e.app
+        .logger()
+        .error(
+          "invitation email failed",
+          "invitation",
+          id,
+          "err",
+          String(err).split(email).join("[address]"),
+        );
+    }
+  },
+);
 
 // PB's DELETE loads the row before it writes and succeeds on a row already gone, so a revoke
 // racing an accept would answer 204 for a consumed invitation. One conditional DELETE claims the

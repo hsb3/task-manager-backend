@@ -88,7 +88,7 @@ onRecordCreateRequest((e) => {
       );
     return;
   }
-  // This server's own listener, from serve's --http flag (PocketBase default 127.0.0.1:8090).
+  // KEEP IN SYNC: pb_hooks/lib/invitations.js `--http=` — this server's own listener, from serve's --http flag (PocketBase default 127.0.0.1:8090).
   let addr = "127.0.0.1:8090";
   const args = $os.args;
   for (let i = 0; i < args.length; i++) {

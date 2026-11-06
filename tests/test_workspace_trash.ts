@@ -689,7 +689,7 @@ try {
   check(
     "LIVE invite route — Olive (owner) → the uniform acknowledgement",
     tup(await owns.now(), ...(await resolve(WS, olive))),
-    tup(olive_id, 200, { invited: true }),
+    tup(olive_id, 200, { invited: true, mail_sent: false }),
   );
   check("LIVE control moved nobody — Olive still owns it", await owner_now(), olive_id);
   check(
