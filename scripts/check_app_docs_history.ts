@@ -84,6 +84,14 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785187500_seed_app_docs.js", "decision:api-keys", "- **A key can read the metadata of the keys of its owner.** "]',
+    "card sq82: a key request naming api_keys is now refused (decision:api-key-reads-refused); the accepted limit is marked superseded",
+  ],
+  [
+    '["1785187500_seed_app_docs.js", "decision:api-keys", "Reading is not managing; closing it needs a marker on the req"]',
+    "card sq82: the marker this sentence waited for is replaced by a refusal of key requests naming api_keys (decision:api-key-reads-refused)",
+  ],
+  [
     '["1785187200_seed_app_docs.js", "collection:project_items", "Any other operator, a modifier, an empty value where one is "]',
     "card 1t2f: status.name and labels.name now filter by name; the record names status.category as the refused path",
   ],

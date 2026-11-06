@@ -106,6 +106,29 @@ async function find_by_filter(
   return r.items || [];
 }
 
+// Test-only hook for (h9b). Validation runs after the pre-scan and before the insert, so holding
+// both creates there makes the pre-scan miss the winner every time and the unique index refuse the
+// loser: the loser releases the winner only once past its own scan, then waits for the winner row.
+const H9B_HOOK = `onRecordValidate((e) => {
+  const email = e.record.getString("email");
+  const key = e.record.getString("email_key");
+  if (email.indexOf("forced.loser.") === 0) {
+    e.app.store().set("h9b:" + key, true);
+    for (let i = 0; i < 100; i++) {
+      const rows = arrayOf(new DynamicModel({ id: "" }));
+      const q = e.app.db().newQuery("SELECT id FROM users WHERE email_key = {:k}");
+      q.bind({ k: key });
+      q.all(rows);
+      if (rows.length) break;
+      sleep(50);
+    }
+  } else if (email.indexOf("+win@") !== -1) {
+    for (let i = 0; i < 100 && !e.app.store().has("h9b:" + key); i++) sleep(50);
+  }
+  return e.next();
+}, "users");
+`;
+
 class Room {
   /**One self-contained `pocketbase serve` clean-room: fresh --dir, a COPY of
   pb_migrations as --migrationsDir, and a scratch copy of the WHOLE pb_hooks/
@@ -148,12 +171,11 @@ class Room {
       ],
       { cwd: REPO_ROOT, capture_output: true },
     );
-    this.proc = await roomkit.serve(
-      this.port,
-      this.data_dir,
-      this.migrations_dir,
-      roomkit.hooks_dir(this.tmp),
-    );
+    // A private hooks copy (the battery shares one) carrying the h9b interleaving hook.
+    const hooks = path.join(this.tmp, "pb_hooks_h9b");
+    fs.cpSync(roomkit.hooks_dir(this.tmp), hooks, { recursive: true, dereference: true });
+    fs.writeFileSync(path.join(hooks, "zz_test_h9b_interleave.pb.js"), H9B_HOOK);
+    this.proc = await roomkit.serve(this.port, this.data_dir, this.migrations_dir, hooks);
   }
 
   async stop(): Promise<void> {
@@ -623,19 +645,12 @@ try {
   // The hook's read-then-write scan races (SQLite serializes the COMMIT, not the read);
   // the partial unique index on email_key is the backstop, and its refusal must still be
   // a clean 400 rather than a 500 or a second row.
-  // Rounds run until the index refusal has been seen at least once; the cap bounds a run
-  // that never interleaves that way (measured 17 index / 23 scan over 40 rounds).
-  const RACE_ROUNDS_MIN = 3;
-  const RACE_ROUNDS_MAX = 24;
-  let index_loser: any = null;
-  let scan_loser: any = null;
-  let round_no = -1;
-  while (round_no + 1 < RACE_ROUNDS_MAX) {
-    round_no += 1;
+  // Which refusal a free race produces depends on the interleaving (about 4 in 10 rounds reach
+  // the index locally, fewer on a slow runner), so these rounds check only the invariants.
+  const RACE_ROUNDS = 3;
+  for (let round_no = 0; round_no < RACE_ROUNDS; round_no++) {
     const pair = [`race.${round_no}.pair@gmail.com`, `race${round_no}pair+tag@gmail.com`];
     const race_key = `race${round_no}pair@gmail.com`;
-    // threading.Barrier guaranteed both threads released together; here both fetches are
-    // started (un-awaited) back to back inside one Promise.all, with no await between them.
     const race_out: [number, any][] = await Promise.all(
       pair.map((email, i) => signup(email, `race ${round_no}-${i}`, su_token)),
     );
@@ -643,58 +658,44 @@ try {
     check(`round ${round_no}: one create wins, one is refused`, statuses, [200, 400]);
     check(`round ${round_no}: exactly one row on ${race_key}`, rows_with_key(race_key), 1);
     const loser = race_out.find(([st]) => st !== 200)?.[1] ?? null;
-    check(`round ${round_no}: one of the pair was refused`, loser !== null, true);
-    if (loser === null) continue;
-    // Which of the two refusals fires depends on the interleaving: the hook's scan sees
-    // the winner (its verbatim verdict) or the index does (PB's own validation error).
     check(
       `round ${round_no}: the refusal is a clean duplicate verdict`,
       ["An account with this email address already exists.", "Failed to create record."].includes(
-        loser.message,
+        loser?.message,
       ),
       true,
     );
-    if (truthy((truthy(loser.data) ? loser.data : {}).email_key)) {
-      index_loser = truthy(index_loser) ? index_loser : loser;
-    } else {
-      scan_loser = truthy(scan_loser) ? scan_loser : loser;
-    }
-    if (round_no + 1 >= RACE_ROUNDS_MIN && truthy(index_loser)) break;
   }
 
   console.log(
     "\n── (h9b) the index-caught refusal is the body the sign-up screen must classify ──",
   );
   // The pre-scan's verdict never reaches this loser, so its per-field failure code is the
-  // only thing naming what happened — that is what a client keys on.
-  const rounds_run = round_no + 1;
-  if (index_loser === null) {
-    // A miss proves nothing about the body shape, so it FAILS rather than declaring a skip:
-    // measured ~43% per round, the cap puts a false red near 1e-6 and a green no-op at 100%.
-    console.log(
-      `      only the pre-scan refusal was observed: ${json_dumps(scan_loser, { sort_keys: true })}`,
-    );
-    check(
-      `an index-caught refusal was observed within ${rounds_run} rounds`,
-      "only the pre-scan ever refused",
-      "an index-caught refusal",
-    );
-  } else {
-    console.log(
-      `  observed on the wire after ${rounds_run} rounds: ${json_dumps(index_loser, { sort_keys: true })}`,
-    );
-    check("the index-caught refusal is a 400", index_loser.status ?? null, 400);
-    check(
-      "…it carries PB's generic create message, not the fold verdict",
-      index_loser.message ?? null,
-      "Failed to create record.",
-    );
-    check(
-      "…and names the duplicate only by a per-field failure code",
-      getitem(getitem(index_loser, "data"), "email_key").code ?? null,
-      "validation_not_unique",
-    );
-  }
+  // only thing naming what happened — that is what a client keys on. H9B_HOOK forces the
+  // interleaving, so this pair reaches the index on every run.
+  const forced: [number, any][] = await Promise.all([
+    signup("forced.loser.pair@gmail.com", "forced loser", su_token),
+    signup("forcedloserpair+win@gmail.com", "forced winner", su_token),
+  ]);
+  check(
+    "forced pair: the winner 200, the loser 400",
+    forced.map((r) => r[0]),
+    [400, 200],
+  );
+  check("forced pair: exactly one row on the key", rows_with_key("forcedloserpair@gmail.com"), 1);
+  const index_loser = forced[0][1];
+  console.log(`  observed on the wire: ${json_dumps(index_loser, { sort_keys: true })}`);
+  check("the index-caught refusal is a 400", index_loser.status ?? null, 400);
+  check(
+    "…it carries PB's generic create message, not the fold verdict",
+    index_loser.message ?? null,
+    "Failed to create record.",
+  );
+  check(
+    "…and names the duplicate only by a per-field failure code",
+    getitem(getitem(index_loser, "data"), "email_key").code ?? null,
+    "validation_not_unique",
+  );
 
   // ══════════════════════════════════════════════════════════════════════════
   // (i) abandoned unconfirmed signups expire after 30 days

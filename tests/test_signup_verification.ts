@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 /**Public signup sends its own verification email: an anonymous `POST /api/collections/users/records`
-yields exactly one verification mail, a superuser-created user yields none, and a failed send
-neither rolls the user back nor blocks a later `request-verification`.
+yields exactly one verification mail, a superuser-created user yields none, a failed send
+neither rolls the user back nor blocks a later `request-verification`, and an unroutable mail
+server never holds the signup response (decision:signup-mail-off-request).
 
 Clean room, --hooksDir from a pb_hooks copy, mail captured by scripts/smtp_sink.ts.
 Port 8155 + PB_PORT_OFFSET (suite self-boot band); SMTP sink on 2534 + PB_PORT_OFFSET.*/
@@ -10,7 +11,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { py_repr, read_text, run_checked, splitlines, urlencode } from "../scripts/_py.ts";
+import { py_repr, read_text, run_checked, splitlines, tup, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
@@ -24,7 +25,7 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 const SU_EMAIL = "probe@example.com";
 const SU_PASSWORD = "probe123456";
 const SINK_PORT = 2534 + PORT_OFFSET;
-const MAIL_WAIT = 10; // seconds; a send is synchronous in the create request, so this is slack
+const MAIL_WAIT = 10; // seconds; the send follows the signup response by milliseconds, so this is slack
 
 let failures = 0;
 
@@ -41,8 +42,9 @@ async function api(
   p: string,
   token: string | null = null,
   body: any = null,
+  extra: Record<string, string> = {},
 ): Promise<[number, any]> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...extra };
   if (token) headers.Authorization = token;
   const r = await fetch(BASE_URL + p, {
     method,
@@ -266,6 +268,130 @@ try {
   check(
     "the skip is logged as a warning against the user id",
     (await wait_for_log(su, "signup verification email skipped: SMTP disabled", r.id)).length,
+    1,
+  );
+
+  // pp2j: the send must not hold the signup. Each signup below has its own client address
+  // (X-Forwarded-For is trusted) so the per-address signup rate limit never answers 429.
+  console.log("\n── (e) signup answers within 2 s while SMTP is unreachable ──");
+  const BOUND_MS = 2000;
+  const timed = async (email: string, ip: string): Promise<[number, any, number]> => {
+    const t0 = performance.now();
+    const [st, rec] = await api(
+      "POST",
+      "/api/collections/users/records",
+      null,
+      signup_body(email, "Timed Signup"),
+      {
+        "X-Forwarded-For": ip,
+      },
+    );
+    return [st, rec, performance.now() - t0];
+  };
+  [s] = await api("PATCH", "/api/settings", su, {
+    smtp: { enabled: true, host: "10.255.255.1", port: 25, tls: false },
+  });
+  check("superuser PATCH /api/settings (SMTP → an unroutable host) → 200", s, 200);
+  const STUCK = "stuck-smtp@example.com";
+  let ms: number;
+  [s, r, ms] = await timed(STUCK, "203.0.113.11");
+  console.log(`  ·  signup with SMTP unroutable → status ${s} after ${Math.round(ms)} ms`);
+  check(
+    `anonymous signup with SMTP unroutable → 200 within ${BOUND_MS} ms`,
+    tup(s, ms < BOUND_MS),
+    tup(200, true),
+  );
+  [s] = await api("PATCH", "/api/settings", su, {
+    smtp: { enabled: true, host: "127.0.0.1", port: SINK_PORT, tls: false },
+  });
+  check("superuser PATCH /api/settings (SMTP → the sink again) → 200", s, 200);
+  [s] = await api("POST", "/api/collections/users/request-verification", null, { email: STUCK });
+  check("request-verification for the stuck signup once SMTP is reachable → 204", s, 204);
+  check(
+    "one verification mail then arrives for the stuck signup",
+    (await wait_for_mail(MAIL_DIR_2, STUCK)).length,
+    1,
+  );
+  const QUICK = "quick-smtp@example.com";
+  [s, r, ms] = await timed(QUICK, "203.0.113.12");
+  console.log(`  ·  signup with SMTP reachable → status ${s} after ${Math.round(ms)} ms`);
+  check(
+    `anonymous signup with SMTP reachable → 200 within ${BOUND_MS} ms`,
+    tup(s, ms < BOUND_MS),
+    tup(200, true),
+  );
+  const quick_mail = await wait_for_mail(MAIL_DIR_2, QUICK);
+  check(
+    "exactly ONE verification mail, carrying the confirm link, follows it",
+    tup(quick_mail.length, quick_mail[0]?.includes("confirm-verification") ?? false),
+    tup(1, true),
+  );
+  const BATCHED = "batched-signup@example.com";
+  [s, r] = await api(
+    "POST",
+    "/api/batch",
+    null,
+    {
+      requests: [
+        {
+          method: "POST",
+          url: "/api/collections/users/records",
+          body: signup_body(BATCHED, "Batched"),
+        },
+      ],
+    },
+    { "X-Forwarded-For": "203.0.113.13" },
+  );
+  check(
+    "anonymous batch signup → 200, its create 200",
+    tup(s, r?.[0]?.status ?? null),
+    tup(200, 200),
+  );
+  check(
+    "exactly ONE verification mail follows the batch signup once it commits",
+    (await wait_for_mail(MAIL_DIR_2, BATCHED)).length,
+    1,
+  );
+  const SEND_ROUTE = `/internal/signup-verification/${r?.[0]?.body?.id}`;
+  check(
+    "the signup-mail route refuses a caller without the server secret → 404",
+    tup(
+      (await api("POST", SEND_ROUTE))[0],
+      (await api("POST", SEND_ROUTE, su, null, { "X-Signup-Mail": "guess" }))[0],
+    ),
+    tup(404, 404),
+  );
+  check(
+    "no further mail went to the batch signup",
+    (await wait_for_mail(MAIL_DIR_2, BATCHED)).length,
+    1,
+  );
+
+  // Last: this burst spends the API rate limit of 127.0.0.1, which every later call here shares.
+  console.log(
+    "\n── (f) a client spending the rate limit of the server address cannot stop the mail ──",
+  );
+  let limited = 0;
+  for (let i = 0; i < 310; i++) {
+    const h = await fetch(BASE_URL + "/api/health", {
+      headers: { "X-Forwarded-For": "127.0.0.1" },
+    });
+    await h.body?.cancel();
+    if (h.status === 429) limited++;
+  }
+  check("a forged 127.0.0.1 burst of /api/health reaches the limit (some 429s)", limited > 0, true);
+  const AFTER_BURST = "after-burst@example.com";
+  [s] = await api(
+    "POST",
+    "/api/collections/users/records",
+    null,
+    signup_body(AFTER_BURST, "After Burst"),
+    { "X-Forwarded-For": "203.0.113.14" },
+  );
+  check("anonymous signup after the burst → 200", s, 200);
+  check(
+    "one verification mail still follows it",
+    (await wait_for_mail(MAIL_DIR_2, AFTER_BURST)).length,
     1,
   );
 } finally {

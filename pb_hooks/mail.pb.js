@@ -15,6 +15,9 @@
 onBootstrap((e) => {
   e.next();
 
+  // Per-boot secret that lets only this server call the signup-mail route below.
+  e.app.store().set("signupMailSecret", $security.randomString(40));
+
   // appURL drives {APP_URL} in the auth email templates, which link to PocketBase's own
   // confirmation pages, so it is this server's public URL whether or not SMTP is configured.
   const settings0 = e.app.settings();
@@ -67,7 +70,8 @@ onBootstrap((e) => {
 });
 
 // ── Request hook: a public signup sends its own verification email ───────────
-// Seeding/import (superuser) sends nothing; the send blocks the signup until SMTP answers.
+// Seeding/import (superuser) sends nothing. decision:signup-mail-off-request: the send runs in a
+// loopback request that answers at once, because a JSVM hook cannot send in the background.
 onRecordCreateRequest((e) => {
   const send = !e.hasSuperuserAuth();
   e.next();
@@ -84,9 +88,29 @@ onRecordCreateRequest((e) => {
       );
     return;
   }
+  // This server's own listener, from serve's --http flag (PocketBase default 127.0.0.1:8090).
+  let addr = "127.0.0.1:8090";
+  const args = $os.args;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--http" && i + 1 < args.length) addr = args[i + 1];
+    else if (args[i].indexOf("--http=") === 0) addr = args[i].slice(7);
+  }
+  addr = addr
+    .replace(/^(0\.0\.0\.0)?:/, "127.0.0.1:")
+    .replace(/^\[::\]:/, "[::1]:");
+  let failure = "";
   try {
-    $mails.sendRecordVerification(e.app, e.record);
+    const res = $http.send({
+      url: `http://${addr}/internal/signup-verification/${e.record.id}`,
+      method: "POST",
+      headers: { "X-Signup-Mail": e.app.store().get("signupMailSecret") },
+      timeout: 1,
+    });
+    if (res.statusCode !== 204) failure = `loopback answered ${res.statusCode}`;
   } catch (err) {
+    failure = String(err);
+  }
+  if (failure) {
     // The user is already committed; request-verification remains the retry path.
     e.app
       .logger()
@@ -95,7 +119,48 @@ onRecordCreateRequest((e) => {
         "user",
         e.record.id,
         "err",
-        String(err).split(e.record.getString("email")).join("[address]"),
+        failure.split(e.record.getString("email")).join("[address]"),
       );
   }
 }, "users");
+
+// Answers 204 before sending, so the signup that called it never waits on SMTP. Outside /api/,
+// so no rate limit rule applies to it and a client forging the server address cannot spend it.
+routerAdd("POST", "/internal/signup-verification/{id}", (e) => {
+  const secret = e.app.store().get("signupMailSecret");
+  if (
+    !secret ||
+    !$security.equal(e.request.header.get("X-Signup-Mail"), secret)
+  ) {
+    throw new NotFoundError();
+  }
+  // Close: the caller would otherwise reuse this connection while the send still holds it.
+  e.response.header().set("Connection", "close");
+  e.response.writeHeader(204);
+  e.flush();
+
+  // A batch signup commits only after its hook returns, so wait for the row.
+  const id = e.request.pathValue("id");
+  let user = null;
+  for (let i = 0; i < 50 && !user; i++) {
+    try {
+      user = e.app.findRecordById("users", id);
+    } catch (_) {
+      sleep(100);
+    }
+  }
+  if (!user || user.verified()) return;
+  try {
+    $mails.sendRecordVerification(e.app, user);
+  } catch (err) {
+    e.app
+      .logger()
+      .error(
+        "signup verification email failed",
+        "user",
+        user.id,
+        "err",
+        String(err).split(user.getString("email")).join("[address]"),
+      );
+  }
+});

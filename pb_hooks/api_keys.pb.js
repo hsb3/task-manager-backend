@@ -99,6 +99,19 @@ routerUse(
         });
       }
 
+      // decision:api-key-reads-refused: rules cannot tell a key from its owner, and relation joins skip api_keys rules.
+      if (
+        require(`${__hooks}/lib/api_keys.js`).namesApiKeys(
+          $app,
+          e.request.url.rawQuery,
+        )
+      ) {
+        const msg = "API keys cannot read API keys.";
+        throw new ApiError(403, msg, {
+          api_key: new ValidationError("api_key_path", msg),
+        });
+      }
+
       e.auth = owner;
       return e.next();
     },
@@ -106,3 +119,22 @@ routerUse(
     "tmkApiKeyAuth",
   ),
 );
+
+// A key's realtime subscriptions arrive in the body, out of the middleware's reach.
+onRealtimeSubscribeRequest((e) => {
+  const header = e.requestEvent.request.header
+    .get("Authorization")
+    .trim()
+    .replace(/^bearer\s+/i, "");
+  if (!header.startsWith("tmk_")) return e.next();
+  const lib = require(`${__hooks}/lib/api_keys.js`);
+  for (let i = 0; i < e.subscriptions.length; i++) {
+    if (lib.namesApiKeys($app, e.subscriptions[i])) {
+      const msg = "API keys cannot read API keys.";
+      throw new ApiError(403, msg, {
+        api_key: new ValidationError("api_key_path", msg),
+      });
+    }
+  }
+  return e.next();
+});
