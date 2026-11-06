@@ -24,3 +24,4 @@
 - [S3 backup-bucket ops](s3-backup-bucket-ops.md) — curl sigv4 recipe; %40-encode @-keys on DELETE or 403; cron actually 18:08 UTC; pb-files is the separate uploads bucket since PBTT-390
 - [Scratch dirs must be unique](scratch-dirs-must-be-unique.md) — `PB_PORT_OFFSET` separates ports, not directories; a fixed scratch name under a shared temp root let one agent delete another's live rooms; `mktemp -d`
 - [Universal guards need a touches predicate](universal-guard-needs-touches-predicate.md) — without `touchesScope` a universal guard throws on already-bad rows and the leaver sweep strands every remaining assignee (0 vs 5)
+- [Docker holds port 12434](docker-holds-port-12434.md) — PB_PORT_OFFSET=4300 lands test_stale_write on Docker Desktop's listener (ollama holds 11434); lsof the band before assigning a lane offset
