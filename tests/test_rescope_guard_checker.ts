@@ -252,7 +252,7 @@ check(
   out.includes("❌ projects.workspace is repointable on update"),
   true,
 );
-check("--no-allowlist reports 13 findings", out.includes("13 tenant-anchor finding(s)"), true);
+check("--no-allowlist reports 12 findings", out.includes("12 tenant-anchor finding(s)"), true);
 
 let [root, dst, model] = scratch_schema("statuses", `${GUARD} && (${GRANT})`);
 try {

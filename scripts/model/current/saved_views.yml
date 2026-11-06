@@ -59,7 +59,8 @@ capabilities:
       = @request.auth.id || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
       ?= "active")) && @request.body.workspace:isset = false && workspace.trashed = "" && (@request.query.workspace:isset
-      = false || workspace = @request.query.workspace)'
+      = false || workspace = @request.query.workspace) && (@request.body.owner:isset = false || @request.body.owner
+      = owner)'
     actors:
     - workspace-owner
     - active-workspace-member
@@ -68,9 +69,13 @@ capabilities:
     - active-workspace-admin
     authRequired: guard
     body_guards:
+    - '@request.body.owner'
+    - '@request.body.owner:isset'
     - '@request.body.workspace:isset'
     body_pins:
     - '@request.body.workspace:isset = false'
+    - '@request.body.owner:isset = false'
+    - '@request.body.owner = owner'
     record_state:
     - workspace.trashed = ""
     - '@request.query.workspace:isset = false || workspace = @request.query.workspace'

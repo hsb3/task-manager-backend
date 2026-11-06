@@ -223,6 +223,7 @@ onRecordCreateRequest((e) => {
 // INTO completed stamps completedAt=now; crossing OUT clears it. original() returns
 // persisted values (unsubmitted fields keep their stored value on the merged record).
 onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
   const newStatusId = e.record.get("status");
   const origStatusId = e.record.original().get("status");
   let newCat = "";
@@ -236,6 +237,22 @@ onRecordUpdateRequest((e) => {
     try {
       origCat = e.app.findRecordById("statuses", origStatusId).get("category");
     } catch (_) {}
+  }
+  // decision:server-owned-fields-locked: only a request that crosses the completed boundary may carry completedAt, and the server's value wins.
+  // A superuser is exempt so an operator can correct a stored timestamp.
+  if (
+    !e.hasSuperuserAuth() &&
+    Object.prototype.hasOwnProperty.call(
+      e.requestInfo().body || {},
+      "completedAt",
+    ) &&
+    (origCat === "completed") === (newCat === "completed")
+  ) {
+    const msg =
+      "completedAt cannot be sent; the server sets it when the status changes.";
+    throw new BadRequestError(msg, {
+      completedAt: new ValidationError("validation_failed", msg),
+    });
   }
   if (origCat !== "completed" && newCat === "completed") {
     e.record.set("completedAt", new Date().toISOString().replace("T", " "));

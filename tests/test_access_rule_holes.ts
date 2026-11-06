@@ -741,6 +741,165 @@ try {
     tup(200, 0, 0),
   );
 
+  // COVERS: rule:saved_views.create, rule:saved_views.update
+  console.log("\n── saved_views.owner is locked on update ──");
+  const VIEW = (
+    await as_make(
+      mia,
+      "saved_views",
+      { workspace: W, name: "mia personal view", filterData: [], scope: "personal" },
+      "Mia creates a personal view with no owner sent",
+    )
+  ).id;
+  const view_owner = async () => (await api("GET", rec("saved_views", VIEW), su))[1].owner;
+  check("(fixture) the server fills Mia as the view's owner", await view_owner(), ids.Mia);
+  // Hand a reassigned view back so each actor below is measured against Mia's view.
+  const restore_view = async () => {
+    if ((await view_owner()) !== ids.Mia)
+      await api("PATCH", rec("saved_views", VIEW), su, { owner: ids.Mia });
+  };
+  const mia_v = await tierkit.actor_at_tier(W, ids.Mia!, "member", su, "Mia");
+  [s] = await api("PATCH", rec("saved_views", VIEW), mia, { owner: ids.Sam });
+  check(
+    "saved_views.update: Mia (view owner) hands her view to Sam → 404",
+    tup(await mia_v.now(), s, await view_owner()),
+    tup("member", 404, ids.Mia),
+  );
+  await restore_view();
+  [s] = await api("PATCH", rec("saved_views", VIEW), mia, { owner: ids.Mia });
+  check(
+    "control: Mia sends her own id as owner → 200",
+    tup(await mia_v.now(), s),
+    tup("member", 200),
+  );
+  await mia_v.done();
+  const olive_v = await tierkit.owner_of_workspace(W, ids.Olive!, su, "Olive");
+  [s] = await api("PATCH", rec("saved_views", VIEW), olive, { owner: ids.Olive });
+  check(
+    "saved_views.update: Olive (workspace owner) claims Mia's view → 404",
+    tup(await olive_v.now(), s, await view_owner()),
+    tup(ids.Olive, 404, ids.Mia),
+  );
+  await restore_view();
+  [s] = await api("PATCH", rec("saved_views", VIEW), olive, { name: "renamed by olive" });
+  check(
+    "control: Olive (workspace owner) renames Mia's view → 200",
+    tup(await olive_v.now(), s),
+    tup(ids.Olive, 200),
+  );
+  await olive_v.done();
+  const ada_v = await tierkit.actor_at_tier(W, ids.Ada!, "admin", su, "Ada");
+  [s] = await api("PATCH", rec("saved_views", VIEW), ada, { owner: ids.Ada });
+  check(
+    "saved_views.update: Ada (admin) claims Mia's view → 404",
+    tup(await ada_v.now(), s, await view_owner()),
+    tup("admin", 404, ids.Mia),
+  );
+  await restore_view();
+  await ada_v.done();
+  [s] = await api("PATCH", rec("saved_views", VIEW), null, { owner: ids.Sam });
+  check(
+    "saved_views.update: anon reassigns the view → 404",
+    tup(s, await view_owner()),
+    tup(404, ids.Mia),
+  );
+  await restore_view();
+  [s] = await api("PATCH", rec("saved_views", VIEW), su, { owner: ids.Sam });
+  check(
+    "control: superuser reassigns the view → 200 (rules do not bind it)",
+    tup(s, await view_owner()),
+    tup(200, ids.Sam),
+  );
+  [s] = await api("PATCH", rec("saved_views", VIEW), su, { owner: ids.Mia });
+  check(
+    "(fixture) superuser hands the view back to Mia",
+    tup(s, await view_owner()),
+    tup(200, ids.Mia),
+  );
+
+  // COVERS: rule:labels.create, rule:labels.update, rule:labels.delete
+  console.log("\n── labels.core is server-owned ──");
+  const olive_l = await tierkit.owner_of_workspace(W, ids.Olive!, su, "Olive");
+  const ada_l = await tierkit.actor_at_tier(W, ids.Ada!, "admin", su, "Ada");
+  const mia_l = await tierkit.actor_at_tier(W, ids.Mia!, "member", su, "Mia");
+  const vic_l = await tierkit.actor_at_tier(W, ids.Vic!, "viewer", su, "Vic");
+  for (const [who, tk, standing, want] of [
+    ["Olive (owner)", olive, () => olive_l.now(), ids.Olive],
+    ["Ada (admin)", ada, () => ada_l.now(), "admin"],
+  ] as const) {
+    for (const core of [true, false]) {
+      [s] = await api("POST", rec("labels"), tk, {
+        workspace: W,
+        name: `core ${core} by ${who}`,
+        core,
+      });
+      check(
+        `labels.create: ${who} sends core=${core} → 400`,
+        tup(await standing(), s),
+        tup(want, 400),
+      );
+    }
+    [s, r] = await api("POST", rec("labels"), tk, { workspace: W, name: `plain by ${who}` });
+    check(
+      `control: ${who} creates a label without core → 200, core=false`,
+      tup(await standing(), s, r.core),
+      tup(want, 200, false),
+    );
+  }
+  const [, bugs] = await api(
+    "GET",
+    `${rec("labels")}?${urlencode({ filter: `workspace='${W}' && core=true && name='Bug'` })}`,
+    su,
+  );
+  const BUG: string = getitem(bugs.items[0], "id");
+  const bug = async () => (await api("GET", rec("labels", BUG), su))[1];
+  for (const [who, tk, standing, want] of [
+    ["Olive (owner)", olive, () => olive_l.now(), ids.Olive],
+    ["Ada (admin)", ada, () => ada_l.now(), "admin"],
+    ["Mia (member)", mia, () => mia_l.now(), "member"],
+    ["Vic (viewer)", vic, () => vic_l.now(), "viewer"],
+    ["anon", null, async () => "anon", "anon"],
+  ] as const) {
+    [s] = await api("PATCH", rec("labels", BUG), tk, { core: false });
+    const after = (await bug()).core;
+    check(
+      `labels.update: ${who} clears core on the Bug label → 404, still core`,
+      tup(await standing(), s, after),
+      tup(want, 404, true),
+    );
+    // Restore so the next actor is measured against a core label.
+    if (after !== true) await api("PATCH", rec("labels", BUG), su, { core: true });
+  }
+  [s] = await api("PATCH", rec("labels", BUG), olive, { name: "Bug renamed" });
+  check(
+    "control: Olive (owner) renames the core label → 200",
+    tup(await olive_l.now(), s, (await bug()).name),
+    tup(ids.Olive, 200, "Bug renamed"),
+  );
+  [s] = await api("PATCH", rec("labels", BUG), olive, { name: "Bug" });
+  check("(fixture) Olive restores the name", tup(s, (await bug()).name), tup(200, "Bug"));
+  [s] = await api("DELETE", rec("labels", BUG), olive);
+  check(
+    "pin: Olive (owner) deletes the core label → 400",
+    tup(await olive_l.now(), s, (await bug()).core),
+    tup(ids.Olive, 400, true),
+  );
+  await olive_l.done();
+  await ada_l.done();
+  await mia_l.done();
+  await vic_l.done();
+  [s, r] = await api("POST", rec("labels"), su, {
+    workspace: W,
+    name: "su core label",
+    core: true,
+  });
+  check("control: superuser creates a core label → 200", tup(s, r.core), tup(200, true));
+  const SU_CORE = r.id;
+  [s, r] = await api("PATCH", rec("labels", SU_CORE), su, { core: false });
+  check("control: superuser clears core → 200", tup(s, r.core), tup(200, false));
+  [s] = await api("DELETE", rec("labels", SU_CORE), su);
+  check("(fixture) superuser deletes the no-longer-core label → 204", s, 204);
+
   await tierkit.verify_tiers();
 } finally {
   if (server !== null) await roomkit.stop(server);

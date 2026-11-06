@@ -282,7 +282,7 @@
       "type": "relation"
     },
     {
-      "help": "When the task entered a completed status; the server sets and clears it as the status changes, so a client should not send it.",
+      "help": "When the task entered a completed status; the server sets and clears it as the status changes, a value sent at create is replaced, and a value sent on an update is refused unless the same request moves the status into or out of a completed status; a superuser may set it.",
       "hidden": false,
       "id": "date3200000004",
       "max": "",

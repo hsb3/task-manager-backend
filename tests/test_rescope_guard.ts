@@ -177,10 +177,6 @@ const ALLOWLIST = new Map<string, string>(
         "within-workspace template scoping; a foreign value is rejected by the template-project-workspace-match hook (scope.pb.js G3)",
       ],
       [
-        ["saved_views", "owner"],
-        "the view's creator; a within-workspace attribution set to the caller at create, not a tenant-anchor edge (the view stays readable only to its workspace's members)",
-      ],
-      [
         ["saved_views", "project"],
         "within-workspace view scoping; a foreign value is rejected by the view-project-workspace-match hook (scope.pb.js PBTT-429)",
       ],
@@ -500,6 +496,10 @@ try {
         [
           ["saved_views", "workspace"],
           [a_view, "workspace", BWS, bob, "admin Bob"],
+        ],
+        [
+          ["saved_views", "owner"],
+          [a_view, "owner", bob_id, alice, "owner Alice (view owner)"],
         ],
         [
           ["statuses", "workspace"],
