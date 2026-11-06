@@ -84,6 +84,18 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785186800_seed_app_docs.js", "collection:user_settings", "The server does not interpret time_zone; the 64-character li"]',
+    "card tpyx: the server now reads time_zone to count the user's days (decision:viewer-day-values); the record says how",
+  ],
+  [
+    '["1785186800_seed_app_docs.js", "route:tracker-trash", "**Items.** Each item is {collection, record, purge_at}, where"]',
+    "card tpyx and card f27c: trash rows also carry purge_days and has_priority; the record names the new item shape",
+  ],
+  [
+    '["1785186800_seed_app_docs.js", "route:tracker-trash", "With group set to project, status, priority, assignee or labe"]',
+    "card f27c: the trash route also groups by type; the record lists it",
+  ],
+  [
     '["1785186700_seed_app_docs.js", "route:tracker-summary", "Returns {user, total, byStatus, assignedToMe} for the tasks"]',
     "card vc8g: the summary route counts only workspaces the caller owns or holds an active membership in; the record now says so",
   ],
