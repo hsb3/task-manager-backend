@@ -42,5 +42,7 @@ re-issuable via `railway bucket credentials`; the rest live only in the Railway 
 `.claude/operations/` is untracked and machine-local, so nothing parked there travels
 between the two Macs), the ephemeral PR
 environments (the pull is production-scoped), DNS CNAMEs at the registrar, and the
-GitHub OAuth app callback.
+GitHub and Google OAuth app callbacks (the Google pair is preserved in the IaC but not set in prod yet).
+A migration the hooks refuse fails the deploy at container start and is rolled back by hand:
+decision:refused-migration-fails-the-deploy in `docs/generated/decisions.md`.
 Setting all of that up on a new project, in order: `deploy/README.md`, "Bootstrapping a new Railway project".
