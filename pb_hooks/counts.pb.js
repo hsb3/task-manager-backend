@@ -10,11 +10,18 @@ routerAdd(
         "this route answers per-workspace visibility; a superuser caller is refused rather than answered empty",
       );
 
-    const GROUPS = ["project", "status", "priority", "assignee", "label"];
+    const GROUPS = [
+      "project",
+      "status",
+      "priority",
+      "assignee",
+      "label",
+      "type",
+    ];
     const group = e.request.url.query().get("group") || "";
     if (GROUPS.indexOf(group) === -1)
       throw new BadRequestError(
-        "group must be one of: project, status, priority, assignee, label",
+        "group must be one of: project, status, priority, assignee, label, type",
       );
 
     const filter = e.request.url.query().get("filter") || "";
@@ -170,6 +177,8 @@ routerAdd(
           const labels = idList(row.get("labels"));
           return labels.length ? labels : [null];
         }
+        case "type":
+          return [row.get("type") || null];
         default:
           return [null];
       }
@@ -242,6 +251,17 @@ function refuseUnbindableListRule(e) {
 onCollectionCreate(refuseUnbindableListRule, "project_items");
 onCollectionUpdate(refuseUnbindableListRule, "project_items");
 
+// Refuse boot without the IANA zone database (`tzdata` in Dockerfile): every zone would silently load as UTC.
+onBootstrap((e) => {
+  if (
+    String(new Timezone("Pacific/Kiritimati").string()) !== "Pacific/Kiritimati"
+  )
+    throw new Error(
+      "the time zone database is missing, so no day can be counted in a viewer's time zone; install tzdata in the image",
+    );
+  e.next();
+});
+
 // Subtask counts are served here, never as view columns: a column is filterable and sortable.
 onRecordEnrich((e) => {
   const type = e.record.get("type");
@@ -265,11 +285,119 @@ onRecordEnrich((e) => {
     total = res.total;
     done = res.done;
   }
+  // KEEP IN SYNC: viewer's day — project_stats enrich below and routes.pb.js GET /api/tracker/trash resolve it the same way, `String(new Timezone(sent).string()) !== sent`.
+  const info = e.requestInfo;
+  const viewer = info && info.auth ? info.auth.id : "";
+  const sent = info && info.query ? String(info.query["time_zone"] || "") : "";
+  if (
+    sent &&
+    (sent === "Local" || String(new Timezone(sent).string()) !== sent)
+  )
+    throw new BadRequestError(
+      "The time zone must be an IANA name, such as Europe/Paris.",
+    );
+  let zone = sent;
+  if (viewer) {
+    try {
+      const saved = e.app
+        .findFirstRecordByFilter("user_settings", "user = {:u}", { u: viewer })
+        .getString("time_zone");
+      if (
+        saved &&
+        saved !== "Local" &&
+        String(new Timezone(saved).string()) === saved
+      )
+        zone = saved;
+    } catch (_) {}
+  }
+  const today = String(
+    new DateTime().time().in(new Timezone(zone)).format("2006-01-02"),
+  );
+  const dayNumber = (ymd) =>
+    Date.UTC(
+      Number(ymd.slice(0, 4)),
+      Number(ymd.slice(5, 7)) - 1,
+      Number(ymd.slice(8, 10)),
+    ) / 86400000;
+  // A due date is a calendar day: its stored date, never shifted into the viewer's zone.
+  const due = String(e.record.get("due") || "");
+  const dueDays = /^\d{4}-\d{2}-\d{2}/.test(due)
+    ? dayNumber(due) - dayNumber(today)
+    : null;
+  let reason = "";
+  if (
+    type === "task" &&
+    viewer &&
+    e.record.get("assignee") === viewer &&
+    !e.record.get("status_terminal")
+  )
+    // Inbox thresholds (decision:viewer-day-values): overdue below 0 days, due soon at 3 days or fewer.
+    reason =
+      dueDays === null
+        ? "assigned"
+        : dueDays < 0
+          ? "overdue"
+          : dueDays <= 3
+            ? "due_soon"
+            : "assigned";
+
   e.record.withCustomData(true);
   e.record.set("subtask_total", total);
   e.record.set("subtask_done", done);
+  e.record.set("due_days", dueDays);
+  e.record.set("reason", reason);
   return e.next();
 }, "project_items");
+
+// next_milestone: the earliest live published milestone dated on or after the viewer's today, else the latest dated one.
+onRecordEnrich((e) => {
+  // KEEP IN SYNC: viewer's day — the project_items enrich above and routes.pb.js GET /api/tracker/trash resolve it the same way, `String(new Timezone(sent).string()) !== sent`.
+  const info = e.requestInfo;
+  const viewer = info && info.auth ? info.auth.id : "";
+  const sent = info && info.query ? String(info.query["time_zone"] || "") : "";
+  if (
+    sent &&
+    (sent === "Local" || String(new Timezone(sent).string()) !== sent)
+  )
+    throw new BadRequestError(
+      "The time zone must be an IANA name, such as Europe/Paris.",
+    );
+  let zone = sent;
+  if (viewer) {
+    try {
+      const saved = e.app
+        .findFirstRecordByFilter("user_settings", "user = {:u}", { u: viewer })
+        .getString("time_zone");
+      if (
+        saved &&
+        saved !== "Local" &&
+        String(new Timezone(saved).string()) === saved
+      )
+        zone = saved;
+    } catch (_) {}
+  }
+  const today = String(
+    new DateTime().time().in(new Timezone(zone)).format("2006-01-02"),
+  );
+  const res = new DynamicModel({ id: "" });
+  // Drafts are skipped: a member who cannot open one must not learn its id here.
+  const live =
+    " FROM milestones m WHERE m.project = {:p} AND m.trashed = '' AND m.draft = 0 AND COALESCE(m.target, '') != ''";
+  e.app
+    .db()
+    .newQuery(
+      "SELECT COALESCE((SELECT m.id" +
+        live +
+        " AND substr(m.target, 1, 10) >= {:today} ORDER BY substr(m.target, 1, 10), m.id LIMIT 1), (SELECT m.id" +
+        live +
+        " ORDER BY substr(m.target, 1, 10) DESC, m.id DESC LIMIT 1), '') AS id",
+    )
+    .bind({ p: e.record.id, today: today })
+    .one(res);
+  e.record.withCustomData(true);
+  e.record.set("next_milestone", res.id);
+  return e.next();
+}, "project_stats");
 
 // KEEP IN SYNC: statuses enrich: terminal and off_pipeline — STATUS_CATEGORIES' resolved half, `completed` and `canceled`, as schema/project_items.view.json reads it (scripts/check_constants.ts).
 onRecordEnrich((e) => {

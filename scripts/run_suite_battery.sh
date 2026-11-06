@@ -548,6 +548,15 @@ run_suite "test_item_write_refusals" bun tests/test_item_write_refusals.ts
 # ── item list: the project_items list refuses a filter clause its field cannot answer and clamps its paging.
 run_suite "test_item_list_filters"   bun tests/test_item_list_filters.ts
 
+# ── item values: due_days and the inbox reason on project_items, purge_days on trash rows, in the viewer's day.
+run_suite "test_due_window"          bun tests/test_due_window.ts
+
+# ── counts: items grouped by type, trash counted per type, a retired priority flagged on trash rows.
+run_suite "test_counts_type_trash"   bun tests/test_counts_type_trash.ts
+
+# ── project_stats names each project's next milestone.
+run_suite "test_next_milestone"      bun tests/test_next_milestone.ts
+
 # ── security: a trashed workspace is unreadable but owner-enumerable and owner-restorable — self-booting.
 run_suite "test_workspace_trash"    bun tests/test_workspace_trash.ts
 

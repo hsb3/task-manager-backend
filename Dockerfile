@@ -3,7 +3,8 @@ FROM alpine:3.24
 
 # The canonical PocketBase pin: scripts/check_pb_pin.ts holds every other PB_VERSION site to it.
 ARG PB_VERSION=0.40.4
-RUN apk add --no-cache ca-certificates unzip
+# tzdata: hooks count days in a viewer's IANA time zone, and pb_hooks/counts.pb.js refuses boot without it.
+RUN apk add --no-cache ca-certificates tzdata unzip
 ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
 RUN unzip /tmp/pb.zip -d /pb/ && rm /tmp/pb.zip
 

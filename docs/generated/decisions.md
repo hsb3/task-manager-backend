@@ -616,6 +616,22 @@ The signup hook in `pb_hooks/main.pb.js` creates the row with `theme` and `font`
 
 Anyone can sign up, so the `users` auth rule requires `verified`, alongside `approved` (decision:signup-approval): an unverified account cannot sign in. The verification email carries a token valid for 24 hours, and `POST /api/collections/users/confirm-verification` sets the flag. An approved account that never verifies is deleted: the daily `unconfirmed-signup-purge` cron in `pb_hooks/signup_purge.pb.js` removes approved, unverified accounts created more than 30 days ago, except the sole owner of a workspace with other members, which is skipped and logged (decision:account-delete-sole-owner), while an unapproved account is never swept. Superusers are not subject to the `users` auth rule.
 
+## viewer-day-values
+
+- **Slug:** `decision:viewer-day-values`
+- **Title:** Due windows, purge countdowns and the next milestone are counted in the viewer's calendar day, on the server.
+- **Ref:** `project_items`
+
+Three values used to be worked out by each client from raw dates: how many days until an item is due and why it needs its assignee, how many days until a trashed item is purged, and which milestone of a project is next. The server now serves them: due_days and reason on every collection:project_items row, purge_days on every row of GET /api/tracker/trash (route:tracker-trash), and next_milestone on every collection:project_stats row. They are computed when a row is served, so they cannot be filtered or sorted on.
+
+**Whose day.** A count of days depends on where the reader is: two readers on either side of the date line are on different calendar days at the same moment. Each value is therefore counted from today in the viewer's time zone: their user_settings.time_zone when it names a known zone, else a time_zone query parameter sent with the request, else UTC. The saved setting wins because it is what the person chose; the parameter serves a caller with no setting, such as a fresh account. An unknown name sent as time_zone, or Local (the server's own zone, which means nothing to a reader), answers 400 rather than being silently read as UTC. The server refuses to boot without the IANA zone database, because without it every zone would load as UTC.
+
+**Dates and moments.** A due date and a milestone target are calendar days, as in Linear, whose due dates carry no time of day: the stored date is the day, never shifted into the reader's zone. purge_at is a moment, so the day it falls on is read in the viewer's zone, like today.
+
+**Inbox reason.** reason is set only on a task assigned to the viewer whose status is not completed or canceled: overdue when due_days is below 0, due_soon from 0 to 3, assigned otherwise, including no due date. Every other row reads an empty reason, so resolved work never shows as overdue. The thresholds live only in pb_hooks/counts.pb.js. There is no in-review reason: no status marks review, and guessing one from the order of a custom vocabulary is wrong.
+
+**Next milestone.** The earliest milestone of the project, neither trashed nor a draft, whose target is on or after the viewer's today; when all are past, the latest; when none has a target, empty. Same-day ties go to the lower id. Drafts are skipped because the stats row is read by members a draft is hidden from.
+
 ## vocab-first-class-collections
 
 - **Slug:** `decision:vocab-first-class-collections`

@@ -295,12 +295,50 @@ routerAdd(
       throw new BadRequestError(
         "sort must be a comma list of project_items columns, each optionally prefixed - or +",
       );
-    const GROUPS = ["project", "status", "priority", "assignee", "label"];
+    const GROUPS = [
+      "project",
+      "status",
+      "priority",
+      "assignee",
+      "label",
+      "type",
+    ];
     const group = q.get("group") || "";
     if (group && GROUPS.indexOf(group) === -1)
       throw new BadRequestError(
-        "group must be one of: project, status, priority, assignee, label",
+        "group must be one of: project, status, priority, assignee, label, type",
       );
+    // KEEP IN SYNC: viewer's day — counts.pb.js project_items and project_stats enrich resolve it the same way, `String(new Timezone(sent).string()) !== sent`.
+    const sent = String(q.get("time_zone") || "");
+    if (
+      sent &&
+      (sent === "Local" || String(new Timezone(sent).string()) !== sent)
+    )
+      throw new BadRequestError(
+        "The time zone must be an IANA name, such as Europe/Paris.",
+      );
+    let zone = sent;
+    try {
+      const saved = e.app
+        .findFirstRecordByFilter("user_settings", "user = {:u}", { u: uid })
+        .getString("time_zone");
+      if (
+        saved &&
+        saved !== "Local" &&
+        String(new Timezone(saved).string()) === saved
+      )
+        zone = saved;
+    } catch (_) {}
+    const loc = new Timezone(zone);
+    const dayNumber = (ymd) =>
+      Date.UTC(
+        Number(ymd.slice(0, 4)),
+        Number(ymd.slice(5, 7)) - 1,
+        Number(ymd.slice(8, 10)),
+      ) / 86400000;
+    const today = dayNumber(
+      String(new DateTime().time().in(loc).format("2006-01-02")),
+    );
 
     // project_items' view query selects trashed rows too (only its RULES hide them) and this
     // e.app read applies no rule, so the view columns are the one trash matcher. An item's OWN
@@ -364,6 +402,8 @@ routerAdd(
             const labels = idList(row.get("labels"));
             return labels.length ? labels : [null];
           }
+          case "type":
+            return [row.get("type") || null];
           default:
             return [null];
         }
@@ -507,14 +547,22 @@ routerAdd(
       // A row purged between the two reads is skipped rather than served half-built.
       if (!rec) continue;
       const trashed = String(pageRows[i].get("trashed"));
+      const purgeAt = new Date(
+        Date.parse(trashed.replace(" ", "T")) + retentionDays * 86400000,
+      )
+        .toISOString()
+        .replace("T", " ");
       items.push({
         collection: COLS[pageRows[i].get("type")],
         record: rec,
-        purge_at: new Date(
-          Date.parse(trashed.replace(" ", "T")) + retentionDays * 86400000,
-        )
-          .toISOString()
-          .replace("T", " "),
+        purge_at: purgeAt,
+        // purge_at is a moment, so its day is read in the viewer's zone, like today.
+        purge_days:
+          dayNumber(
+            String(new DateTime(purgeAt).time().in(loc).format("2006-01-02")),
+          ) - today,
+        // A priority id missing from the workspace vocabulary reads as no priority, as on the list.
+        has_priority: Number(pageRows[i].get("has_priority")) === 1,
       });
     }
     return e.json(200, {
