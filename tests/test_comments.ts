@@ -26,6 +26,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc, stop_server } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
@@ -66,10 +67,6 @@ async function api(
 }
 
 tierkit.use(api);
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
-}
 
 async function find_by_filter(
   collection: string,
@@ -119,11 +116,6 @@ async function start_server(data_dir: string, migrations_dir: string): Promise<r
       `socket held by pid(s) ${py_repr([...roomkit.listening_pids(PORT)].sort((a, b) => a - b))} ──`,
   );
   return proc;
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 // ── Scratch tree + boot ─────────────────────────────────────────────────────────

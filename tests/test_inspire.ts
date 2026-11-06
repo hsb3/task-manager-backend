@@ -19,6 +19,7 @@ import os from "node:os";
 import path from "node:path";
 import { by_code_point, getitem, json_dumps, py_repr, run_checked } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { stop_server } from "./suitekit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -110,11 +111,6 @@ async function start_server(data_dir: string, migrations_dir: string): Promise<r
     if (saved === undefined) delete process.env.INSPIRE_UPSTREAM_URL;
     else process.env.INSPIRE_UPSTREAM_URL = saved;
   }
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 // ── Scratch tree + boot ─────────────────────────────────────────────────────────

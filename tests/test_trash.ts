@@ -20,6 +20,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as roomkit from "./roomkit.ts";
+import { esc, load_env } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 import { migrate_up, pb_bin_path } from "../scripts/pb_migrate.ts";
 import {
@@ -27,8 +28,6 @@ import {
   json_dumps,
   py_repr,
   py_str,
-  py_strip,
-  read_text,
   tup,
   urlencode,
   truthy,
@@ -36,20 +35,6 @@ import {
 } from "../scripts/_py.ts";
 
 // .env is gitignored — no secrets hard-coded here.
-function load_env(path = ".env"): void {
-  if (fs.existsSync(path)) {
-    for (let line of read_text(path).split(/\r\n|\r|\n/)) {
-      line = py_strip(line);
-      if (line && !line.startsWith("#") && line.includes("=")) {
-        const i = line.indexOf("=");
-        const k = line.slice(0, i);
-        const v = line.slice(i + 1);
-        if (!(k in process.env)) process.env[k] = v;
-      }
-    }
-  }
-}
-
 load_env();
 
 // R1 sentence pin: a no-server half of the R1 proof (the live half is T21, below). Replays
@@ -119,10 +104,6 @@ async function login(email: string): Promise<[string, string]> {
     password: "test123456",
   });
   return [roomkit.token_of(PB, email, r), r.record.id];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_id(

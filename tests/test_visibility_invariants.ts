@@ -45,6 +45,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { stop_server } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
@@ -356,11 +357,6 @@ function start_server(
   migrations_dir: string,
 ): Promise<roomkit.Room> {
   return roomkit.serve(PORT, data_dir, migrations_dir, roomkit.hooks_dir(scratch));
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 // ── Generic record building ──────────────────────────────────────────────────────────────────

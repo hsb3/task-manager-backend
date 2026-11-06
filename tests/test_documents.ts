@@ -9,6 +9,7 @@ Seed contract (scripts/seed.ts): Alice owns "Alice's Workspace" + project
  */
 
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 import { py_str, tup, urlencode, truthy } from "../scripts/_py.ts";
 
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
@@ -51,10 +52,6 @@ async function login(email: string, retries = 5, delay = 0.4): Promise<[string, 
   }
   // token_of never returns here: every retry came back without a token.
   return [roomkit.token_of(PB, email, r), r.record.id];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_id(

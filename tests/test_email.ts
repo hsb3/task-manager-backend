@@ -30,6 +30,7 @@ manual runbook step, gated on the sender-identity decision.
 import fs from "node:fs";
 import { randomBytes } from "node:crypto";
 import * as roomkit from "./roomkit.ts";
+import { load_env } from "./suitekit.ts";
 import {
   getitem,
   decode_text,
@@ -40,25 +41,10 @@ import {
   py_strip,
   PY_WS,
   quopri_decodestring,
-  read_text,
   urlencode,
 } from "../scripts/_py.ts";
 
 // .env is gitignored — no secrets hard-coded here.
-function load_env(path = ".env"): void {
-  if (fs.existsSync(path)) {
-    for (let line of read_text(path).split(/\r\n|\r|\n/)) {
-      line = py_strip(line);
-      if (line && !line.startsWith("#") && line.includes("=")) {
-        const i = line.indexOf("=");
-        const k = line.slice(0, i);
-        const v = line.slice(i + 1);
-        if (!(k in process.env)) process.env[k] = v;
-      }
-    }
-  }
-}
-
 load_env();
 
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds

@@ -6,6 +6,7 @@ Self-contained & rerunnable — creates and cleans up its own fixture.
  */
 
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 import { py_str, tup, urlencode, truthy } from "../scripts/_py.ts";
 
@@ -45,10 +46,6 @@ async function login(email: string): Promise<[string, string]> {
     password: "test123456",
   });
   return [roomkit.token_of(PB, email, r), r.record.id];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_id(

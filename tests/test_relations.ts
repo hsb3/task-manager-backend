@@ -26,6 +26,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
@@ -70,10 +71,6 @@ tierkit.use(api);
 function msg(body: any): string {
   // PB capitalizes and period-terminates a hook message on the wire — compare folded.
   return py_rstrip(py_strip(py_str(py_get(body, "message", ""))), ".").toLowerCase();
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_by_filter(

@@ -7,6 +7,7 @@
 
 import { by_code_point, py_str, truthy, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
 const PB = process.env.PB_URL ?? `http://127.0.0.1:${8090 + PORT_OFFSET}`;
@@ -57,10 +58,6 @@ async function login(email: string): Promise<[string, string]> {
     password: "test123456",
   });
   return [roomkit.token_of(PB, email, r), r.record.id];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_id(

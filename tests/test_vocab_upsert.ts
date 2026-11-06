@@ -16,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import { by_code_point, json_dumps, py_repr, run_checked, tup, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc, stop_server } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
@@ -53,10 +54,6 @@ async function api(
   });
   const raw = await r.text();
   return [r.status, raw ? JSON.parse(raw) : {}];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_by_filter(
@@ -115,11 +112,6 @@ async function su_create_user(su: string, name: string, email: string): Promise<
 
 function start_server(data_dir: string, migrations_dir: string): Promise<roomkit.Room> {
   return roomkit.serve(PORT, data_dir, migrations_dir, roomkit.hooks_dir(S));
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 async function get_statuses(ws_id: string, token: string | null): Promise<any[]> {

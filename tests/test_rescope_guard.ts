@@ -33,6 +33,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc, stop_server } from "./suitekit.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const PB_BIN = roomkit.pb_bin();
@@ -219,10 +220,6 @@ async function api(
   return [r.status, raw ? JSON.parse(raw) : {}];
 }
 
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
-}
-
 async function find_id(
   collection: string,
   field: string,
@@ -261,11 +258,6 @@ async function superuser_token(): Promise<string> {
 
 function start_server(data_dir: string, migrations_dir: string): Promise<roomkit.Room> {
   return roomkit.serve(PORT, data_dir, migrations_dir, roomkit.hooks_dir(S));
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 // ── Derive the relation-field universe from the generated model tree ────────────────────────

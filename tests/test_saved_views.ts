@@ -23,6 +23,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc, stop_server } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
@@ -61,10 +62,6 @@ async function api(
   const raw = new Uint8Array(await r.arrayBuffer());
   const text = new TextDecoder("utf-8", { fatal: true }).decode(raw);
   return [r.status, raw.length ? JSON.parse(text) : {}]; // 204 -> empty body
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_by_filter(
@@ -108,11 +105,6 @@ async function superuser_token(): Promise<string> {
 
 function start_server(data_dir: string, migrations_dir: string): Promise<roomkit.Room> {
   return roomkit.serve(PORT, data_dir, migrations_dir, roomkit.hooks_dir(S));
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 // ── Scratch tree + boot ─────────────────────────────────────────────────────────

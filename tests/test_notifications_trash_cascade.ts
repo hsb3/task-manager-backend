@@ -23,6 +23,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { stop_server } from "./suitekit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -71,11 +72,6 @@ async function api(
 
 function start_server(data_dir: string, migrations_dir: string): Promise<roomkit.Room> {
   return roomkit.serve(PORT, data_dir, migrations_dir, roomkit.hooks_dir(S));
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 // ── Scratch tree + boot ─────────────────────────────────────────────────────────

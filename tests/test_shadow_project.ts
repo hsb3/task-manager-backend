@@ -31,6 +31,7 @@ import {
   py_get,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -101,10 +102,6 @@ async function api(
     }
   }
   return [r.status, raw ? JSON.parse(raw) : {}];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 class Room {

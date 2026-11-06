@@ -29,6 +29,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
@@ -90,10 +91,6 @@ async function api(
     return api(method, path, token, body, true);
   }
   return [r.status, raw ? JSON.parse(raw) : {}];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_id(

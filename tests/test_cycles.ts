@@ -23,6 +23,7 @@ import {
   tup,
   urlencode,
   truthy,
+  sqlite_connect,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 import * as tierkit from "./tierkit.ts";
@@ -861,6 +862,111 @@ try {
   check("cleanup: superuser removes the second project", s, 204);
   [s] = await api("DELETE", `/api/collections/cycles/records/${cyc_b_id}`, su);
   check("cleanup: superuser removes the ws-B assignment cycle", s, 204);
+
+  // A row made bad behind the hooks stays saveable on fields the guards do not check.
+  // COVERS: hook:cycles.pb.js#onRecordUpdate:cycles, hook:cycles.pb.js#onRecordUpdate:tasks
+  console.log("\n── (7e) an already-bad row still saves an unrelated field ──");
+  const T_JAN1 = "2028-01-01 00:00:00.000Z";
+  const T_JAN10 = "2028-01-10 00:00:00.000Z";
+  const T_FEB1 = "2028-02-01 00:00:00.000Z";
+  const T_FEB10 = "2028-02-10 00:00:00.000Z";
+  const T_MAR1 = "2028-03-01 00:00:00.000Z";
+  const T_MAR10 = "2028-03-10 00:00:00.000Z";
+  const touch_ids: Record<string, string> = {};
+  for (const [label, token, ws, starts, ends] of [
+    ["span", alice, ALICE_WS, T_JAN1, T_JAN10],
+    ["kept", alice, ALICE_WS, T_FEB1, T_FEB10],
+    ["moved", alice, ALICE_WS, T_MAR1, T_MAR10],
+    ["foreign", bob, BOB_WS, T_JAN1, T_JAN10],
+  ] as const) {
+    [s, r] = await api("POST", "/api/collections/cycles/records", token, {
+      workspace: ws,
+      name: `Touches Cycle ${label}`,
+      starts_on: starts,
+      ends_on: ends,
+    });
+    check(`(fixture) valid cycle '${label}' created`, s, 200);
+    touch_ids[label] = r.id;
+  }
+  for (const label of ["bad", "clean"]) {
+    [s, r] = await api("POST", "/api/collections/tasks/records", alice, {
+      title: `Touches Task ${label}`,
+      workspace: ALICE_WS,
+      project: proj_one,
+      cycle: label === "bad" ? touch_ids.span : "",
+    });
+    check(`(fixture) valid task '${label}' created`, s, 200);
+    touch_ids[`task_${label}`] = r.id;
+  }
+  const touch_db = sqlite_connect(path.join(DATA_DIR, "data.db"));
+  try {
+    touch_db.run("UPDATE tasks SET cycle = ? WHERE id = ?", [
+      touch_ids.foreign!,
+      touch_ids.task_bad!,
+    ]);
+    touch_db.run("UPDATE cycles SET ends_on = ? WHERE id = ?", [JAN5, touch_ids.span!]);
+    touch_db.run("UPDATE cycles SET starts_on = ?, ends_on = ? WHERE id = ?", [
+      "2028-02-05 00:00:00.000Z",
+      "2028-02-15 00:00:00.000Z",
+      touch_ids.moved!,
+    ]);
+  } finally {
+    touch_db.close();
+  }
+  [s, r] = await api("GET", `/api/collections/tasks/records/${touch_ids.task_bad}`, su);
+  check("(fixture) the task now points at another workspace's cycle", r.cycle, touch_ids.foreign);
+
+  [s] = await api("PATCH", `/api/collections/tasks/records/${touch_ids.task_bad}`, alice, {
+    title: "Touches Task bad, renamed by owner",
+  });
+  check("owner renames a task already on a foreign cycle → 200", s, 200);
+  [s] = await api("PATCH", `/api/collections/tasks/records/${touch_ids.task_bad}`, su, {
+    title: "Touches Task bad, renamed by superuser",
+  });
+  check("superuser renames a task already on a foreign cycle → 200", s, 200);
+  [s] = await api("PATCH", `/api/collections/cycles/records/${touch_ids.span}`, alice, {
+    name: "Touches Cycle span, renamed",
+  });
+  check("owner renames a cycle already ending before it starts → 200", s, 200);
+  [s] = await api("PATCH", `/api/collections/cycles/records/${touch_ids.moved}`, alice, {
+    name: "Touches Cycle moved, renamed",
+  });
+  check("owner renames a cycle already overlapping another → 200", s, 200);
+  [s] = await api("PATCH", `/api/collections/cycles/records/${touch_ids.kept}`, su, {
+    name: "Touches Cycle kept, renamed",
+  });
+  check("superuser renames the cycle that was overlapped → 200", s, 200);
+
+  [s] = await api("PATCH", `/api/collections/tasks/records/${touch_ids.task_clean}`, alice, {
+    cycle: touch_ids.foreign,
+  });
+  check("control: a save that MOVES a task onto a foreign cycle → 400", s, 400);
+  // The range guard is registered first, so each refusal is told apart by its message.
+  [s, r] = await api("PATCH", `/api/collections/cycles/records/${touch_ids.kept}`, alice, {
+    ends_on: "2028-01-20 00:00:00.000Z",
+  });
+  check(
+    "control: a save that sets an ends_on before starts_on → 400 (range)",
+    tup(s, (r.message ?? "").includes("must end after")),
+    tup(400, true),
+  );
+  [s, r] = await api("PATCH", `/api/collections/cycles/records/${touch_ids.kept}`, alice, {
+    ends_on: "2028-02-12 00:00:00.000Z",
+  });
+  check(
+    "control: a save that moves dates into another cycle → 400 (overlap)",
+    tup(s, (r.message ?? "").includes("run into another cycle")),
+    tup(400, true),
+  );
+
+  for (const tid of [touch_ids.task_bad, touch_ids.task_clean]) {
+    [s] = await api("DELETE", `/api/collections/tasks/records/${tid}`, su);
+    check(`cleanup: superuser removes tasks/${tid!.slice(0, 8)}`, s, 204);
+  }
+  for (const label of ["span", "kept", "moved", "foreign"]) {
+    [s] = await api("DELETE", `/api/collections/cycles/records/${touch_ids[label]}`, su);
+    check(`cleanup: superuser removes the '${label}' touches cycle`, s, 204);
+  }
 
   // ══════════════════ 8. Cleanup ══════════════════════════════════════════════
   console.log("\n── (8) cleanup ──");

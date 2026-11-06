@@ -32,6 +32,7 @@ import {
   sqlite_connect,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc, stop_server } from "./suitekit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -70,10 +71,6 @@ async function api(
   });
   const raw = await r.text();
   return [r.status, raw ? JSON.parse(raw) : {}]; // 204 -> empty body
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_by_filter(
@@ -121,11 +118,6 @@ function start_server(
   hooks: string | null = null,
 ): Promise<roomkit.Room> {
   return roomkit.serve(PORT, data_dir, migrations_dir, hooks || roomkit.hooks_dir(S));
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 async function start_sink(mail_dir: string): Promise<Bun.Subprocess> {

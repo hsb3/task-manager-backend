@@ -16,6 +16,7 @@
 import { randomBytes } from "node:crypto";
 import { py_str, tup, truthy, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
@@ -61,10 +62,6 @@ function check_in(label: string, got: any, allowed: any[]): void {
   console.log(
     `  ${ok ? "✅" : "❌ MISMATCH"}  ${label.padEnd(56)} → ${py_str(got)} (want one of ${py_str(tup(...allowed))})`,
   );
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_id(
