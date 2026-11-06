@@ -18,6 +18,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as roomkit from "./roomkit.ts";
+import { stop_server } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 import {
   getitem,
@@ -112,11 +113,6 @@ function start_server(
   hooks: string | null = null,
 ): Promise<roomkit.Room> {
   return roomkit.serve(PORT, data_dir, migrations_dir, hooks || roomkit.hooks_dir(S));
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 function now_ts(): string {

@@ -49,6 +49,7 @@ onRecordCreate((e) => {
 // ── RANGE guard — a cycle ends strictly after it starts ──────────────────────
 // The UNIVERSAL tier, not *Request: a programmatic e.app.save() from a cron or route
 // fires no *Request hook and would otherwise store an impossible span.
+// Only a save that changes a guarded field is judged (a new record's original() is blank).
 // An empty ends_on under a set starts_on is refused here too — on create the defaulting
 // hook above has already filled it, so this is the update that clears it.
 // KEEP IN SYNC: the create + update handlers below are byte-parallel apart from the
@@ -56,7 +57,11 @@ onRecordCreate((e) => {
 onRecordCreate((e) => {
   const starts = String(e.record.get("starts_on") || "");
   const ends = String(e.record.get("ends_on") || "");
-  if (starts) {
+  const orig = e.record.original();
+  const touchesSpan =
+    starts !== String(orig.get("starts_on") || "") ||
+    ends !== String(orig.get("ends_on") || "");
+  if (starts && touchesSpan) {
     const from = new Date(starts.replace(" ", "T")).getTime();
     const to = ends ? new Date(ends.replace(" ", "T")).getTime() : NaN;
     if (!(to > from)) {
@@ -68,7 +73,11 @@ onRecordCreate((e) => {
 onRecordUpdate((e) => {
   const starts = String(e.record.get("starts_on") || "");
   const ends = String(e.record.get("ends_on") || "");
-  if (starts) {
+  const orig = e.record.original();
+  const touchesSpan =
+    starts !== String(orig.get("starts_on") || "") ||
+    ends !== String(orig.get("ends_on") || "");
+  if (starts && touchesSpan) {
     const from = new Date(starts.replace(" ", "T")).getTime();
     const to = ends ? new Date(ends.replace(" ", "T")).getTime() : NaN;
     if (!(to > from)) {
@@ -82,13 +91,19 @@ onRecordUpdate((e) => {
 // Automatic rollover needs an unambiguous next cycle, which overlapping spans make
 // undefined (Linear allows none within a team). Boundaries are inclusive: a span may
 // start the day after the previous one ends, not on it.
+// Only a save that changes a guarded field is judged (a new record's original() is blank).
 // KEEP IN SYNC: the create + update handlers below are byte-parallel apart from the
 // registration verb.
 onRecordCreate((e) => {
   const ws = e.record.get("workspace");
   const starts = String(e.record.get("starts_on") || "");
   const ends = String(e.record.get("ends_on") || "");
-  if (ws && starts && ends) {
+  const orig = e.record.original();
+  const touchesOverlap =
+    ws !== orig.get("workspace") ||
+    starts !== String(orig.get("starts_on") || "") ||
+    ends !== String(orig.get("ends_on") || "");
+  if (ws && starts && ends && touchesOverlap) {
     const clash = e.app.findRecordsByFilter(
       "cycles",
       "workspace = {:w} && id != {:id} && starts_on <= {:ends} && ends_on >= {:starts}",
@@ -110,7 +125,12 @@ onRecordUpdate((e) => {
   const ws = e.record.get("workspace");
   const starts = String(e.record.get("starts_on") || "");
   const ends = String(e.record.get("ends_on") || "");
-  if (ws && starts && ends) {
+  const orig = e.record.original();
+  const touchesOverlap =
+    ws !== orig.get("workspace") ||
+    starts !== String(orig.get("starts_on") || "") ||
+    ends !== String(orig.get("ends_on") || "");
+  if (ws && starts && ends && touchesOverlap) {
     const clash = e.app.findRecordsByFilter(
       "cycles",
       "workspace = {:w} && id != {:id} && starts_on <= {:ends} && ends_on >= {:starts}",
@@ -133,11 +153,16 @@ onRecordUpdate((e) => {
 // The UNIVERSAL tier, not *Request: a programmatic e.app.save() fires no *Request hook
 // and would otherwise store a cross-tenant pointer. A cycle has no project of its own,
 // so the workspace match is the whole check.
+// Only a save that changes a guarded field is judged (a new record's original() is blank).
 // KEEP IN SYNC: the create + update handlers below are byte-parallel apart from the
 // registration verb.
 onRecordCreate((e) => {
   const cycle = e.record.get("cycle");
-  if (cycle) {
+  const orig = e.record.original();
+  const touchesTenancy =
+    cycle !== orig.get("cycle") ||
+    e.record.get("workspace") !== orig.get("workspace");
+  if (cycle && touchesTenancy) {
     let c = null;
     try {
       c = e.app.findRecordById("cycles", cycle);
@@ -152,7 +177,11 @@ onRecordCreate((e) => {
 }, "tasks");
 onRecordUpdate((e) => {
   const cycle = e.record.get("cycle");
-  if (cycle) {
+  const orig = e.record.original();
+  const touchesTenancy =
+    cycle !== orig.get("cycle") ||
+    e.record.get("workspace") !== orig.get("workspace");
+  if (cycle && touchesTenancy) {
     let c = null;
     try {
       c = e.app.findRecordById("cycles", cycle);

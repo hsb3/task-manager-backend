@@ -664,6 +664,7 @@ run_suite "test_port_collisions_checker" bun tests/test_port_collisions_checker.
 run_suite "test_app_docs_history_checker" bun tests/test_app_docs_history_checker.ts
 run_suite "test_rescope_guard_checker"  bun tests/test_rescope_guard_checker.ts
 run_suite "test_membership_status_checker" bun tests/test_membership_status_checker.ts
+run_suite "test_universal_touches_checker" bun tests/test_universal_touches_checker.ts
 run_suite "test_view_within_list_checker" bun tests/test_view_within_list_checker.ts
 run_suite "test_fixture_project_resolve_checker" bun tests/test_fixture_project_resolve_checker.ts
 run_suite "test_app_docs_down_up_checker" bun tests/test_app_docs_down_up_checker.ts

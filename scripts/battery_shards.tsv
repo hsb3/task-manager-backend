@@ -137,3 +137,4 @@
 3	0	test_ts_source
 3	0	test_route_registry_checker
 3	0	test_openapi_routes
+4	0	test_universal_touches_checker

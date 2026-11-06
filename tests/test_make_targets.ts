@@ -453,4 +453,97 @@ for (const job of Object.keys(jobs)) {
   }
 }
 
+// A job that reaches bun (directly or through a make recipe) needs setup-bun first.
+function jobs_missing_setup_bun(wf: any, mk: string): string[] {
+  const bun = /\bbunx?\b/;
+  const needs_bun = (target: string, seen = new Set<string>()): boolean => {
+    if (seen.has(target)) return false;
+    seen.add(target);
+    const m = new RegExp(`^${RegExp.escape(target)}:([^\\n]*)((?:\\n\\t[^\\n]*)*)`, "m").exec(mk);
+    // A recipe that hands off to a shell script runs whatever bun that script calls.
+    const scripts = m ? [...m[2].matchAll(/\bbash\s+(\S+\.sh)\b|\bsh\s+(\S+\.sh)\b/g)] : [];
+    const script_bun = scripts.some(([, a, b]) => bun.test(read_text(path.join(REPO, a ?? b))));
+    return (
+      !!m &&
+      (bun.test(m[2]) ||
+        script_bun ||
+        m[1]
+          .replace(/#.*/, "")
+          .split(/\s+/)
+          .some((dep) => dep && needs_bun(dep, seen)))
+    );
+  };
+  const step_needs_bun = (run: string): boolean =>
+    bun.test(run) ||
+    [...run.matchAll(/(?<![\w-])make\s+([a-z][\w-]*)/g)].some(([, target]) => needs_bun(target));
+  const missing: string[] = [];
+  for (const [job, def] of Object.entries<any>(wf.jobs)) {
+    let installed = false;
+    for (const step of def.steps) {
+      installed ||= String(step.uses ?? "").startsWith("oven-sh/setup-bun@");
+      if (!installed && step_needs_bun(step.run ?? "")) {
+        missing.push(`${job}: ${step.run.split("\n")[0]}`);
+        break;
+      }
+    }
+  }
+  return missing;
+}
+const missing = jobs_missing_setup_bun(workflow, makefile);
+check("every CI job that runs bun installs bun first", missing.length === 0);
+for (const job of Object.keys(jobs)) {
+  check(
+    `${job} installs bun before its first bun step`,
+    !missing.some((m) => m.startsWith(`${job}: `)),
+  );
+}
+const mutant = (edit: (steps: any[]) => any[], job: string) => {
+  const copy = structuredClone(workflow);
+  copy.jobs[job].steps = edit(copy.jobs[job].steps);
+  return jobs_missing_setup_bun(copy, makefile);
+};
+const named = (list: string[], job: string) => list.filter((m) => m.startsWith(`${job}: `));
+const is_setup = (s: any) => String(s.uses ?? "").startsWith("oven-sh/setup-bun@");
+// Dropping the bun install step too leaves only the make recipe to reveal the bun need.
+const no_setup = mutant(
+  (steps) => steps.filter((s) => !is_setup(s) && !/^bun /.test(s.run ?? "")),
+  "static",
+);
+console.log(`   mutant (a): ${JSON.stringify(no_setup)}`);
+check(
+  "mutant: static without setup-bun is the only job named, via make check-static",
+  named(no_setup, "static").join() === "static: make check-static",
+);
+const late = mutant((steps) => {
+  const rest = steps.filter((s) => !is_setup(s));
+  const at = rest.findIndex((s) => s.run === "make battery");
+  return [...rest.slice(0, at + 1), steps.find(is_setup), ...rest.slice(at + 1)];
+}, "battery");
+console.log(`   mutant (b): ${JSON.stringify(late)}`);
+check(
+  "mutant: battery with setup-bun after make battery is named",
+  named(late, "battery").length === 1,
+);
+const no_bun_steps = mutant(
+  (steps) => steps.filter((s) => !is_setup(s) && !/^bun /.test(s.run ?? "")),
+  "battery",
+);
+console.log(`   mutant (d): ${JSON.stringify(named(no_bun_steps, "battery"))}`);
+check(
+  "mutant: battery without setup-bun or bun install is named via make battery's script",
+  named(no_bun_steps, "battery").join() === "battery: make battery",
+);
+const reset_job = structuredClone(workflow);
+reset_job.jobs.wipe = { steps: [{ run: "make reset" }] };
+check(
+  "a job running make reset (help comment on its target line) is handled without throwing",
+  jobs_missing_setup_bun(reset_job, makefile).every((m) => !m.startsWith("wipe: ")),
+);
+const bunless = structuredClone(workflow);
+bunless.jobs.lint = { steps: [{ run: "echo hi" }, { run: "make help" }] };
+check(
+  "a job that never touches bun is not named",
+  !jobs_missing_setup_bun(bunless, makefile).some((m) => m.startsWith("lint: ")),
+);
+
 process.exit(FAILS.length ? 1 : 0);

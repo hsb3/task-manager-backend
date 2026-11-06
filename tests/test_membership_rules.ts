@@ -18,6 +18,7 @@
  */
 
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 import {
   by_code_point,
@@ -63,10 +64,6 @@ async function login(email: string): Promise<[string, string]> {
     password: "test123456",
   });
   return [roomkit.token_of(PB, email, r), r.record.id];
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_id(

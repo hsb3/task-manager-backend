@@ -10,26 +10,12 @@
  * a missing or re-roled fixture turns the check red instead of satisfying it (PBTT-454).
  */
 
-import fs from "node:fs";
-import { py_str, py_strip, read_text, tup, truthy, urlencode } from "../scripts/_py.ts";
+import { py_str, tup, truthy, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc, load_env } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 // .env is gitignored — no secrets hard-coded here.
-function load_env(path = ".env"): void {
-  if (fs.existsSync(path)) {
-    for (let line of read_text(path).split(/\r\n|\r|\n/)) {
-      line = py_strip(line);
-      if (line && !line.startsWith("#") && line.includes("=")) {
-        const i = line.indexOf("=");
-        const k = line.slice(0, i);
-        const v = line.slice(i + 1);
-        if (!(k in process.env)) process.env[k] = v;
-      }
-    }
-  }
-}
-
 load_env();
 
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
@@ -66,11 +52,6 @@ async function login(email: string): Promise<[string, string]> {
     password: "test123456",
   });
   return [roomkit.token_of(PB, email, r), r.record.id];
-}
-
-// PocketBase filter string literals escape an embedded quote with a backslash.
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 /** Resolve a record id by query instead of a hard-coded id (re-seed regenerates ids). */

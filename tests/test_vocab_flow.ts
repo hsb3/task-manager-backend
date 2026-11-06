@@ -35,6 +35,7 @@ import {
   urlencode,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc } from "./suitekit.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const POCKETBASE_BIN = roomkit.pb_bin();
@@ -174,10 +175,6 @@ async function login(email: string, password = "test123456"): Promise<string> {
   const tok = r.token;
   if (!truthy(tok)) throw new roomkit.SystemExit(`login failed for ${email}: ${py_str(r)}`);
   return tok;
-}
-
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
 }
 
 async function find_one(collection: string, filt: string, token: string | null): Promise<any> {

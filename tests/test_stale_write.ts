@@ -47,6 +47,7 @@ import {
   py_get,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { esc, stop_server } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
@@ -134,10 +135,6 @@ async function api_form(
 
 tierkit.use(api);
 
-function esc(value: string): string {
-  return value.replaceAll("'", "\\'");
-}
-
 function respell(value: string): [string, string, string] {
   // T-separated, offset-spelled, and ms-stripped variants of a `stored` timestamp.
   const t_form = value.replaceAll(" ", "T");
@@ -208,11 +205,6 @@ async function start_server(
       else process.env.TZ = prev_tz;
     }
   }
-}
-
-async function stop_server(proc: roomkit.Room | null): Promise<void> {
-  if (proc === null) return;
-  await roomkit.stop(proc);
 }
 
 async function read_record(collection: string, rec_id: any, token: string | null): Promise<any> {
