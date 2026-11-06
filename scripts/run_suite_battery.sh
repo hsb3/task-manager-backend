@@ -532,6 +532,8 @@ run_suite "test_invite_mirror"      bun tests/test_invite_mirror.ts
 run_suite "test_invitations"        bun tests/test_invitations.ts
 # ── I-INVITE: decision:invitation-send-limit-and-decline-block — the per-inviter daily invitation limit and decline suppression.
 run_suite "test_invitation_limits"  bun tests/test_invitation_limits.ts
+# ── I-INVITE: decision:invitation-mail-and-resend — invitation mail, resend on re-invite, mail_sent, the one-minute resend cooldown.
+run_suite "test_invitation_mail"    bun tests/test_invitation_mail.ts
 
 # ── security: tenant-anchor relations are immutable on update — self-booting (own clean room).
 run_suite "test_rescope_guard"      bun tests/test_rescope_guard.ts

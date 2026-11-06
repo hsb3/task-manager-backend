@@ -362,7 +362,7 @@ try {
   check(
     "re-inviting an already pending address at the limit is still the same 200 ack",
     await route(WS1, A, "a1-3@example.test"),
-    tup(200, { invited: true }),
+    tup(200, { invited: true, mail_sent: false }),
   );
   [s] = await direct(WS1, A, "a1-over-2@example.test");
   check("a direct create to the route's workspace (WS1) is refused too", s, 429);

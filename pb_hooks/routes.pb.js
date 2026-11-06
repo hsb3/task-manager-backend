@@ -965,28 +965,70 @@ require(`${__hooks}/lib/routes.js`).add(
     try {
       e.app.save(rec);
     } catch (err) {
-      // Re-inviting a pending address answers like the first invitation and changes nothing.
+      // Re-inviting a pending address resends that invitation (decision:invitation-mail-and-resend).
       // Detected by re-reading the pair (the create hook folded email_key onto rec), never by
       // matching PB's validation wording — every OTHER save failure re-throws untouched.
       const key = rec.getString("email_key");
-      let collided = false;
+      let existing = null;
       if (key) {
         try {
-          e.app.findFirstRecordByFilter(
+          existing = e.app.findFirstRecordByFilter(
             "workspace_invitations",
             "workspace = {:w} && email_key = {:k}",
             { w: wsId, k: key },
           );
-          collided = true;
         } catch (_) {
-          collided = false;
+          existing = null;
         }
       }
-      if (!collided) throw err;
+      if (!existing) throw err;
+      const invLib = require(`${__hooks}/lib/invitations.js`);
+      if (
+        invLib.expiry(existing.getString("created"), invLib.expiryDays(e.app))
+          .expired
+      ) {
+        // An expired invitation cannot be accepted: replace it; the after-create hook mails the new one.
+        e.app.delete(existing);
+        e.app.save(rec);
+      } else if (e.app.settings().smtp.enabled) {
+        // shortcut: one store key per resent invitation, never pruned; move to a PocketBase rate rule once a path with a parameter can carry one.
+        const stampKey = "invitation_resend:" + existing.id;
+        const last = e.app.store().get(stampKey);
+        if (typeof last === "number" && Date.now() - last < 60000) {
+          const msg =
+            "This invitation was sent again less than a minute ago. Try again later.";
+          throw new ApiError(429, msg, {
+            email: new ValidationError("invitation_resend_too_soon", msg),
+          });
+        }
+        e.app.store().set(stampKey, Date.now());
+        const failure = invLib.dispatchMail(e.app, existing.id);
+        if (failure)
+          e.app
+            .logger()
+            .error(
+              "invitation email failed",
+              "invitation",
+              existing.id,
+              "err",
+              failure.split(existing.getString("email")).join("[address]"),
+            );
+      } else {
+        e.app
+          .logger()
+          .warn(
+            "invitation email skipped: SMTP disabled",
+            "invitation",
+            existing.id,
+          );
+      }
     }
-    // Identical in status, body and key set whether or not the address has an account or is
-    // already invited — the one property that makes this route not an account-existence oracle.
-    return e.json(200, { invited: true });
+    // Identical in status, body and key set whether or not the address has an account — the one
+    // property that makes this route not an account-existence oracle; only a repeated resend differs.
+    return e.json(200, {
+      invited: true,
+      mail_sent: e.app.settings().smtp.enabled,
+    });
   },
 );
 

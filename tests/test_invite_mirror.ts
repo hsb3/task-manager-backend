@@ -172,7 +172,7 @@ async function invite(
     check(
       `${label}: the 200 body is EXACTLY the acknowledgement`,
       tup(Object.keys(body).sort(by_code_point), body),
-      tup(["invited"], { invited: true }),
+      tup(["invited", "mail_sent"], { invited: true, mail_sent: false }),
     );
   }
   return tup(s, body);
@@ -551,7 +551,7 @@ try {
   check(
     "Alice (owner) invites a new member — accepted, an invitation row for member",
     tup(s, r, truthy(row) ? getitem(row, "role") : row),
-    tup(200, { invited: true }, "member"),
+    tup(200, { invited: true, mail_sent: false }, "member"),
   );
   await clear_target();
   [s, r] = await invite("active admin invites a new member", ROUTE, admin_tok, {
@@ -561,7 +561,7 @@ try {
   check(
     "the ACTIVE admin invites a new member — accepted, an invitation row for member",
     tup(s, r, truthy(row) ? getitem(row, "role") : row),
-    tup(200, { invited: true }, "member"),
+    tup(200, { invited: true, mail_sent: false }, "member"),
   );
   await clear_target();
 
@@ -634,7 +634,11 @@ try {
     });
     // The BODY, not just the status: a 200 saying anything else is a different answer, and a
     // status-only comparison let a leaking route through a whole suite once.
-    const route_allows = Bun.deepEquals([s_route, body_route], [200, { invited: true }], true);
+    const route_allows = Bun.deepEquals(
+      [s_route, body_route],
+      [200, { invited: true, mail_sent: false }],
+      true,
+    );
     // The route answers 200 for an unresolvable address too, so the ROW is what proves its
     // 200 was an invitation rather than the uniform silence.
     const route_wrote = (await target_row()) !== null;
@@ -787,7 +791,7 @@ try {
   check(
     "the SAME create without the key is accepted — the 400 names the key",
     await invite("control: no stale-write key", ROUTE, alice, { email: TARGET_EMAIL }),
-    tup(200, { invited: true }),
+    tup(200, { invited: true, mail_sent: false }),
   );
   await clear_target();
 

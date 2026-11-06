@@ -279,11 +279,11 @@ try {
   const UNREG = "invitations-nobody@example.test";
   [s, r] = await resolve(WS, OWNER, reg_email);
   check(
-    "R1 owner invites a registered address → 200 {invited:true}",
+    "R1 owner invites a registered address → 200 {invited:true, mail_sent:false}",
     tup(s, r),
-    tup(200, { invited: true }),
+    tup(200, { invited: true, mail_sent: false }),
   );
-  check_keys("R1 response key set is exactly {invited}", r, ["invited"]);
+  check_keys("R1 response key set is exactly {invited, mail_sent}", r, ["invited", "mail_sent"]);
   const [s2, r2] = await resolve(WS, OWNER, UNREG);
   check("R1 owner invites an unregistered address → identical answer", tup(s2, r2), tup(s, r));
   const rows = (await invites_of(WS)).filter((i) => getitem(i, "email") === reg_email);
@@ -296,7 +296,7 @@ try {
   check(
     "re-invite (different case/whitespace/role) → same 200 ack",
     tup(s3, r3),
-    tup(200, { invited: true }),
+    tup(200, { invited: true, mail_sent: false }),
   );
   const rows_after = (await invites_of(WS)).filter((i) => getitem(i, "email") === reg_email);
   check("still exactly one row", rows_after.length, 1);

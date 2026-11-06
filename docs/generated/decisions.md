@@ -315,6 +315,28 @@ The window is the `app_settings` row `invitation_expiry_days`, default 7. Pocket
 
 `invited_by` is an audit stamp, not a requirement: an invitation is a grant the workspace makes, so an admin leaving does not revoke it.
 
+## invitation-mail-and-resend
+
+- **Slug:** `decision:invitation-mail-and-resend`
+- **Title:** An invitation sends the invitee one email with the sign-in address and the invitation id, inviting the same address again sends it again, and a server without mail says so in the response.
+- **Ref:** `workspace_invitations`
+
+Before this an invitation was silent: the row existed, but nothing told the invitee, who learned of it only by signing in with that address. Prior art: GitHub, Slack and Linear all email a link; Linear resends an invite from its member list and limits how often. This app has no web app of its own and its clients are API callers, so the mail names the app URL as the place to sign in and states the invitation id with the accept and decline calls in words.
+
+- **Send.** Both ways of creating an invitation (the collection create and POST /api/tracker/workspaces/{id}/resolve-member-email) send the mail, from the sender address in settings, after the create has answered, so a create never waits on the mail server (the same arrangement as decision:signup-mail-off-request). A failed send logs invitation email failed against the invitation id with the address redacted; the server does not retry by itself.
+- **No mail server.** The create succeeds and the response says mail_sent: false; the server logs invitation email skipped: SMTP disabled. Refusing the create would leave a server without mail unable to invite at all, and the invitation itself is the grant; the mail is only how the invitee hears of it.
+- **Superuser rows send nothing** and answer mail_sent: false, as a superuser-created account gets no verification mail: seeding and import are not invitations by a person.
+- **Resend is re-inviting.** Inviting a pending address again through the route was already an idempotent 200; it now mails the same invitation again, keeping its id and expiry and spending none of the daily limit of decision:invitation-send-limit-and-decline-block, because no invitation was created. An invitation that has already expired cannot be accepted, so re-inviting replaces it with a fresh one (new id, new expiry, one daily slot), as revoke and invite would. No separate resend route: the member list already has the address, and one call covers invite and resend alike, as it does in Linear.
+- **Rate limit.** A second resend of the same invitation within a minute answers 429 and sends nothing; the count is per invitation and starts afresh when the server restarts. A first invitation is bounded by the daily limit per inviter, which bulk onboarding already relies on, so it carries no per-minute limit.
+
+Accepted limits:
+
+- **mail_sent reports a hand-off, not a delivery.** The create has answered before the transport is reached; a failure is only in the server log.
+- **The mail link is the app URL, not a page.** There is no web page to land on; an invitee signs in (creating and confirming an account first when needed, then waiting for approval) and a client accepts with the id.
+- **Replacing an expired invitation is not one step.** When the fresh invitation is refused at the daily limit, the expired one is already gone; it could not have been accepted anyway and the daily sweep would have removed it.
+
+See collection:workspace_invitations. `tests/test_invitation_mail.ts` proves it.
+
 ## invitation-send-limit-and-decline-block
 
 - **Slug:** `decision:invitation-send-limit-and-decline-block`
