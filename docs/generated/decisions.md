@@ -368,6 +368,18 @@ Only members can be assignees: a request hook in `pb_hooks/main.pb.js` refuses, 
 
 The hook absorbs errors, so it is a harmless no-op when the membership goes because its workspace or user is being deleted.
 
+## me-route
+
+- **Slug:** `decision:me-route`
+- **Title:** One call tells a caller who they are, where they belong and what they may do there.
+- **Ref:** `workspaces`
+
+A client opening a session needs the account, the workspaces it can enter, its role and standing in each, a few counts and the unread badge. The web proxy assembled that itself: it paged the membership list for the own row, counted projects and open tasks with one list call each, decided write and manage from the role in the browser, and read the badge as the total of a read=false notification list. Every client had to repeat that.
+
+GET /api/tracker/me (route:tracker-me) now serves it from the server in one call. Prior art: the Linear API answers its viewer query with the signed-in user and the organization and teams they belong to in one request, and the GitHub REST API puts a permissions map of booleans, computed for the caller, on each repository it returns. The capability flags follow the GitHub shape and are derived from the role tiers (decision:role-tiers), so no client recomputes them; they are advisory, and every write is still decided by its collection rule.
+
+Open means a live task whose status category is neither completed nor canceled, the same two categories project_items treats as resolved, so the name of a custom status never changes the count. A task with no status counts as open. The unread count is decided row by row by the live notifications list rule, so it cannot drift from what the inbox lists. A suspended membership stays in the list with its status, because a client must tell a closed workspace from a missing one, but the workspace name and counts are withheld: the workspace rules give a suspended member no read.
+
 ## notification-fanout-semantics
 
 - **Slug:** `decision:notification-fanout-semantics`

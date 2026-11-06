@@ -101,6 +101,7 @@
 1	2	test_write_hygiene
 2	2	test_user_settings_me
 3	2	test_access_rule_holes
+4	2	test_notification_actor
 1	1	test_app_docs_seed_idempotent
 3	1	test_check_pb_pin
 1	1	test_decision_citations_checker
@@ -110,6 +111,8 @@
 1	1	test_py_helpers
 2	1	test_room_preflight_checker
 2	1	test_invitation_expiry_list
+2	1	test_me_route
+2	1	test_notifications_suspended
 3	0	test_app_docs_down_up_checker
 3	0	test_app_docs_history_checker
 3	0	test_app_docs_quotes_checker

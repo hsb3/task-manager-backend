@@ -104,6 +104,30 @@ export const ALLOWLIST = new Map<string, string>([
     "card 2ghp and card 1853: the route applies the new name, pointer and time zone checks; the record lists them",
   ],
   [
+    '["1785187400_seed_app_docs.js", "collection:notifications", "**Read.** Access is recipient-only, and list and view share "]',
+    "card s80p: the quoted notifications rule gained a workspace leg; the record quotes the new rule",
+  ],
+  [
+    '["1785187400_seed_app_docs.js", "collection:notifications", "**Update.** update carries the same access predicate (withou"]',
+    "card 06sf: actor and read_at are server-written; the record adds them to the field lock",
+  ],
+  [
+    '["1785187400_seed_app_docs.js", "collection:notifications", "A notification naming no task, document or decision always l"]',
+    "card s80p: a row naming a workspace now needs live membership of it; the record says which rows always list",
+  ],
+  [
+    '["1785187400_seed_app_docs.js", "collection:notifications", "Fields: user (relation to users, required, the recipient, re"]',
+    "card 06sf: notifications gained actor and read_at; the record lists both fields",
+  ],
+  [
+    '["1785187400_seed_app_docs.js", "collection:notifications", "It covers exactly what the list shows, skips dismissed rows,"]',
+    "card 06sf: read-all now stamps read_at; the record says so",
+  ],
+  [
+    '["1785187400_seed_app_docs.js", "collection:notifications", "The list rule does not scope by workspace; a caller filters "]',
+    "card s80p: the list rule now checks the workspace a row names; the record says how a caller narrows to one workspace",
+  ],
+  [
     '["1785186800_seed_app_docs.js", "collection:user_settings", "The server does not interpret time_zone; the 64-character li"]',
     "card tpyx: the server now reads time_zone to count the user's days (decision:viewer-day-values); the record says how",
   ],

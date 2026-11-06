@@ -157,6 +157,13 @@ export const CONSTANTS: Record<string, Spec> = {
         note: "project_items enrich hook: subtask_done counts children in a resolved-half status",
       },
       {
+        file: "pb_hooks/me.pb.js",
+        marker: "KEEP IN SYNC: open items",
+        each: String.raw`(?<=category IN \([^)]*)'([^']*)'`,
+        values: ["completed", "canceled"],
+        note: "me route: open_items leaves out tasks in a resolved-half status",
+      },
+      {
         file: "pb_hooks/counts.pb.js",
         marker: "KEEP IN SYNC: statuses enrich: terminal and off_pipeline",
         each: String.raw`category === "([^"]*)"`,

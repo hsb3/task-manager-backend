@@ -1578,6 +1578,8 @@ routerAdd(
         notice.set("user", parties[i]);
         notice.set("workspace", wsId);
         notice.set("kind", "ownership_transferred");
+        // A superuser's id names no users row, so an operator's handover carries no actor.
+        if (!isSuperuser) notice.set("actor", uid);
         txApp.save(notice);
       }
     });

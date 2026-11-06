@@ -200,6 +200,32 @@
       "required": false,
       "system": false,
       "type": "bool"
+    },
+    {
+      "cascadeDelete": false,
+      "collectionId": "_pb_users_auth_",
+      "help": "",
+      "hidden": false,
+      "id": "relation3000030013",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "actor",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "help": "",
+      "hidden": false,
+      "id": "date3000030014",
+      "max": "",
+      "min": "",
+      "name": "read_at",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "date"
     }
   ],
   "indexes": [

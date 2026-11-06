@@ -104,6 +104,16 @@ export const ALLOWLIST_RULES: Allowlist = new Map();
 export const ALLOWLIST_HOOKS: Allowlist = new Map([
   [
     JSON.stringify([
+      "me.pb.js",
+      "sql:m",
+      "JOIN workspace_members m ON m.workspace = w.id AND [[m.user]] = {:u} <?>  WHERE w.trashed = '' AND (w.owner = {:u} OR m.id IS NOT NULL) ORDER BY w.created, w.id",
+    ]),
+    "not a grant: GET /api/tracker/me lists the caller's own row in ANY status so a suspended " +
+      "membership is reported as suspended; counts, name and capabilities are served only when " +
+      "the owner or an active row reads the workspace (card 06sf)",
+  ],
+  [
+    JSON.stringify([
       "owner.pb.js",
       "e.app.findFirstRecordByFilter",
       "workspace = {:w} && user = {:u}",

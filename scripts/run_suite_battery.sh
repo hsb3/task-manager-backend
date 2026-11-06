@@ -575,6 +575,15 @@ run_suite "test_invitation_expiry_list" bun tests/test_invitation_expiry_list.ts
 # ── landing: the workspace a user lands in, and whether a named workspace can be switched to.
 run_suite "test_landing"             bun tests/test_landing.ts
 
+# ── the me route: workspaces with role, status, counts and capabilities, plus the unread count, in one call.
+run_suite "test_me_route"            bun tests/test_me_route.ts
+
+# ── notifications name their actor and carry the server's read time.
+run_suite "test_notification_actor"  bun tests/test_notification_actor.ts
+
+# ── a member suspended from a workspace stops seeing the notifications that name only that workspace.
+run_suite "test_notifications_suspended" bun tests/test_notifications_suspended.ts
+
 # ── security: a trashed workspace is unreadable but owner-enumerable and owner-restorable — self-booting.
 run_suite "test_workspace_trash"    bun tests/test_workspace_trash.ts
 
