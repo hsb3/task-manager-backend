@@ -1,90 +1,68 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// ── Boot hook: configure the GitHub OAuth2 provider from the environment ──────
-// WHY A HOOK AND NOT A MIGRATION? We tried the migration route first and hit a
-// hard PocketBase limitation worth remembering: a collection MIGRATION cannot
-// carry an oauth2 provider's credentials — on that path PocketBase strips the
-// per-provider secret material (clientId + clientSecret) and persists only
-// `oauth2.enabled`, so a migration can flip oauth2 ON but can never say WHO the
-// provider is. The superuser HTTP API is different: a PATCH of the users
-// collection DOES persist clientId/clientSecret (measured — test_oauth's fake
-// provider relies on it). The GitHub app identity still applies at runtime here.
-//
-// That makes this boot hook the SOLE OWNER of the whole oauth2 config: it reads
-// the GitHub app credentials from the environment and writes the full provider
-// entry onto the live users collection every boot. Credentials stay in env
-// (Railway variables / local .env) and never touch git or a migration file —
-// only the env-var NAMES appear below.
-//
-// DELIBERATELY ENV-DRIVEN AND NO-OP WHEN UNSET: local dev and CI boot with no
-// GitHub credentials, so the guard below returns early and leaves oauth2 at its
-// stock disabled default. GitHub login only lights up where both variables are
-// present (prod). onBootstrap must call e.next() FIRST so core init (DB +
-// settings loaded) is complete before we look the collection up and save it —
-// and it must NEVER abort boot on the dev path.
+// Boot hook: the SOLE OWNER of the users collection's oauth2 config, built from
+// `<PROVIDER>_CLIENT_ID` / `<PROVIDER>_CLIENT_SECRET` env pairs (GitHub, Google) on every boot
+// (decision:oauth-providers-from-env).
+// A hook, not a migration: a collection migration drops clientId + clientSecret and keeps only
+// `oauth2.enabled` (measured), and secrets never ride git or a migration file anyway.
+// e.next() FIRST: core init (DB + settings) must be complete before the collection is saved.
 onBootstrap((e) => {
   e.next();
 
-  const clientId = $os.getenv("GITHUB_CLIENT_ID");
-  const clientSecret = $os.getenv("GITHUB_CLIENT_SECRET");
-
-  // Both halves required. $os.getenv returns "" when a variable is unset, so an
-  // empty string on EITHER side means "not configured" — stay disabled, don't
-  // abort. A half-configured provider (id without secret) would be useless and
-  // could fail validation, so we treat it the same as fully unset.
-  if (!clientId || !clientSecret) {
-    e.app.logger().info("no GITHUB_CLIENT_ID/SECRET; oauth2 stays disabled");
-    return;
+  const providers = [];
+  for (const name of ["github", "google"]) {
+    const prefix = name.toUpperCase();
+    const clientId = $os.getenv(prefix + "_CLIENT_ID");
+    const clientSecret = $os.getenv(prefix + "_CLIENT_SECRET");
+    // $os.getenv is "" when unset; a half pair could fail validation, so it counts as unset.
+    if (!clientId || !clientSecret) {
+      e.app
+        .logger()
+        .info(
+          "no " + prefix + "_CLIENT_ID/SECRET; " + name + " sign-in stays off",
+        );
+      continue;
+    }
+    providers.push({
+      name: name,
+      clientId: clientId,
+      clientSecret: clientSecret,
+    });
   }
-
   const col = e.app.findCollectionByNameOrId("users");
 
-  // unmarshal() merges this object onto the collection model in place — the same
-  // primitive the migrations use. We only touch oauth2 here; mappedFields is left
-  // at its stock default, which already maps GitHub's name + avatar onto the
-  // users record, so there is nothing to add there. `name` picks the provider
-  // implementation ("github"); clientId + clientSecret are the GitHub OAuth app's
-  // credentials, supplied purely from env.
+  // Saved even when empty: pb_data persists across deploys, so a pair removed from the env must
+  // turn its stored provider off, not merely log. unmarshal() merges in place (the migrations'
+  // primitive); only oauth2 is touched, mappedFields keeps its stock name + avatar mapping.
   unmarshal(
-    {
-      oauth2: {
-        enabled: true,
-        providers: [
-          {
-            name: "github",
-            clientId: clientId,
-            clientSecret: clientSecret,
-          },
-        ],
-      },
-    },
+    { oauth2: { enabled: providers.length > 0, providers: providers } },
     col,
   );
 
-  // A genuinely invalid oauth2 config would (correctly) abort boot here — that is
-  // the intended fail-fast for a broken prod secret. Log the SOURCE without ever
-  // emitting the secret: clientId length only, never its value, and never the
-  // secret at all.
+  // A genuinely invalid oauth2 config aborts boot here — the intended fail-fast for a
+  // broken prod secret. Log the SOURCE without the secret: clientId length only.
   e.app.save(col);
-  e.app
-    .logger()
-    .info(
-      "github provider configured from env",
-      "clientIdLength",
-      clientId.length,
-    );
+  for (const p of providers) {
+    e.app
+      .logger()
+      .info(
+        p.name + " provider configured from env",
+        "clientIdLength",
+        p.clientId.length,
+      );
+  }
 });
 
-// ── Request hook: enforce verified + auto-link on GitHub login (Ruling 4) ─────
+// ── Request hook: enforce verified + auto-link on OAuth login (Ruling 4) ─────
 // Fires after the OAuth2 token exchange and BEFORE PocketBase links the external
 // account to a users record. We use it to make two guarantees, both keyed on the
-// fact that e.oAuth2User.email is documented as the VERIFIED email — GitHub only
-// fills it when it has confirmed the user owns that address, and leaves it EMPTY
+// fact that e.oAuth2User.email is documented as the VERIFIED email — a provider (GitHub, Google)
+// fills it only when it has confirmed the user owns that address, and leaves it EMPTY
 // otherwise. That single invariant is what makes both behaviours below safe.
 //
 //   (a) FIRST-TIME SIGNUP → verified=true. Our users authRule requires
-//       verified=true, so a brand-new GitHub account created with verified=false
-//       would be immediately bricked (403 on its own token). Because GitHub has
+//       verified=true, so a brand-new OAuth account created with verified=false
+//       would be immediately bricked (403 on its own token). Because the provider has
 //       already verified the email, we can safely mark the new record verified so
 //       the account works on first login instead of being locked out.
 //
@@ -92,7 +70,7 @@ onBootstrap((e) => {
 //       (PBTT-529) onto an EXISTING users record, we point the auth at THAT record rather
 //       than letting a second, duplicate account be created. This is safe ONLY
 //       because the email is provider-verified: an attacker cannot claim someone
-//       else's address without GitHub confirming ownership, and if ownership
+//       else's address without the provider confirming ownership, and if ownership
 //       can't be confirmed the email is empty and we do nothing.
 //
 // DEFENSIVE + IDEMPOTENT BY DESIGN. PocketBase's own engine may already do some
@@ -148,25 +126,27 @@ onRecordAuthWithOAuth2Request((e) => {
 
   if (existing) {
     // (b) LINK: an account with this verified email already exists. Assigning
-    // e.record BEFORE e.next() makes the core linking attach the GitHub identity
+    // e.record BEFORE e.next() makes the core linking attach the provider identity
     // to this record instead of minting a duplicate. Setting e.record to the same
     // record the engine already chose is harmless (idempotent).
     e.record = existing;
     // (a) also applies to the linked record: guarantee it satisfies the authRule.
     e.record.set("verified", true);
-  } else {
-    // (a) FIRST-TIME SIGNUP: mark the brand-new record verified so the authRule
-    // (verified=true) doesn't lock the account out on its very first token.
-    if (e.record) {
-      e.record.set("verified", true);
-    }
-    // Defensive mirror: on a new-record flow PocketBase builds the record from
-    // e.createData. Setting it there too means verified survives regardless of
-    // which object the core ultimately persists from.
-    if (e.createData) {
-      e.createData.verified = true;
-    }
   }
 
-  return e.next();
+  // (a) FIRST-TIME SIGNUP: the record does not exist before e.next(), and the create form drops
+  // `verified` from createData (a system field), so the brand-new record is verified AFTER the
+  // core saved it — including when the auth response itself was refused (the approval gate 403),
+  // since the account persists and must not be locked out on its first approved login.
+  let err = null;
+  try {
+    e.next();
+  } catch (x) {
+    err = x;
+  }
+  if (!existing && e.record && !e.record.getBool("verified")) {
+    e.record.set("verified", true);
+    e.app.save(e.record);
+  }
+  if (err) throw err;
 }, "users");

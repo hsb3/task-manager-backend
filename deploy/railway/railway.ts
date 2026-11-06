@@ -19,6 +19,8 @@ export default defineRailway(() => {
       APP_ADMIN_EMAILS: preserve(),
       GITHUB_CLIENT_ID: preserve(),
       GITHUB_CLIENT_SECRET: preserve(),
+      GOOGLE_CLIENT_ID: preserve(),
+      GOOGLE_CLIENT_SECRET: preserve(),
       MAIL_SENDER_ADDRESS: preserve(),
       PB_BACKUPS_CRON: preserve(),
       PB_BACKUPS_CRON_MAX_KEEP: preserve(),

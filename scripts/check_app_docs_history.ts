@@ -535,6 +535,14 @@ export const ALLOWLIST = new Map<string, string>([
     '["1785186700_seed_app_docs.js", "route:tracker-export", "Per-collection cuts match the live read rules: trashed rows "]',
     "card vc8g: the export returns only the notifications the notifications list rule returns; the record now says so",
   ],
+  [
+    '["1785188000_seed_app_docs.js", "collection:users", "GitHub OAuth account linking matches on the same key: a prov"]',
+    "card 6n7n: provider sign-in linking now covers GitHub and Google (decision:oauth-providers-from-env)",
+  ],
+  [
+    '["1785188000_seed_app_docs.js", "collection:users", "The authRule is verified = true && approved = true: a new ac"]',
+    "card 6n7n: the authRule sentence names provider sign-in (GitHub or Google), not GitHub OAuth alone",
+  ],
 ]);
 
 export class Drop {

@@ -1,3 +1,11 @@
+---
+title: Entity metadata model, facet schema
+status: current
+version: 1
+updated: 2026-11-06
+generator: scripts/model/extract_current.ts # writes current/ in this schema; this file is hand-written
+---
+
 # Entity metadata model — facet schema
 
 _The structured per-object model the owner asked for (2026-07-26): for each entity,
