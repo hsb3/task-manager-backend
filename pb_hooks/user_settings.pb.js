@@ -1,9 +1,8 @@
 /// <reference path="../pb_data/types.d.ts" />
 // /api/tracker/users/{id}/settings: the caller's users.name and user_settings row, read together and written in one transaction.
 
-routerAdd(
-  "GET",
-  "/api/tracker/users/{id}/settings",
+require(`${__hooks}/lib/routes.js`).add(
+  "GET /api/tracker/users/{id}/settings",
   (e) => {
     // Another user's id answers like a denied record view, so the route reveals no account.
     if (e.request.pathValue("id") !== e.auth.id)
@@ -27,12 +26,10 @@ routerAdd(
       time_zone: us ? us.getString("time_zone") : "",
     });
   },
-  $apis.requireAuth("users"),
 );
 
-routerAdd(
-  "PATCH",
-  "/api/tracker/users/{id}/settings",
+require(`${__hooks}/lib/routes.js`).add(
+  "PATCH /api/tracker/users/{id}/settings",
   (e) => {
     if (e.request.pathValue("id") !== e.auth.id)
       throw new NotFoundError("The requested resource wasn't found.");
@@ -141,5 +138,4 @@ routerAdd(
       time_zone: us.getString("time_zone"),
     });
   },
-  $apis.requireAuth("users"),
 );

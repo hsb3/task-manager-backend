@@ -1023,9 +1023,8 @@ onBootstrap((e) => {
 // A daily cron cannot be waited on in the battery, so this route runs the SAME
 // inlined sweep on demand and returns {purged: <count>}. Mirrors the alerts.pb.js
 // self-test-route philosophy. requireSuperuserAuth gates it to a superuser token.
-routerAdd(
-  "POST",
-  "/api/tracker/trash/purge",
+require(`${__hooks}/lib/routes.js`).add(
+  "POST /api/tracker/trash/purge",
   (e) => {
     // ── INLINED SWEEP (route copy, uses e.app) — KEEP IN SYNC with the cron copy ──
     var retentionDays = 30;
@@ -1122,5 +1121,4 @@ routerAdd(
     // ── END INLINED SWEEP (route copy) ──
     return e.json(200, { purged: purged });
   },
-  $apis.requireSuperuserAuth(),
 );

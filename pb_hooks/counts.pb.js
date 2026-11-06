@@ -1,8 +1,7 @@
 /// <reference path="../pb_data/types.d.ts" />
 // GET /api/tracker/project-items/counts: group counts in one PB query, visibility from project_items' own live listRule.
-routerAdd(
-  "GET",
-  "/api/tracker/project-items/counts",
+require(`${__hooks}/lib/routes.js`).add(
+  "GET /api/tracker/project-items/counts",
   (e) => {
     // A superuser matches no membership branch of the rule, so it would silently count nothing.
     if (e.auth.isSuperuser())
@@ -203,7 +202,6 @@ routerAdd(
     });
     return e.json(200, { items: items, total: rows.length });
   },
-  $apis.requireAuth(),
 );
 
 // Self-contained top-level fn passed DIRECTLY as the handler — legal under the pooled-JSVM law.

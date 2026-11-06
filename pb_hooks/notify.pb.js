@@ -1332,9 +1332,8 @@ onRecordUpdateRequest(
 // (9) POST /api/tracker/notifications/read-all — the caller's whole unread inbox (or one
 // ?workspace= plus rows with no workspace), marked read in ONE statement. A per-row PATCH loop
 // trips the app's own /api/ rate limit on a big inbox.
-routerAdd(
-  "POST",
-  "/api/tracker/notifications/read-all",
+require(`${__hooks}/lib/routes.js`).add(
+  "POST /api/tracker/notifications/read-all",
   (e) => {
     // [[read]] bracket-quoted (reserved-ish); NULL-safe so an unset flag still counts.
     // KEEP IN SYNC (unread predicate): notifications.listRule, the
@@ -1400,7 +1399,6 @@ routerAdd(
       .execute();
     return e.json(200, { updated: res.rowsAffected() });
   },
-  $apis.requireAuth(),
 );
 
 // (10) digest cron (lead-owned): one email per user summarizing their unread notifications.
