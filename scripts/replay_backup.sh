@@ -46,7 +46,7 @@ if [ -z "$ZIP" ]; then
   # Newest = greatest LastModified among the .zip keys, whatever the key is named.
   KEY=$(curl -fsS --user "$CREDS" --aws-sigv4 "$SIGV4" "$ENDPOINT/$BUCKET/?list-type=2" \
     | sed 's/<Contents>/\n/g' \
-    | { sed -n 's/.*<Key>\([^<]*\.zip\)<\/Key><LastModified>\([^<]*\)<\/LastModified>.*/\2 \1/p' || true; } \
+    | { sed -n 's/.*<Key>\([^<]*\.zip\)<\/Key>.*<LastModified>\([^<]*\)<\/LastModified>.*/\2 \1/p' || true; } \
     | sort | tail -n 1 | cut -d' ' -f2-)
   [ -n "$KEY" ] || { echo "no .zip backup found in bucket $BUCKET" >&2; exit 1; }
   echo "newest backup: $KEY"
