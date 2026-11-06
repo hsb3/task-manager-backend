@@ -1,10 +1,13 @@
 #!/usr/bin/env bun
-/** Agent probe: drives the API as one normal member would, logging every call and asserting today's behaviour, friction included. */
+/** Agent probe: drives the API as one normal member would, logging every call and asserting today's behaviour, friction included; `--world N` runs it against the e2e world of seed N. */
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { parse_args } from "../scripts/_argparse.ts";
 import { py_repr, run_checked, urlencode } from "../scripts/_py.ts";
+import { seed_world } from "../e2e/seed.ts";
+import { generate, persona } from "../e2e/world.ts";
 import * as roomkit from "./roomkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
@@ -16,6 +19,19 @@ const SU_EMAIL = "probe@example.com";
 const SU_PASSWORD = "probe123456";
 const RATE_LIMIT = 300; // the `/api/` rule in the settings migration
 const BURST_CAP = 700; // hard stop if no 429 ever arrives
+const USAGE = "usage: test_agent_probe.ts [-h] [--world SEED]";
+const ARGS = parse_args(
+  USAGE,
+  `${USAGE}\n\noptions:\n  -h, --help    show this help message and exit\n  --world SEED  seed the room with e2e/seed.ts's world SEED instead of scripts/seed.ts\n`,
+  [["--world", "store", "world", false, "int"]],
+  { world: null },
+);
+const WORLD = ARGS.world === null ? null : generate(ARGS.world);
+const P = WORLD === null ? null : persona(WORLD);
+const P_ITEMS = WORLD === null ? [] : WORLD.items.filter((i) => i.workspace === P!.workspace.key);
+/** Seeded titles in the probed workspace: the world's matching items, else scripts/seed.ts's. */
+const seeded = (pred: (i: (typeof P_ITEMS)[number]) => boolean, legacy: string[]): string[] =>
+  WORLD === null ? legacy : P_ITEMS.filter(pred).map((i) => i.title);
 
 let failures = 0;
 
@@ -79,87 +95,104 @@ try {
   );
   server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, roomkit.hooks_dir(S));
 
-  // Superuser seeding: Alice owns her workspace, Bob is its second (plain) member, Carol is outside.
-  const seed = Bun.spawn([process.execPath, "scripts/seed.ts"], {
-    cwd: REPO_ROOT,
-    env: {
-      ...process.env,
-      PB_URL: BASE_URL,
-      PB_SUPERUSER_EMAIL: SU_EMAIL,
-      PB_SUPERUSER_PASSWORD: SU_PASSWORD,
-    },
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [seed_out, seed_err, seed_rc] = await Promise.all([
-    new Response(seed.stdout).text(),
-    new Response(seed.stderr).text(),
-    seed.exited,
-  ]);
-  check("seed.ts exit code", seed_rc, 0);
-  if (seed_rc !== 0) {
-    console.log(seed_out, seed_err);
-    throw new roomkit.SystemExit("seed failed — cannot proceed");
+  if (WORLD !== null) {
+    // Every write but the account creates goes through the world users' own tokens.
+    await seed_world(BASE_URL, WORLD, [SU_EMAIL, SU_PASSWORD]);
+  } else {
+    // Superuser seeding: Alice owns her workspace, Bob is its second (plain) member, Carol is outside.
+    const seed = Bun.spawn([process.execPath, "scripts/seed.ts"], {
+      cwd: REPO_ROOT,
+      env: {
+        ...process.env,
+        PB_URL: BASE_URL,
+        PB_SUPERUSER_EMAIL: SU_EMAIL,
+        PB_SUPERUSER_PASSWORD: SU_PASSWORD,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [seed_out, seed_err, seed_rc] = await Promise.all([
+      new Response(seed.stdout).text(),
+      new Response(seed.stderr).text(),
+      seed.exited,
+    ]);
+    check("seed.ts exit code", seed_rc, 0);
+    if (seed_rc !== 0) {
+      console.log(seed_out, seed_err);
+      throw new roomkit.SystemExit("seed failed — cannot proceed");
+    }
   }
 
   let s: number, r: any, hdr: Headers;
 
-  console.log("\n── sign in as Bob, a normal member ──");
+  console.log("\n── sign in as a normal member ──");
   [s, r] = await api("POST", "/api/collections/users/auth-with-password", null, {
-    identity: "bob@example.com",
-    password: "test123456",
+    identity: P?.user.email ?? "bob@example.com",
+    password: P?.user.password ?? "test123456",
   });
   check("auth-with-password → 200", s, 200);
-  const bob: string = r.token;
-  const BOB: string = r.record.id;
+  const me: string = r.token;
+  const ME: string = r.record.id;
 
-  console.log("\n── workspaces and Bob's role in each ──");
+  console.log("\n── workspaces and the member's role in each ──");
+  // The probed workspace is someone else's, where the member is a plain `member`.
+  const WS_NAME = P?.workspace.name ?? "Alice's Workspace";
+  const OWN_NAME =
+    WORLD?.workspaces.find((w) => w.owner === P!.user.key)!.name ?? "Bob's Workspace";
+  const joined =
+    WORLD === null
+      ? [[WS_NAME, "member"]]
+      : WORLD.workspaces.flatMap((w) =>
+          w.members.filter((m) => m.user === P!.user.key).map((m) => [w.name, m.role]),
+        );
   const ws_window_start = Date.now();
-  [s, r] = await api("GET", list("workspaces", { sort: "name" }), bob);
+  [s, r] = await api("GET", list("workspaces", { sort: "name" }), me);
   check("workspaces list → 200", s, 200);
-  check("workspaces Bob can see", titles(r.items), ["Alice's Workspace", "Bob's Workspace"]);
+  check(
+    "workspaces the member can see",
+    titles(r.items),
+    [OWN_NAME, ...joined.map((j) => j[0]!)].sort(),
+  );
+  const ws_name: Record<string, string> = Object.fromEntries(
+    r.items.map((w: any) => [w.id, w.name]),
+  );
   check(
     "a workspace record carries no role field",
     r.items.some((w: any) => "role" in w),
     false,
   );
-  const WS: string = r.items.find((w: any) => w.name === "Alice's Workspace").id;
-  const OWN_WS: string = r.items.find((w: any) => w.name === "Bob's Workspace").id;
+  const WS: string = r.items.find((w: any) => w.name === WS_NAME).id;
+  const OWN_WS: string = r.items.find((w: any) => w.name === OWN_NAME).id;
   check(
-    "Bob's Workspace names Bob as its owner",
+    "the member's own workspace names them as its owner",
     r.items.find((w: any) => w.id === OWN_WS).owner,
-    BOB,
+    ME,
   );
-  [s, r] = await api("GET", list("workspace_members", { filter: `user='${BOB}'` }), bob);
-  check("workspace_members for Bob → 200", s, 200);
+  [s, r] = await api("GET", list("workspace_members", { filter: `user='${ME}'` }), me);
+  check("workspace_members for the member → 200", s, 200);
   check(
     "membership rows: (workspace, role) per row",
-    r.items
-      .map((m: any) => [
-        m.workspace === WS ? "Alice's" : m.workspace === OWN_WS ? "Bob's" : m.workspace,
-        m.role,
-      ])
-      .sort(),
-    [
-      ["Alice's", "member"],
-      ["Bob's", "admin"],
-    ],
+    r.items.map((m: any) => [ws_name[m.workspace] ?? m.workspace, m.role]).sort(),
+    [[OWN_NAME, "admin"], ...joined].sort(),
   );
 
   console.log("\n── resolve the ids a filter needs ──");
-  [s, r] = await api("GET", list("projects", { filter: `workspace='${WS}'` }), bob);
-  check("projects in Alice's workspace", titles(r.items), ["Website Redesign"]);
-  const PROJ: string = r.items.find((p: any) => p.name === "Website Redesign").id;
-  [s, r] = await api("GET", list("statuses", { filter: `workspace='${WS}'`, perPage: 50 }), bob);
+  [s, r] = await api("GET", list("projects", { filter: `workspace='${WS}'` }), me);
+  const PROJ_NAMES = P?.workspace.projects.map((p) => p.name) ?? ["Website Redesign"];
+  check("projects in the probed workspace", titles(r.items), [...PROJ_NAMES].sort());
+  const PROJ: string = r.items.find((p: any) => p.name === PROJ_NAMES[0]).id;
+  [s, r] = await api("GET", list("statuses", { filter: `workspace='${WS}'`, perPage: 50 }), me);
   check("statuses list → 200", s, 200);
   const ST: Record<string, string> = Object.fromEntries(r.items.map((x: any) => [x.name, x.id]));
-  [s, r] = await api("GET", list("labels", { filter: `workspace='${WS}'`, perPage: 50 }), bob);
+  [s, r] = await api("GET", list("labels", { filter: `workspace='${WS}'`, perPage: 50 }), me);
   check("labels list → 200", s, 200);
   check("the workspace has two labels to filter by", r.items.length >= 2, true);
-  const [LABEL, OTHER_LABEL]: string[] = r.items.map((x: any) => x.id);
+  const LABEL_NAME = "Bug";
+  const LABEL: string = r.items.find((x: any) => x.name === LABEL_NAME).id;
+  const OTHER_LABEL: string = r.items.find((x: any) => x.name !== LABEL_NAME).id;
 
   console.log("\n── realtime: subscribe to tasks before changing one ──");
-  sse = new roomkit.SSEListener(BASE_URL, bob, "tasks");
+  sse = new roomkit.SSEListener(BASE_URL, me, "tasks");
   check("SSE stream connected (PB_CONNECT clientId)", (await sse.start()) !== null, true);
   console.log(`    GET /api/realtime -> stream (clientId ${sse.client_id})`);
   console.log(
@@ -168,18 +201,18 @@ try {
   await Bun.sleep(1000); // let the subscribe POST land before the first write
 
   console.log("\n── create a task and a document ──");
-  [s, r] = await api("POST", "/api/collections/tasks/records", bob, {
+  [s, r] = await api("POST", "/api/collections/tasks/records", me, {
     title: "Probe zephyr task",
     project: PROJ,
     status: ST.Todo,
-    assignee: BOB,
+    assignee: ME,
     due: "2026-12-01 00:00:00.000Z",
     labels: [LABEL],
   });
   check("task create → 200", s, 200);
   check("task workspace filled from its project", r.workspace, WS);
   const TASK: string = r.id;
-  [s, r] = await api("POST", "/api/collections/documents/records", bob, {
+  [s, r] = await api("POST", "/api/collections/documents/records", me, {
     title: "Probe zephyr doc",
     body: "notes",
     workspace: WS,
@@ -189,7 +222,7 @@ try {
   const DOC: string = r.id;
 
   console.log("\n── patch the task, then once with an unknown key ──");
-  [s, r] = await api("PATCH", `/api/collections/tasks/records/${TASK}`, bob, {
+  [s, r] = await api("PATCH", `/api/collections/tasks/records/${TASK}`, me, {
     title: "Probe zephyr task v2",
     status: ST["In Progress"],
   });
@@ -205,7 +238,7 @@ try {
     ],
   );
   sse.stop = true;
-  [s, r] = await api("PATCH", `/api/collections/tasks/records/${TASK}`, bob, {
+  [s, r] = await api("PATCH", `/api/collections/tasks/records/${TASK}`, me, {
     title: "Probe zephyr task v3",
     estimate: 3,
   });
@@ -214,14 +247,14 @@ try {
     [s, String(r.message ?? "").includes("estimate")],
     [400, true],
   );
-  [s, r] = await api("PATCH", `/api/collections/tasks/records/${TASK}`, bob, {
+  [s, r] = await api("PATCH", `/api/collections/tasks/records/${TASK}`, me, {
     title: "Probe zephyr task v3",
   });
   check("patch without it → 200, title saved", [s, r.title], [200, "Probe zephyr task v3"]);
 
   console.log("\n── list through project_items, one filter at a time ──");
   // A decoy the due bound and the label id must each exclude.
-  [s] = await api("POST", "/api/collections/tasks/records", bob, {
+  [s] = await api("POST", "/api/collections/tasks/records", me, {
     title: "Probe later task",
     project: PROJ,
     status: ST.Todo,
@@ -233,37 +266,59 @@ try {
     const [st, body] = await api(
       "GET",
       list("project_items", { filter: `workspace='${WS}' && (${filter})`, perPage: 200 }),
-      bob,
+      me,
     );
     return [st, st === 200 ? titles(body.items) : body];
   };
-  check("type='document'", await items("type='document'"), [200, ["Probe zephyr doc"]]);
-  check("status=In Progress id", await items(`status='${ST["In Progress"]}'`), [
-    200,
-    ["Design homepage", "Probe zephyr task v3"],
+  // A filter no seeded row matches proves only the probe's own writes, so a world must match each.
+  const unmatched: string[] = [];
+  const want = (
+    more: string[],
+    pred: (i: (typeof P_ITEMS)[number]) => boolean,
+    legacy: string[],
+  ) => {
+    const rows = seeded(pred, legacy);
+    if (rows.length === 0) unmatched.push(more[0]!);
+    return [200, [...more, ...rows].sort()];
+  };
+  const in_progress = want(["Probe zephyr task v3"], (i) => i.status === "In Progress", [
+    "Design homepage",
   ]);
-  check("assignee=Bob", await items(`assignee='${BOB}'`), [
-    200,
-    ["Probe zephyr task v3", "Wire up nav"],
-  ]);
-  check("due on or before 2026-12-31", await items("due != '' && due <= '2026-12-31'"), [
-    200,
-    ["Probe zephyr task v3"],
-  ]);
-  check("labels ~ label id", await items(`labels ~ '${LABEL}'`), [200, ["Probe zephyr task v3"]]);
+  check(
+    "type='document'",
+    await items("type='document'"),
+    want(["Probe zephyr doc"], (i) => i.type === "document", []),
+  );
+  check("status=In Progress id", await items(`status='${ST["In Progress"]}'`), in_progress);
+  check(
+    "assignee=the member",
+    await items(`assignee='${ME}'`),
+    want(["Probe zephyr task v3"], (i) => i.assignee === P!.user.key, ["Wire up nav"]),
+  );
+  check(
+    "due on or before 2026-12-31",
+    await items("due != '' && due <= '2026-12-31'"),
+    want(["Probe zephyr task v3"], (i) => i.due !== null && i.due <= "2026-12-31", []),
+  );
+  check(
+    "labels ~ label id",
+    await items(`labels ~ '${LABEL}'`),
+    want(["Probe zephyr task v3"], (i) => i.labels.includes(LABEL_NAME), []),
+  );
   check(
     "filter by status NAME returns the status id rows (decision:item-filter-by-name)",
     await items("status.name = 'In Progress'"),
-    [200, ["Design homepage", "Probe zephyr task v3"]],
+    in_progress,
   );
+  if (WORLD !== null) check("every filter matched a seeded world row", unmatched, []);
 
   console.log("\n── comment, search ──");
-  [s, r] = await api("POST", "/api/collections/comments/records", bob, {
+  [s, r] = await api("POST", "/api/collections/comments/records", me, {
     task: TASK,
     body: "looks good",
   });
-  check("comment create (no author in body)", [s, r.author ?? null], [200, BOB]);
-  [s, r] = await api("GET", `/api/tracker/search?${urlencode({ q: "zephyr" })}`, bob);
+  check("comment create (no author in body)", [s, r.author ?? null], [200, ME]);
+  [s, r] = await api("GET", `/api/tracker/search?${urlencode({ q: "zephyr" })}`, me);
   check("search → 200", s, 200);
   check(
     "search hits",
@@ -275,16 +330,16 @@ try {
   );
 
   console.log("\n── trash the task and read it back ──");
-  [s] = await api("DELETE", `/api/collections/tasks/records/${TASK}`, bob);
+  [s] = await api("DELETE", `/api/collections/tasks/records/${TASK}`, me);
   check("task DELETE → 204", s, 204);
-  [s] = await api("GET", `/api/collections/tasks/records/${TASK}`, bob);
+  [s] = await api("GET", `/api/collections/tasks/records/${TASK}`, me);
   check("trashed task by id", s, 404);
-  [s, r] = await api("GET", `/api/tracker/trash?${urlencode({ workspace: WS })}`, bob);
+  [s, r] = await api("GET", `/api/tracker/trash?${urlencode({ workspace: WS })}`, me);
   check("trash list → 200", s, 200);
   check(
     "trash rows",
     (r.items ?? []).map((i: any) => [i.collection, i.record.id, i.record.trashed_by]),
-    [["tasks", TASK, BOB]],
+    [["tasks", TASK, ME]],
   );
 
   console.log("\n── rate limit: more than 300 requests inside 60s ──");
@@ -293,7 +348,7 @@ try {
   let first429_hdr: Headers | null = null;
   const t0 = Date.now();
   while (first429 === null && statuses.length < BURST_CAP) {
-    [s, r, hdr] = await api("GET", list("workspaces", { perPage: 1 }), bob);
+    [s, r, hdr] = await api("GET", list("workspaces", { perPage: 1 }), me);
     statuses.push(s);
     if (s === 429) [first429, first429_hdr] = [r, hdr];
   }
@@ -305,7 +360,7 @@ try {
     true,
   );
   // PB's limiter is a fixed window per (collection, route, IP), not a shared /api/ pool or a
-  // refilling bucket: only Bob's one earlier workspaces list shares this bucket, so 300 - 1.
+  // refilling bucket: only the member's one earlier workspaces list shares this bucket, so 300 - 1.
   check(
     "200s before the first 429 (workspaces list bucket)",
     statuses.filter((x) => x === 200).length,
@@ -317,11 +372,11 @@ try {
     [...(first429_hdr?.keys() ?? [])].filter((k) => /retry-after|ratelimit/i.test(k)),
     [],
   );
-  [s] = await api("GET", list("projects", { perPage: 1 }), bob);
+  [s] = await api("GET", list("projects", { perPage: 1 }), me);
   check("same token, another collection's list after the 429", s, 200);
-  [s] = await api("GET", list("workspaces", { perPage: 1 }), bob);
+  [s] = await api("GET", list("workspaces", { perPage: 1 }), me);
   check("same token + route again, no header (control)", s, 429);
-  [s] = await api("GET", list("workspaces", { perPage: 1 }), bob, null, {
+  [s] = await api("GET", list("workspaces", { perPage: 1 }), me, null, {
     "X-Forwarded-For": "203.0.113.7",
   });
   check("same token + route, client-set X-Forwarded-For after the 429", s, 200);
