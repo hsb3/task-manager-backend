@@ -1010,11 +1010,12 @@ try {
     out.milestones = getitem(mst, "id");
     // Assigning is what writes the derived rows: a task_activity row, the auto-subscription
     // and the assignee's notification all come from this one PATCH.
-    for (const tid of [out.tasks, out.task2]) {
-      [s] = await api("PATCH", `/api/collections/tasks/records/${tid}`, olive, {
-        assignee: sam_id,
-      });
-      check(`(9) ${label}: task assigned to Sam`, s, 200);
+    for (const [tid, uid, who] of [
+      [out.tasks, sam_id, "Sam"],
+      [out.task2, mia_id, "Mia"],
+    ]) {
+      [s] = await api("PATCH", `/api/collections/tasks/records/${tid}`, olive, { assignee: uid });
+      check(`(9) ${label}: task assigned to ${who}`, s, 200);
     }
     return out;
   }
@@ -1029,7 +1030,7 @@ try {
   check("(9) Mia subscribes herself to the Bravo task", s, 200);
 
   // Sam is suspended AFTER the assignment (an assignee must be an active member at assign
-  // time), so from here his only read on either task is the assignee leg of its rules.
+  // time): an assignment grants nothing beyond active membership, so he reads nothing.
   for (const [label, ws_id] of [
     ["Alpha", ALPHA],
     ["Bravo", BRAVO],
@@ -1054,7 +1055,7 @@ try {
 
   const COLLS = ["tasks", "documents", "decisions", "milestones", "projects"] as const;
   const [OWNER, ADMIN, MEMBER] = ["Olive (owner)", "Adam (active admin)", "Mia (member)"];
-  const [VIEWER, ASSIGNEE] = ["Vic (viewer)", "Sam (assignee only)"];
+  const [VIEWER, ASSIGNEE] = ["Vic (viewer)", "Sam (suspended assignee)"];
   const [OUTSIDER, ROOT] = ["Nate (non-member)", "superuser"];
   const READERS: [string, string][] = [
     [OWNER, olive],
@@ -1066,42 +1067,34 @@ try {
     [ROOT, su],
   ];
   const SEES_ALL = from_keys(COLLS, 200);
-  const SEES_TASKS = {
-    tasks: 200,
-    documents: 404,
-    decisions: 404,
-    milestones: 404,
-    projects: 404,
-  };
   const SEES_NONE = from_keys(COLLS, 404);
   const LIVE_VIEW: Record<string, Record<string, number>> = {
     [OWNER]: SEES_ALL,
     [ADMIN]: SEES_ALL,
     [MEMBER]: SEES_ALL,
     [VIEWER]: SEES_ALL,
-    [ASSIGNEE]: SEES_TASKS,
+    [ASSIGNEE]: SEES_NONE,
     [OUTSIDER]: SEES_NONE,
     [ROOT]: SEES_ALL,
   };
   const COUNTS_ALL = { tasks: 2, documents: 1, decisions: 1, milestones: 1, projects: 1 };
-  const COUNTS_TASKS = { tasks: 2, documents: 0, decisions: 0, milestones: 0, projects: 0 };
   const COUNTS_NONE = from_keys(COLLS, 0);
   const LIVE_LIST: Record<string, Record<string, number>> = {
     [OWNER]: COUNTS_ALL,
     [ADMIN]: COUNTS_ALL,
     [MEMBER]: COUNTS_ALL,
     [VIEWER]: COUNTS_ALL,
-    [ASSIGNEE]: COUNTS_TASKS,
+    [ASSIGNEE]: COUNTS_NONE,
     [OUTSIDER]: COUNTS_NONE,
     [ROOT]: COUNTS_ALL,
   };
-  // project_items unions the four item types; the assignee leg carries only the two tasks.
+  // project_items unions the four item types.
   const LIVE_ITEMS: Record<string, number> = {
     [OWNER]: 5,
     [ADMIN]: 5,
     [MEMBER]: 5,
     [VIEWER]: 5,
-    [ASSIGNEE]: 2,
+    [ASSIGNEE]: 0,
     [OUTSIDER]: 0,
     [ROOT]: 5,
   };
@@ -1114,14 +1107,14 @@ try {
     [OUTSIDER]: 0,
     [ROOT]: 1,
   };
-  // search is cross-workspace and self-scopes per row: six marked rows, tasks-only for the
-  // assignee, and nothing for a superuser (who owns no workspace and holds no membership).
+  // search is cross-workspace and self-scopes per row: six marked rows, and nothing for a
+  // superuser (who owns no workspace and holds no membership).
   const LIVE_SEARCH: Record<string, number> = {
     [OWNER]: 6,
     [ADMIN]: 6,
     [MEMBER]: 6,
     [VIEWER]: 6,
-    [ASSIGNEE]: 2,
+    [ASSIGNEE]: 0,
     [OUTSIDER]: 0,
     [ROOT]: 0,
   };
@@ -1259,7 +1252,7 @@ try {
         await total("project_stats", tok, `workspace='${ws_id}'`),
         stats[who],
       );
-      const derived = who === ROOT || (live && who !== OUTSIDER);
+      const derived = who === ROOT || (live && who !== OUTSIDER && who !== ASSIGNEE);
       check(
         `${phase} ${label} task_activity by task — ${who}`,
         await total("task_activity", tok, `task='${ids.tasks}'`),
@@ -1288,9 +1281,14 @@ try {
     }
     const [s, seen] = await notif_task_ids(sam);
     check(
-      `${phase} ${label}: Sam's inbox carries the task notification`,
+      `${phase} ${label}: Sam's inbox hides the task notification`,
       tup(s, seen.has(ids.tasks)),
-      tup(200, live && notified),
+      tup(200, false),
+    );
+    check(
+      `${phase} ${label}: Sam's task notification row exists (superuser read)`,
+      (await total("notifications", su, `user='${sam_id}' && task='${ids.tasks}'`)) > 0,
+      live && notified,
     );
   }
 
@@ -1393,9 +1391,14 @@ try {
   await probe_writes("(9b)", "Bravo", BRAVO, B, true);
   await probe_writes("(9b)", "Alpha", ALPHA, A, true);
   const olive_before = await summary_total(olive);
-  const asa_before = await summary_total(sam);
+  const mia_before = await summary_total(mia);
   check("(9b) Olive's summary counts his project tasks", olive_before[0], 200);
-  check("(9b) Sam's summary counts her assignments", asa_before[0], 200);
+  check("(9b) Mia's summary counts her two assignments", mia_before, tup(200, 2));
+  check(
+    "(9b) Sam's summary counts nothing (suspended everywhere)",
+    await summary_total(sam),
+    tup(200, 0),
+  );
 
   console.log("\n── (9c) trash Bravo — one write to workspaces.trashed, nothing stamped inside ──");
   [s] = await api("DELETE", `/api/collections/workspaces/records/${BRAVO}`, olive);
@@ -1445,10 +1448,11 @@ try {
     tup(200, 1),
   );
   check(
-    "(9e) Sam's summary drops exactly her two Bravo assignments",
-    tup((await summary_total(sam))[0], asa_before[1] - (await summary_total(sam))[1]),
-    tup(200, 2),
+    "(9e) Mia's summary drops exactly her Bravo assignment",
+    tup((await summary_total(mia))[0], mia_before[1] - (await summary_total(mia))[1]),
+    tup(200, 1),
   );
+  check("(9e) Sam's summary still counts nothing", await summary_total(sam), tup(200, 0));
 
   console.log("\n── (9f) R2 — who may enumerate and restore a trashed workspace ──");
   for (const [who, tok, tier, standing] of [
@@ -1519,7 +1523,8 @@ try {
     await summary_total(olive),
     olive_before,
   );
-  check("(9g) Sam's summary is back to its pre-trash total", await summary_total(sam), asa_before);
+  check("(9g) Mia's summary is back to its pre-trash total", await summary_total(mia), mia_before);
+  check("(9g) Sam's summary still counts nothing", await summary_total(sam), tup(200, 0));
   check("(9g) neither workspace is listed as trashed any more", await trash_ids(olive), []);
 
   await olive_owns.done();

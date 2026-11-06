@@ -1796,7 +1796,7 @@ try {
   }
 
   // ── (S0) the controls a too-wide clause would break, re-run inside every hide ──
-  console.log("\n── (S0) controls: live parent, project-less parent, assignee-only writer ──");
+  console.log("\n── (S0) controls: live parent, project-less parent, suspended assignee ──");
   const S_PROJECT = await r_project(ALICE_WS, "S-live-project");
   const S_CTRL: [string, string, string, string][] = [];
   for (const [rel, coll, extra] of R_PARENTS) {
@@ -1849,7 +1849,7 @@ try {
   [, r] = await api("GET", `/api/collections/tasks/records/${S_ASSIGNED}`, su);
   check("(fixture) read-back: the stored assignee is Hana", r.assignee, hana_id);
   // pb_hooks/main.pb.js refuses assigning a task to anyone who is not an ACTIVE member, so the
-  // assignee-only standing is reached by suspending the membership AFTER the assignment.
+  // suspended-assignee standing is reached by suspending the membership AFTER the assignment.
   [s] = await api("PATCH", `/api/collections/workspace_members/records/${HANA_ROW}`, su, {
     status: "suspended",
   });
@@ -1863,12 +1863,6 @@ try {
     "suspended",
   );
   const [hana] = await login("hana@example.com");
-  [s] = await api("GET", `/api/collections/projects/records/${S_PROJECT}`, hana);
-  check(
-    "Hana cannot read the task's project at all → 404 (the control's premise)",
-    tup(tup(...(await HANA_TIER.standing())), s),
-    tup(tup("member", "suspended"), 404),
-  );
 
   async function s_controls(phase: string): Promise<void> {
     for (const [rel, shape, pid, cid] of S_CTRL) {
@@ -1876,16 +1870,15 @@ try {
       await s_update(`CONTROL during ${phase}: ${shape}`, cid, false);
       await s_delete(`CONTROL during ${phase}: ${shape}`, rel, pid, false);
     }
-    // The rule traversal runs server-side, so a container the caller cannot read never
-    // narrows what the caller may write through it.
+    // decision:active-membership-grants-access: an assignment alone grants no write in any phase.
     const [s] = await api("POST", "/api/collections/comments/records", hana, {
       task: S_ASSIGNED,
       body: s_body("hana"),
     });
     check(
-      `CONTROL during ${phase}: assignee-only Hana POSTs on her live task`,
+      `CONTROL during ${phase}: suspended assignee Hana POSTs on her live task (refused)`,
       tup(tup(...(await HANA_TIER.standing())), s),
-      tup(tup("member", "suspended"), 200),
+      tup(tup("member", "suspended"), 400),
     );
   }
 

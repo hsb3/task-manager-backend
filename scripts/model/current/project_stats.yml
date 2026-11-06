@@ -5,17 +5,17 @@ entity: project_stats
 kind: view
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active"))'
     actors:
-    - record-owner
+    - workspace-owner
     - active-workspace-member
     authRequired: guard
   view:
-    verbatim: '@request.auth.id != "" && (owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active"))'
     actors:
-    - record-owner
+    - workspace-owner
     - active-workspace-member
     authRequired: guard
   create:
@@ -37,8 +37,8 @@ relations:
 - field: owner
   target: users
   cardinality: one
-  required: true
-  on_target_delete: cascade
+  required: false
+  on_target_delete: clear
 - field: workspace
   target: workspaces
   cardinality: one

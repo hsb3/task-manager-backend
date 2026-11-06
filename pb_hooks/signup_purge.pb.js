@@ -29,9 +29,47 @@ onBootstrap((e) => {
       var purged = 0;
       for (var i = 0; i < recs.length; i++) {
         try {
-          // Programmatic delete: the onRecordDeleteRequest("users") sole-owner veto in
-          // main.pb.js does NOT fire here, so a purge cannot be blocked by it; the
-          // cascade's consequences ride the universal onRecordAfterDeleteSuccess hooks.
+          // A programmatic delete never reaches the onRecordDeleteRequest("users") veto, so the
+          // sweep applies it here: the cascade would take a workspace other people still use.
+          // KEEP IN SYNC: sole-owner test with pb_hooks/main.pb.js `workspace = {:w} && user != {:u}`
+          var uid = recs[i].id;
+          var owned = $app.findRecordsByFilter(
+            "workspaces",
+            "owner = {:o}",
+            "",
+            0,
+            0,
+            { o: uid },
+          );
+          var shared = "";
+          for (var j = 0; j < owned.length && !shared; j++) {
+            try {
+              $app.findFirstRecordByFilter(
+                "workspace_members",
+                "workspace = {:w} && user != {:u}",
+                {
+                  w: owned[j].id,
+                  u: uid,
+                },
+              );
+              shared = owned[j].id;
+            } catch (_) {
+              /* not found: no other member in this owned workspace */
+            }
+          }
+          if (shared) {
+            $app
+              .logger()
+              .info(
+                "unconfirmed-signup-purge skipped a sole owner of a shared workspace",
+                "user",
+                uid,
+                "workspace",
+                shared,
+              );
+            continue;
+          }
+          // The cascade's consequences ride the universal onRecordAfterDeleteSuccess hooks.
           $app.delete(recs[i]);
           purged++;
         } catch (_) {

@@ -1128,7 +1128,6 @@
         "required": [
           "id",
           "name",
-          "owner",
           "workspace"
         ],
         "type": "object"
@@ -1209,7 +1208,6 @@
         "required": [
           "id",
           "name",
-          "owner",
           "workspace"
         ],
         "type": "object"
@@ -1324,7 +1322,6 @@
         "required": [
           "id",
           "name",
-          "owner",
           "scope",
           "workspace"
         ],

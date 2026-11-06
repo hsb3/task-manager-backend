@@ -123,13 +123,14 @@ check(
 
 console.log("\n── (c) multi-witness pruning, real repo graph (comments) ──");
 info = real.resolve("comments", "task.project.owner");
-check("task.project.owner yields exactly 2 empty-witnesses", info.witnesses.length, 2);
+check("task.project.owner yields exactly 3 empty-witnesses", info.witnesses.length, 3);
 check(
   "witness prefixes",
   info.witnesses.map((w) => [w.empty_prefix, sorted(w.nonempty_prefixes)]),
   [
     ["task", []],
     ["task.project", ["task"]],
+    ["task.project.owner", ["task", "task.project"]],
   ],
 );
 verdict = guards.anon_satisfiable(

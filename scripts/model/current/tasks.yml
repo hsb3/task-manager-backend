@@ -6,13 +6,12 @@ kind: base
 capabilities:
   list:
     verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active") || assignee
-      = @request.auth.id) && trashed = "" && (project = "" || (project.created != "" && project.trashed
-      = "")) && workspace.trashed = ""'
+      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && trashed
+      = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed =
+      ""'
     actors:
     - workspace-owner
     - active-workspace-member
-    - assignee
     authRequired: guard
     record_state:
     - trashed = ""
@@ -20,13 +19,12 @@ capabilities:
     - workspace.trashed = ""
   view:
     verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active") || assignee
-      = @request.auth.id) && trashed = "" && (project = "" || (project.created != "" && project.trashed
-      = "")) && workspace.trashed = ""'
+      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && trashed
+      = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed =
+      ""'
     actors:
     - workspace-owner
     - active-workspace-member
-    - assignee
     authRequired: guard
     record_state:
     - trashed = ""
@@ -37,8 +35,6 @@ capabilities:
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status
       ?= "active") || project.workspace.owner = @request.auth.id || (project.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && project.workspace.workspace_members_via_workspace.role ?!= "viewer" && project.workspace.workspace_members_via_workspace.status
-      ?= "active") || (@request.body.parent != "" && @request.body.parent.assignee = @request.auth.id
-      && @request.body.parent.workspace.workspace_members_via_workspace.user ?= @request.auth.id && @request.body.parent.workspace.workspace_members_via_workspace.status
       ?= "active")) && (workspace = "" || workspace.trashed = "") && (project = "" || project.workspace.trashed
       = "")'
     actors:
@@ -46,23 +42,17 @@ capabilities:
     - active-workspace-writer
     - workspace-owner
     - active-workspace-writer
-    - custom(@request.body.parent != "" && @request.body.parent.assignee = @request.auth.id && @request.body.parent.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && @request.body.parent.workspace.workspace_members_via_workspace.status ?=
-      "active")
     authRequired: guard
-    body_guards:
-    - '@request.body.parent'
     record_state:
     - workspace = "" || workspace.trashed = ""
     - project = "" || project.workspace.trashed = ""
   update:
     verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status
-      ?= "active") || assignee = @request.auth.id) && workspace.trashed = ""'
+      ?= "active")) && workspace.trashed = ""'
     actors:
     - workspace-owner
     - active-workspace-writer
-    - assignee
     authRequired: guard
     record_state:
     - workspace.trashed = ""

@@ -494,8 +494,8 @@ try {
   }); // no status, no priority, no assignee, no labels
   check("t4 created", s, 200);
 
-  // The assignee-only branch: assigned while an ACTIVE member, then suspended — a membership
-  // DELETE unassigns, so this is the only way to reach tasks' `assignee = @request.auth.id` leg.
+  // A suspended assignee: assigned while an ACTIVE member, then suspended (a membership DELETE
+  // unassigns) — decision:active-membership-grants-access says the assignment alone counts nothing.
   [s, t_asg] = await api("POST", "/api/collections/tasks/records", alice, {
     workspace: WS,
     project: PRJ,
@@ -572,14 +572,10 @@ try {
     assignee,
     ALL_FILTER,
   );
-  check("assignee-only counts exactly the ONE task assigned to them", n_asg, 1);
+  check("a suspended assignee counts nothing, their assigned task included", n_asg, 0);
   let asg_body: any;
   [s, asg_body] = await counts(assignee, "assignee", ALL_FILTER);
-  check(
-    "  …and that bucket is keyed on the assignee's own id",
-    route_buckets(asg_body)[0],
-    new Map([[assignee_id, 1]]),
-  );
+  check("  …so no bucket is keyed on the assignee's own id", route_buckets(asg_body)[0], new Map());
 
   // Named draft-privacy spot check: member1 (author) sees it, member2 (plain peer) does not,
   // admin (active admin) does — mirrors decisions.listRule's draft branch exactly.

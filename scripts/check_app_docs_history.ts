@@ -82,7 +82,132 @@ export const CITATION = new RegExp(
 export const BASELINE = "1785185300";
 
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
-export const ALLOWLIST = new Map<string, string>([]);
+export const ALLOWLIST = new Map<string, string>([
+  [
+    '["1785186700_seed_app_docs.js", "route:tracker-summary", "Returns {user, total, byStatus, assignedToMe} for the tasks"]',
+    "card vc8g: the summary route counts only workspaces the caller owns or holds an active membership in; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:comments", "A suspended membership reads nothing on the document and dec"]',
+    "card vc8g: the comments rules lost the task-assignee branch; the record now says a suspended assignee reads nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:notifications", "**Read.** Access is recipient-only, and list and view share "]',
+    "card vc8g: the quoted notifications rule lost its task.assignee leg; the record quotes the new rule",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:project_items", "**Rules.** The listRule reproduces per type exactly what the"]',
+    "card vc8g: the view rules lost their assignee branch; the record now describes membership-only task access",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:project_items", "A caller who reaches a task only as its assignee gets counts"]',
+    "card vc8g: the view rules lost their assignee branch; the record now describes membership-only task access",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:project_items", "A non-member assignee gets 404 on a trashed task."]',
+    "card vc8g: the view rules lost their assignee branch; the record now describes membership-only task access",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:project_items", "For the owner and any active member this discloses nothing n"]',
+    "card vc8g: the view rules lost their assignee branch; the record now describes membership-only task access",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:project_stats", "**Access.** List and view are open to the owner of the proje"]',
+    "card vc8g: project_stats admits the workspace owner and active members, not the project creator; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:project_stats", "The owner branch checks no membership, so a creator whose me"]',
+    "card vc8g: project_stats admits the workspace owner and active members, not the project creator; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:project_stats", "The rules carry no workspace-owner branch of their own."]',
+    "card vc8g: project_stats admits the workspace owner and active members, not the project creator; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:projects", "Fields: name (required), description, owner (relation to use"]',
+    "card bwpj: projects.owner is optional and emptied on account delete; the record now says the project and its items stay",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:saved_views", "Fields: workspace (relation, required, removed with its work"]',
+    "card bwpj: saved_views.owner is optional; the record now says what an account delete does to personal and workspace views",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:task_activity", "A row holding a task is read by the owner or an ACTIVE membe"]',
+    "card vc8g: the task_activity rules lost their assignee branch; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:tasks", "**Access.** The workspace owner, an ACTIVE member, or the as"]',
+    "card vc8g: the tasks rules lost their assignee branch; the record now describes membership-only access",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:tasks", "The exception is the assignee branch, which is record-relati"]',
+    "card vc8g: the tasks rules lost their assignee branch; the record now describes membership-only access",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:workspace_members", "Branches that grant on another basis stay ungated: workspace"]',
+    "card vc8g: no rule grants on assignment any more; the record now says a suspended or viewer assignee gains nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:workspace_members", "The assignee branches carry no role guard, so on a task assi"]',
+    "card vc8g: no rule grants on assignment any more; the record now says a suspended or viewer assignee gains nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "collection:workspace_members", "The one exception is the task create branch keyed on the ass"]',
+    "card vc8g: no rule grants on assignment any more; the record now says a suspended or viewer assignee gains nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:active-membership-grants-access", "- **Task assignees.** A member who leaves has their tasks un"]',
+    "card vc8g: assignment grants nothing past an active membership; the record now says a suspended assignee keeps nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:active-membership-grants-access", "A suspended member therefore loses access to the workspace, "]',
+    "card vc8g: assignment grants nothing past an active membership; the record now says a suspended assignee keeps nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:active-membership-grants-access", "An assignee of a parent task may also create a subtask under"]',
+    "card vc8g: assignment grants nothing past an active membership; the record now says a suspended assignee keeps nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:active-membership-grants-access", "Four paths admit the assignee of a task with no status condi"]',
+    "card vc8g: assignment grants nothing past an active membership; the record now says a suspended assignee keeps nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:active-membership-grants-access", "The task-scoped rules of `task_activity`, `task_subscribers`"]',
+    "card vc8g: assignment grants nothing past an active membership; the record now says a suspended assignee keeps nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:active-membership-grants-access", "An active workspace membership grants access to the workspac"]',
+    "card vc8g: assignment grants nothing past an active membership; the record now says a suspended assignee keeps nothing",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:role-tiers", "A viewer reads what a member reads and writes nothing in the"]',
+    "card vc8g: a viewer writes nothing, an assigned task included; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:role-tiers", "Their create, update and delete rules admit the owner and an"]',
+    "card vc8g: a viewer writes nothing, an assigned task included; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:search-scoping-standard", "It requires authentication (401 otherwise) and runs one boun"]',
+    "card vc8g: the search route lost its assignee leg; the record now scopes tasks by membership only",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:verified-login", "An approved account that never verifies is deleted: the dail"]',
+    "card bwpj: the signup purge skips a sole owner of a shared workspace; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:project-stats-membership", "The query selects the project workspace as `workspace`, whic"]',
+    "card vc8g: project_stats admits the workspace owner and active members, not the project creator; the record now says so",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "decision:project-write-access", "Its one effect is a read, the task counts of the project (de"]',
+    "card vc8g: projects.owner no longer admits a read of the project task counts; the record now says it grants no read",
+  ],
+  [
+    '["1785186700_seed_app_docs.js", "route:tracker-export", "Per-collection cuts match the live read rules: trashed rows "]',
+    "card vc8g: the export returns only the notifications the notifications list rule returns; the record now says so",
+  ],
+]);
 
 export class Drop {
   constructor(

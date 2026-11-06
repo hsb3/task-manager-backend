@@ -6,13 +6,12 @@ kind: base
 capabilities:
   list:
     verbatim: user = @request.auth.id && (task = "" || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = "")) && (document = "" || ((document.workspace.owner
-      = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && document.workspace.workspace_members_via_workspace.status ?= "active")) && document.trashed =
-      "" && (document.project = "" || (document.project.created != "" && document.project.trashed = ""))
-      && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
+      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = "")) && (document = "" || ((document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) &&
+      document.trashed = "" && (document.project = "" || (document.project.created != "" && document.project.trashed
+      = "")) && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id
       || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status
       ?= "active")) && decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")) && (document = "" ||
@@ -26,9 +25,8 @@ capabilities:
     actors:
     - custom(user = @request.auth.id)
     - custom(task = "")
-    - custom-compound((workspace-owner || active-workspace-member || assignee) && task.trashed = "" &&
-      (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = "")
+    - custom-compound((workspace-owner || active-workspace-member) && task.trashed = "" && (task.project
+      = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed = "")
     - custom(document = "")
     - custom-compound((workspace-owner || active-workspace-member) && document.trashed = "" && (document.project
       = "" || (document.project.created != "" && document.project.trashed = "")) && document.workspace.trashed
@@ -52,13 +50,12 @@ capabilities:
     - dismissed = false
   view:
     verbatim: user = @request.auth.id && (task = "" || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = "")) && (document = "" || ((document.workspace.owner
-      = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && document.workspace.workspace_members_via_workspace.status ?= "active")) && document.trashed =
-      "" && (document.project = "" || (document.project.created != "" && document.project.trashed = ""))
-      && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
+      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = "")) && (document = "" || ((document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) &&
+      document.trashed = "" && (document.project = "" || (document.project.created != "" && document.project.trashed
+      = "")) && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id
       || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status
       ?= "active")) && decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")) && (document = "" ||
@@ -72,9 +69,8 @@ capabilities:
     actors:
     - custom(user = @request.auth.id)
     - custom(task = "")
-    - custom-compound((workspace-owner || active-workspace-member || assignee) && task.trashed = "" &&
-      (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = "")
+    - custom-compound((workspace-owner || active-workspace-member) && task.trashed = "" && (task.project
+      = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed = "")
     - custom(document = "")
     - custom-compound((workspace-owner || active-workspace-member) && document.trashed = "" && (document.project
       = "" || (document.project.created != "" && document.project.trashed = "")) && document.workspace.trashed
@@ -103,13 +99,12 @@ capabilities:
     authRequired: superuser
   update:
     verbatim: user = @request.auth.id && (task = "" || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = "")) && (document = "" || ((document.workspace.owner
-      = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && document.workspace.workspace_members_via_workspace.status ?= "active")) && document.trashed =
-      "" && (document.project = "" || (document.project.created != "" && document.project.trashed = ""))
-      && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
+      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = "")) && (document = "" || ((document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) &&
+      document.trashed = "" && (document.project = "" || (document.project.created != "" && document.project.trashed
+      = "")) && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id
       || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status
       ?= "active")) && decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")) && @request.body.user:isset
@@ -126,9 +121,8 @@ capabilities:
     actors:
     - custom(user = @request.auth.id)
     - custom(task = "")
-    - custom-compound((workspace-owner || active-workspace-member || assignee) && task.trashed = "" &&
-      (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = "")
+    - custom-compound((workspace-owner || active-workspace-member) && task.trashed = "" && (task.project
+      = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed = "")
     - custom(document = "")
     - custom-compound((workspace-owner || active-workspace-member) && document.trashed = "" && (document.project
       = "" || (document.project.created != "" && document.project.trashed = "")) && document.workspace.trashed

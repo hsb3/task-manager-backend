@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
  * E2E proof of the collaboration rules: workspace membership opens
- * projects/tasks/comments to members, an assignee keeps task-relative access, a hook
- * restricts assignment to members, an assignee with an ACTIVE membership may create a
- * subtask under their parent task, a `viewer` reads but never writes, and a
+ * projects/tasks/comments to members, an assignment grants nothing past the membership, a hook
+ * restricts assignment to members, a `viewer` reads but never writes (not even a subtask under
+ * their own assigned task), and a
  * `draft` decision/document/milestone
  * is reachable only by its author, the workspace owner and admin members. Proves the
  * policy from the outside against the running server.
@@ -1877,47 +1877,42 @@ check(
   tup(tup("member", "suspended"), 200),
 );
 
-// Deliberately UNGATED branches, pinned as CURRENT BEHAVIOUR (PBTT-431 gates MEMBERSHIP checks
-// only). A future tightening must flip these, not pass silently.
-console.log("\n── RESIDUAL (ungated by design): assignee-relative access and self-leave ──");
+// decision:active-membership-grants-access: a suspended assignee keeps nothing; self-leave stays ungated.
+console.log("\n── RESIDUAL: a suspended assignee keeps nothing; self-leave stays ungated ──");
 check(
-  "UNGATED `assignee = @request.auth.id`: a SUSPENDED assignee still READS their task",
+  "a SUSPENDED assignee no longer READS their task",
   await reads("tasks", GTA, assignee_tok),
-  tup(true, 200),
+  tup(false, 404),
 );
 // The title carries the search nonce, so this write targets `description` to keep it intact.
 [s] = await api("PATCH", `/api/collections/tasks/records/${GTA}`, assignee_tok, {
-  description: "still writable by a suspended assignee",
+  description: "not writable by a suspended assignee",
 });
 check(
-  "UNGATED `assignee = @request.auth.id`: a SUSPENDED assignee still WRITES their task",
+  "a SUSPENDED assignee no longer WRITES their task",
   tup(await standing(ASSIGNEE_ROW), s),
-  tup(tup("member", "suspended"), 200),
+  tup(tup("member", "suspended"), 404),
 );
 check(
   "…but that same suspended assignee reads NO other row in the workspace",
   await reads("tasks", GT, assignee_tok),
   tup(false, 404),
 );
-// The search route mirrors the rule: its tasks scope carries the same ungated assignee branch,
-// so a suspended assignee still FINDS their own task (and only that one) in full-text search.
+// The search route mirrors the rule: a suspended assignee no longer finds their own task.
 [s, r] = await api("GET", "/api/tracker/search?" + urlencode({ q: ASG_TAG }), assignee_tok);
 check(
-  "UNGATED assignee branch in the search SQL: a SUSPENDED assignee still finds their task",
+  "search: a SUSPENDED assignee no longer finds their task",
   tup(
     s,
     (r.results ?? []).map((x: any) => x.id),
   ),
-  tup(200, [GTA]),
+  tup(200, []),
 );
 [s, r] = await api("GET", "/api/tracker/search?" + urlencode({ q: TAG }), assignee_tok);
 check("…and nothing else in that workspace is searchable to them", tup(s, r.results), tup(200, []));
-// GATED, unlike the branches above: the parent-assignee disjunct of tasks.createRule MINTS a new
-// record in the workspace instead of granting record-relative access to an existing one, so it
-// carries the same active-status conjunct — rooted at the PARENT's workspace, the only path a
-// submitted body can reach. Fixture titles here deliberately carry NO nonce: the search probes
-// above pin an exact result set.
-console.log("\n── GATED: creating a SUBTASK under one's own assigned parent ──");
+// tasks.createRule has no parent-assignee branch: a subtask needs the same membership a top-level
+// task does. Fixture titles here deliberately carry NO nonce: the search probes above pin an exact result set.
+console.log("\n── creating a SUBTASK under one's own assigned parent grants nothing extra ──");
 [s] = await api("POST", "/api/collections/tasks/records", assignee_tok, {
   title: "subtask by a suspended assignee",
   status: GW_TODO,
@@ -1929,8 +1924,8 @@ check(
   tup(await standing(ASSIGNEE_ROW), s),
   tup(tup("member", "suspended"), 400),
 );
-// The population the disjunct exists for: `role ?!= "viewer"` excludes an active viewer from the
-// membership branches, so without it a viewer could not subtask even their OWN assigned task.
+// `role ?!= "viewer"` excludes an active viewer from the membership branches, so a viewer cannot
+// subtask even their OWN assigned task (decision:role-tiers).
 const [viewer_asg_tok, viewer_asg_id] = await gate_account("vwasg", "active viewer assignee");
 const VIEWER_ASG_ROW = await gate_make(
   "workspace_members",
@@ -1954,7 +1949,7 @@ const GTV = await gate_make(
   project: GP,
 });
 check(
-  "control: that ACTIVE VIEWER creates a TOP-LEVEL task (blocked — what makes the disjunct load-bearing)",
+  "control: that ACTIVE VIEWER creates a TOP-LEVEL task (blocked)",
   tup(await standing(VIEWER_ASG_ROW), s),
   tup(tup("viewer", "active"), 400),
 );
@@ -1964,12 +1959,12 @@ check(
   project: GP,
   parent: GTV,
 });
-check_in(
-  "an ACTIVE VIEWER assignee still creates a subtask under their assigned parent",
-  s,
-  [200, 201],
+check(
+  "an ACTIVE VIEWER assignee creates a subtask under their assigned parent (blocked)",
+  tup(await standing(VIEWER_ASG_ROW), s),
+  tup(tup("viewer", "active"), 400),
 );
-// The owner may hold no workspace_members row at all, so ownership — not the disjunct — grants it.
+// The owner may hold no workspace_members row at all, so ownership grants it.
 [s] = await api("POST", "/api/collections/tasks/records", alice, {
   title: "subtask by the workspace owner",
   status: GW_TODO,

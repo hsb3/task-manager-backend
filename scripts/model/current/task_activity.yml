@@ -6,28 +6,28 @@ kind: base
 capabilities:
   list:
     verbatim: '@request.auth.id != "" && ((task != "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = "") || (task = "" && workspace != "" &&
-      (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && workspace.workspace_members_via_workspace.status ?= "active")) && workspace.trashed = ""))'
-    actors:
-    - custom-compound(task != "" && (workspace-owner || active-workspace-member || assignee) && task.trashed
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
       = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = "") || (task = "" && workspace != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && workspace.trashed
+      = ""))'
+    actors:
+    - custom-compound(task != "" && (workspace-owner || active-workspace-member) && task.trashed = ""
+      && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
       = "")
     - custom-compound(task = "" && workspace != "" && (workspace-owner || active-workspace-member) &&
       workspace.trashed = "")
     authRequired: guard
   view:
     verbatim: '@request.auth.id != "" && ((task != "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active") || task.assignee
-      = @request.auth.id) && task.trashed = "" && (task.project = "" || (task.project.created != "" &&
-      task.project.trashed = "")) && task.workspace.trashed = "") || (task = "" && workspace != "" &&
-      (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && workspace.workspace_members_via_workspace.status ?= "active")) && workspace.trashed = ""))'
-    actors:
-    - custom-compound(task != "" && (workspace-owner || active-workspace-member || assignee) && task.trashed
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
       = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
+      = "") || (task = "" && workspace != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && workspace.trashed
+      = ""))'
+    actors:
+    - custom-compound(task != "" && (workspace-owner || active-workspace-member) && task.trashed = ""
+      && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
       = "")
     - custom-compound(task = "" && workspace != "" && (workspace-owner || active-workspace-member) &&
       workspace.trashed = "")

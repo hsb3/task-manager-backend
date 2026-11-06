@@ -5,14 +5,13 @@ entity: project_items
 kind: view
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && ((type = "task" && ((workspace_owner = @request.auth.id || active_members
-      ~ @request.auth.id) || assignee = @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id
-      || active_members ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner
-      = @request.auth.id || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0
-      && workspace_trashed = 0'
+    verbatim: '@request.auth.id != "" && ((type = "task" && (workspace_owner = @request.auth.id || active_members
+      ~ @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id || active_members
+      ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id
+      || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0 && workspace_trashed
+      = 0'
     actors:
-    - custom(type = "task" && ((workspace_owner = @request.auth.id || active_members ~ @request.auth.id)
-      || assignee = @request.auth.id))
+    - custom(type = "task" && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id))
     - custom(type != "task" && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id)
       && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id || active_admins
       ~ @request.auth.id))
@@ -22,19 +21,19 @@ capabilities:
     - project_trashed = 0
     - workspace_trashed = 0
   view:
-    verbatim: (@request.auth.id != "" && ((type = "task" && ((workspace_owner = @request.auth.id || active_members
-      ~ @request.auth.id) || assignee = @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id
-      || active_members ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner
-      = @request.auth.id || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0
-      && workspace_trashed = 0) || (@request.auth.id != "" && trashed != "" && workspace_trashed = 0 &&
-      (workspace_owner = @request.auth.id || active_members ~ @request.auth.id) && (type = "task" || draft
-      = false || author = @request.auth.id || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))
+    verbatim: (@request.auth.id != "" && ((type = "task" && (workspace_owner = @request.auth.id || active_members
+      ~ @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id || active_members
+      ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id
+      || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0 && workspace_trashed
+      = 0) || (@request.auth.id != "" && trashed != "" && workspace_trashed = 0 && (workspace_owner =
+      @request.auth.id || active_members ~ @request.auth.id) && (type = "task" || draft = false || author
+      = @request.auth.id || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))
     actors:
-    - custom(@request.auth.id != "" && ((type = "task" && ((workspace_owner = @request.auth.id || active_members
-      ~ @request.auth.id) || assignee = @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id
-      || active_members ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner
-      = @request.auth.id || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0
-      && workspace_trashed = 0)
+    - custom(@request.auth.id != "" && ((type = "task" && (workspace_owner = @request.auth.id || active_members
+      ~ @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id || active_members
+      ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id
+      || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0 && workspace_trashed
+      = 0)
     - custom(@request.auth.id != "" && trashed != "" && workspace_trashed = 0 && (workspace_owner = @request.auth.id
       || active_members ~ @request.auth.id) && (type = "task" || draft = false || author = @request.auth.id
       || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))

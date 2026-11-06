@@ -47,7 +47,6 @@ routerAdd(
         " OR EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace = " +
         coll +
         ".workspace AND m.[[user]] = {:uid} AND m.status = 'active')";
-      if (opts.assignee) scope += " OR " + coll + ".assignee = {:uid}";
       scope += ")";
       // KEEP IN SYNC: the `workspace.trashed = ""` clause every searched collection's listRule
       // carries — all five have a `workspace` column, so this leg is unconditional. `sw` because
@@ -139,7 +138,6 @@ routerAdd(
     let results = [];
     results = results.concat(
       search("tasks", "title", ["description"], {
-        assignee: true,
         projTrashOpt: true,
       }),
     );
@@ -1230,10 +1228,15 @@ routerAdd(
       return t && taskIdSet[t];
     });
 
-    // self-only collections (mirror notifications/user_settings listRule `user = @request.auth.id`).
+    // notifications.listRule also requires membership of the item's workspace: each row runs the live rule.
+    const notifRule = e.app.findCollectionByNameOrId("notifications").listRule;
+    const info = e.requestInfo();
     const notificationsOut = fetchAll("notifications", "user = {:uid}", {
       uid: uid,
+    }).filter(function (n) {
+      return e.app.canAccessRecord(n, info, notifRule);
     });
+    // user_settings.listRule is `user = @request.auth.id` alone.
     const userSettingsOut = fetchAll("user_settings", "user = {:uid}", {
       uid: uid,
     });

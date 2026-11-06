@@ -575,8 +575,7 @@ onRecordAfterDeleteSuccess((e) => {
     const ws = e.record.get("workspace");
     const uid = e.record.get("user");
     // TASK-055: filter on the task's OWN required workspace, not project.workspace —
-    // the latter collapses to empty for a project-less task, leaving a departed member
-    // assigned (and so still read+write via tasks.viewRule/updateRule's assignee branch).
+    // the latter collapses to empty for a project-less task, leaving a departed member assigned.
     const tasks = e.app.findRecordsByFilter(
       "tasks",
       "workspace = {:w} && assignee = {:u}",
@@ -628,6 +627,7 @@ onRecordDeleteRequest((e) => {
       { o: uid },
     );
     const blocking = [];
+    // KEEP IN SYNC: sole-owner test with pb_hooks/signup_purge.pb.js `workspace = {:w} && user != {:u}`
     for (const ws of ownedWorkspaces) {
       let hasOtherMember = true;
       try {
@@ -981,12 +981,12 @@ routerAdd(
   "/api/tracker/summary",
   (e) => {
     const uid = e.auth.id;
-    // KEEP IN SYNC: the trash clause of tasks.listRule; the scope clause is deliberately narrower (my projects or assigned to me), not the rule's membership scope
+    // KEEP IN SYNC: the membership and trash clauses of tasks.listRule; the personal scope (my projects or assigned to me) narrows them, never replaces them
     const tasks = e.app.findRecordsByFilter(
       "tasks",
       // project.shadow = false keeps this personal: the workspace container is owned by the
       // workspace owner, so without it their total absorbs every member's workspace-level item.
-      '((project.owner = {:uid} && project.shadow = false) || assignee = {:uid}) && trashed = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed = ""',
+      '((project.owner = {:uid} && project.shadow = false) || assignee = {:uid}) && (workspace.owner = {:uid} || (workspace.workspace_members_via_workspace.user ?= {:uid} && workspace.workspace_members_via_workspace.status ?= "active")) && trashed = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed = ""',
       "",
       0,
       0,
