@@ -543,6 +543,59 @@ try {
   }
 
   // ══════════════════ cleanup ══════════════════════════════════════════════════
+  // COVERS: rule:saved_views.view, rule:saved_views.list, rule:saved_views.update
+  console.log("\n── (10) an ownerless PERSONAL view (superuser create) is readable by no user ──");
+  let ownerless: any;
+  [s, ownerless] = await api("POST", "/api/collections/saved_views/records", su, {
+    workspace: ALICE_WS,
+    name: "Ownerless Personal",
+    filterData: {},
+    scope: "personal",
+  });
+  check(
+    "superuser creates a personal view with no owner → 200, owner empty",
+    tup(s, ownerless.owner ?? null),
+    tup(200, ""),
+  );
+  const ownerless_id = ownerless.id ?? null;
+  for (const [who, tok] of [
+    ["ws-owner (Alice)", alice],
+    ["member (Bob)", bob],
+  ] as const) {
+    [s] = await api("GET", `/api/collections/saved_views/records/${py_str(ownerless_id)}`, tok);
+    check(`${who} GET the ownerless personal view by id → 404`, s, 404);
+    [s, r] = await api(
+      "GET",
+      `/api/collections/saved_views/records?filter=(workspace='${py_str(ALICE_WS)}')`,
+      tok,
+    );
+    check(
+      `${who} list does NOT include the ownerless personal view`,
+      py_get(r, "items", [])
+        .map((i: any) => getitem(i, "id"))
+        .includes(ownerless_id),
+      false,
+    );
+  }
+  [s] = await api("GET", `/api/collections/saved_views/records/${py_str(ownerless_id)}`, su);
+  check("superuser GET the ownerless personal view by id → 200", s, 200);
+  [s] = await api("PATCH", `/api/collections/saved_views/records/${py_str(ownerless_id)}`, alice, {
+    name: "Ownerless Personal Renamed",
+  });
+  check("ws-owner (Alice) PATCH the ownerless personal view by id → 200", s, 200);
+  [s] = await api("DELETE", `/api/collections/saved_views/records/${py_str(ownerless_id)}`, alice);
+  check("ws-owner (Alice) DELETE the ownerless personal view by id → 204", s, 204);
+  [s, r] = await api(
+    "GET",
+    `/api/collections/app_docs/records?${urlencode({ filter: "slug='collection:saved_views'" })}`,
+    su,
+  );
+  check(
+    "app_docs collection:saved_views states what an ownerless personal view is",
+    (r.items?.[0]?.body ?? "").includes("readable by no user"),
+    true,
+  );
+
   console.log("\n── cleanup ──");
   for (const vid of cleanup_view_ids) {
     [s] = await api("DELETE", `/api/collections/saved_views/records/${vid}`, alice);

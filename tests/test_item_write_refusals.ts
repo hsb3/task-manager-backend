@@ -326,6 +326,72 @@ try {
   }
   await bob_member2.done();
 
+  console.log("\n── a create into a trashed project is refused (card 6nrc) ──");
+  const bob_member3 = await tierkit.actor_at_tier(ALICE_WS, bob_id, "member", alice, "Bob");
+  [s, r] = await api("POST", URL("projects"), alice, {
+    name: "trashed-project creates",
+    workspace: ALICE_WS,
+  });
+  check("setup: owner creates a project → 200", s, 200);
+  const TRASHED = r.id;
+  const ALL = ["tasks", ...ITEMS];
+  let PARENT = "";
+  for (const c of ALL) {
+    [s, r] = await api("POST", URL(c), alice, { [NAME[c]]: `${c} live project`, project: TRASHED });
+    check(`${c}: owner create into the live project → 200`, s, 200);
+    if (c === "tasks") PARENT = r.id;
+  }
+  [s] = await api("DELETE", `${URL("projects")}/${TRASHED}`, alice);
+  check("setup: owner DELETE moves the project to the trash → 204", s, 204);
+  for (const [who, tok] of [
+    ["owner", alice],
+    ["member", bob],
+  ] as const) {
+    for (const c of ALL) {
+      [s] = await api("POST", URL(c), tok, { [NAME[c]]: `${c} ${who} trashed`, project: TRASHED });
+      check(
+        `${c}: ${who} create {project} into a trashed project → 400`,
+        tup(await bob_member3.now(), s),
+        tup("member", 400),
+      );
+      check(`${c}: …stored nothing`, await stored(c, `${c} ${who} trashed`), 0);
+      [s] = await api("POST", URL(c), tok, {
+        [NAME[c]]: `${c} ${who} trashed ws`,
+        workspace: ALICE_WS,
+        project: TRASHED,
+      });
+      check(`${c}: ${who} create {workspace, project} into a trashed project → 400`, s, 400);
+      check(`${c}: …stored nothing`, await stored(c, `${c} ${who} trashed ws`), 0);
+    }
+    // a subtask names no project; the create hook would inherit the trashed one from its parent
+    [s] = await api("POST", URL("tasks"), tok, {
+      title: `subtask ${who} trashed`,
+      workspace: ALICE_WS,
+      parent: PARENT,
+    });
+    check(`tasks: ${who} subtask create {workspace, parent in a trashed project} → 400`, s, 400);
+    check(`tasks: …stored nothing`, await stored("tasks", `subtask ${who} trashed`), 0);
+  }
+  await bob_member3.done();
+  [s] = await api("PATCH", `${URL("projects")}/${TRASHED}`, alice, { trashed: "" });
+  check("owner restores the project → 200", s, 200);
+  for (const c of ALL) {
+    [s] = await api("POST", URL(c), alice, { [NAME[c]]: `${c} restored`, project: TRASHED });
+    check(`${c}: owner create into the restored project → 200`, s, 200);
+  }
+  for (const c of ALL) {
+    const [, d] = await api(
+      "GET",
+      `/api/collections/app_docs/records?${urlencode({ filter: `slug='collection:${c}'` })}`,
+      su,
+    );
+    check(
+      `${c}: app_docs states the trashed-project refusal`,
+      (d.items?.[0]?.body ?? "").includes("names a project in the trash is refused"),
+      true,
+    );
+  }
+
   console.log("\n── measured (report only): trash with no workspace param ──");
   [s, r] = await api("GET", "/api/tracker/trash", alice);
   console.log(`  GET /api/tracker/trash (no workspace) → ${s} ${py_repr(r.message ?? r)}`);
