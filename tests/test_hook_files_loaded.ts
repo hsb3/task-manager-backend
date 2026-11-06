@@ -460,6 +460,15 @@ try {
     tup(200, "string"),
   );
 
+  // landing.pb.js: its landing route is registered (a missing file 404s).
+  let landing_body: any;
+  [status, landing_body] = await api("GET", "/api/tracker/me/landing", alice);
+  check(
+    "landing.pb.js: GET /api/tracker/me/landing is registered",
+    tup(status, "landing" in landing_body),
+    tup(200, true),
+  );
+
   console.log("\n── §3 every hook file is dispositioned ──");
   const probed = new Set([
     "activity.pb.js",
@@ -471,6 +480,7 @@ try {
     "invitations.pb.js",
     "item_list.pb.js",
     "keys.pb.js",
+    "landing.pb.js",
     "main.pb.js",
     "membership_status.pb.js",
     "names.pb.js",

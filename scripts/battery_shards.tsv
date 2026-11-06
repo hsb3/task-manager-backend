@@ -93,6 +93,7 @@
 4	2	test_item_list_filters
 2	2	test_item_write_refusals
 1	2	test_owner_row
+4	2	test_landing
 2	2	test_unknown_keys
 3	2	test_pb_migrate
 2	2	test_pb_refusal_statuses
@@ -108,6 +109,7 @@
 4	1	test_mutation_proof
 1	1	test_py_helpers
 2	1	test_room_preflight_checker
+2	1	test_invitation_expiry_list
 3	0	test_app_docs_down_up_checker
 3	0	test_app_docs_history_checker
 3	0	test_app_docs_quotes_checker

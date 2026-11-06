@@ -7,33 +7,11 @@ onBootstrap((e) => {
 
   cronAdd("invitation-expiry", "30 5 * * *", () => {
     try {
-      // ── INLINED EXPIRY DAYS (sweep copy) — KEEP IN SYNC: pb_hooks/invitations.pb.js `invitation_expiry_days`, parsed there by readIntSetting ──
-      var days = 7;
-      try {
-        var raw = $app
-          .findFirstRecordByFilter("app_settings", "key = {:k}", {
-            k: "invitation_expiry_days",
-          })
-          .get("value");
-        var parsed = NaN;
-        if (Array.isArray(raw) && raw.length && typeof raw[0] === "number") {
-          var text = "";
-          for (var i = 0; i < raw.length; i++)
-            text += String.fromCharCode(raw[i]);
-          parsed = parseInt(text, 10);
-        } else {
-          parsed = parseInt(String(raw), 10);
-        }
-        if (!isNaN(parsed) && parsed >= 0) days = parsed;
-      } catch (_) {
-        days = 7;
-      }
-      // ── END INLINED EXPIRY DAYS (sweep copy) ──
+      var invLib = require(`${__hooks}/lib/invitations.js`);
+      var days = invLib.expiryDays($app);
 
       // Same instant the accept route refuses at: expired = now >= created + days.
-      var cutoff = new Date(Date.now() - days * 86400000)
-        .toISOString()
-        .replace("T", " ");
+      var cutoff = invLib.daysAgo(days);
       var recs = $app.findRecordsByFilter(
         "workspace_invitations",
         "created <= {:cutoff}",
@@ -52,9 +30,7 @@ onBootstrap((e) => {
         }
       }
       // Never under a day: the ledger's mint rows are the daily invitation limit's count.
-      var eventCutoff = new Date(Date.now() - Math.max(1, days) * 86400000)
-        .toISOString()
-        .replace("T", " ");
+      var eventCutoff = invLib.daysAgo(Math.max(1, days));
       var pruned = $app
         .db()
         .newQuery("DELETE FROM invitation_events WHERE created <= {:cutoff}")

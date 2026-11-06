@@ -324,6 +324,18 @@ The record id is the only real key; `key` on tasks, decisions, documents and mil
 - **The key follows the item.** An item key is minted once after create and is immutable afterwards; moving the item to another project keeps its key even though the prefix then differs from the new project, so no link or spoken name ever breaks or gets reused.
 - **Shadow project items stay keyless**, because the shadow project takes no prefix (decision:shadow-project).
 
+## landing-and-switch-check
+
+- **Slug:** `decision:landing-and-switch-check`
+- **Title:** The server names the workspace a user lands in and answers whether a named workspace may be opened.
+- **Ref:** `workspaces`
+
+Which workspace a user opens after signing in, and whether they may switch to a named one, used to be decided by the web client. Clients are now agents calling the API, so both answers come from the server (decision:backend-owns-business-rules): GET /api/tracker/me/landing and GET /api/tracker/workspaces/{id}/switch, described under collection:workspaces.
+
+**Landing order.** Owned first, then an active membership, then a pending invitation, then a suspended membership. A workspace the user owns is the one they are most likely to work in, and it can never be closed to them. An invitation comes after every workspace the user can already open, because it is an offer, not an entry: it decides the landing only for someone who has nowhere else to go. A suspended membership comes last, so a user whose only workspace has suspended them is told so rather than told they have none. A trashed workspace and an expired invitation are never a landing, and neither is an invitation to a workspace where the user is suspended: accepting leaves a membership row as it is, so it would show a join screen that changes nothing. For the same reason the switch check offers no invitation to a suspended member. Within each step the earliest created wins, so the answer is stable from one sign-in to the next. This follows Linear, which opens a workspace the user belongs to and offers pending invitations as a separate join step rather than an entry.
+
+**Switch check.** The refusal names suspended only to the suspended member, who already knows the workspace exists; every other refusal is not_found, matching the 404 of a workspace read, so the route is no existence oracle. The check carries the caller's invitation to that workspace, expired or not, because a client must choose between showing it and sending the user to their landing.
+
 ## last-workspace-reprovision
 
 - **Slug:** `decision:last-workspace-reprovision`
