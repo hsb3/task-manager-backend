@@ -38,7 +38,6 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 const SU_EMAIL = "probe@example.com";
 const SU_PASSWORD = "probe123456";
 const PASSWORD = "test123456";
-const TRASH_TS = "2026-09-08 00:00:00.000Z"; // PocketBase date wire format, not ISO with a T
 
 let failures = 0;
 
@@ -189,10 +188,8 @@ try {
 
   // ══════════ (2) trashed workspace: BOTH of those remedies are refused ═════════
   console.log("\n── (2) the same workspace in the trash: both of those remedies are refused ──");
-  [s] = await api("PATCH", `/api/collections/workspaces/records/${WS}`, tess, {
-    trashed: TRASH_TS,
-  });
-  check("Tess puts the workspace in the trash", s, 200);
+  [s] = await api("DELETE", `/api/collections/workspaces/records/${WS}`, tess);
+  check("Tess puts the workspace in the trash (DELETE)", s, 204);
   check(
     "handing it over is refused while it sits there",
     (

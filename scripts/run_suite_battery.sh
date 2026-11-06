@@ -563,6 +563,12 @@ run_suite "test_owner_row"           bun tests/test_owner_row.ts
 # ── unknown keys: every record write refuses a body key its collection does not define, naming it.
 run_suite "test_unknown_keys"        bun tests/test_unknown_keys.ts
 
+# ── trash entry: only DELETE moves a workspace, project or item into the trash; an update can only restore.
+run_suite "test_trash_entry"         bun tests/test_trash_entry.ts
+
+# ── deletion impact: the owner reads what deleting a workspace takes with it in one call.
+run_suite "test_delete_impact"       bun tests/test_delete_impact.ts
+
 # ── security: a trashed workspace is unreadable but owner-enumerable and owner-restorable — self-booting.
 run_suite "test_workspace_trash"    bun tests/test_workspace_trash.ts
 

@@ -104,6 +104,14 @@ export const ALLOWLIST = new Map<string, string>([
     "card 06sf: every workspace create gives its owner an admin row, not only the provisioning paths a member row; the record now says so",
   ],
   [
+    '["1785187000_seed_app_docs.js", "decision:workspace-trash-cleanup-not-atomic", "An active admin may trash the workspace too, and when it is "]',
+    "card te4g: only the owner trashes a workspace through the API, with a DELETE; the record no longer says an admin may trash one",
+  ],
+  [
+    '["1785187000_seed_app_docs.js", "decision:workspace-trash-cleanup-not-atomic", "That is the invariant that every user keeps a live workspace"]',
+    "card te4g: only the owner trashes a workspace through the API, with a DELETE; the record no longer says an admin may trash one",
+  ],
+  [
     '["1785186700_seed_app_docs.js", "route:tracker-summary", "Returns {user, total, byStatus, assignedToMe} for the tasks"]',
     "card vc8g: the summary route counts only workspaces the caller owns or holds an active membership in; the record now says so",
   ],

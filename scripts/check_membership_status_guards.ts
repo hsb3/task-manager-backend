@@ -140,6 +140,16 @@ export const ALLOWLIST_HOOKS: Allowlist = new Map([
       "authorized workspace — fetchScoped builds `workspace = {:w}`, with no `user` leg at all " +
       "(PBTT-436, PBTT-431)",
   ],
+  [
+    JSON.stringify([
+      "routes.pb.js",
+      "e.app.countRecords",
+      "<unresolved filter: e.app.countRecords(...)>",
+    ]),
+    "not a grant: GET /api/tracker/workspaces/{id}/deletion-impact answers only ws.owner (404 " +
+      "for everyone else) before it counts, and this counts every roster row of that workspace " +
+      "in ANY status, which is what deleting it removes (card pjpy, decision:soft-delete-trash)",
+  ],
 ]);
 
 /** The gate could not read what it must analyze — never a silent pass. */

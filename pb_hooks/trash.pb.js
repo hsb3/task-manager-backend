@@ -54,6 +54,32 @@ onRecordDeleteRequest(
   "workspaces",
 );
 
+// Only DELETE trashes (card te4g): an update may touch `trashed`/`trashed_by` only to restore the row.
+// Superusers stay exempt: their writes are the documented way to backdate or repair trash.
+onRecordUpdateRequest(
+  (e) => {
+    if (e.auth && e.auth.isSuperuser()) return e.next();
+    var orig = e.record.original();
+    var stillTrashed = String(e.record.get("trashed") || "") !== "";
+    var fields = ["trashed", "trashed_by"];
+    for (var i = 0; i < fields.length; i++) {
+      var was = String(orig.get(fields[i]) || "");
+      var now = String(e.record.get(fields[i]) || "");
+      if (now !== was && (now !== "" || stillTrashed))
+        throw new BadRequestError(
+          "This update would move the record into the trash or change its trash record. Delete the record to move it to the trash; an update can only restore it.",
+        );
+    }
+    return e.next();
+  },
+  "tasks",
+  "decisions",
+  "milestones",
+  "documents",
+  "projects",
+  "workspaces",
+);
+
 // ── tasks: delete-to-trash / second-delete-purges (item, workspace via project) ──
 // KEEP IN SYNC with the decisions/milestones/documents item hooks below (same
 // shape; only the workspace traversal differs — tasks reach the workspace via

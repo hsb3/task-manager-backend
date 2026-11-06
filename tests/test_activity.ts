@@ -177,13 +177,6 @@ async function stop_server(proc: roomkit.Room | null): Promise<void> {
   }
 }
 
-function now_ts(): string {
-  return new Date()
-    .toISOString()
-    .replace("T", " ")
-    .replace(/\.\d+Z$/, ".000Z");
-}
-
 function days_ago_ts(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10) + " 00:00:00.000Z";
 }
@@ -465,10 +458,8 @@ try {
   );
 
   const before_trash = (await su_rows(victim_task)).length;
-  [s] = await api("PATCH", `/api/collections/tasks/records/${victim_task}`, bob, {
-    trashed: now_ts(),
-  });
-  check("Bob trashes the victim task (PATCH trashed) → 200", s, 200);
+  [s] = await api("DELETE", `/api/collections/tasks/records/${victim_task}`, bob);
+  check("Bob trashes the victim task (DELETE) → 204", s, 204);
   check(
     "WRITE PATH INTACT: the trash transition wrote its own activity row",
     (await su_rows(victim_task)).length,
@@ -519,10 +510,8 @@ try {
   );
 
   // The project arm of the predicate: a LIVE task under a TRASHED project.
-  [s] = await api("PATCH", `/api/collections/projects/records/${ALICE_PROJECT}`, alice, {
-    trashed: now_ts(),
-  });
-  check("Alice trashes the project → 200", s, 200);
+  [s] = await api("DELETE", `/api/collections/projects/records/${ALICE_PROJECT}`, alice);
+  check("Alice trashes the project (DELETE) → 204", s, 204);
   check(
     "trashed PROJECT: Bob's list of a live task's rows is empty",
     await bob_rows(control_task),
@@ -565,10 +554,9 @@ try {
   // ══════════════════ (7) DELETE-to-trash — the programmatic-save path ════════
   // COVERS: hook:activity.pb.js#onRecordUpdate:tasks, hook:realtime.pb.js#onRecordUpdate:tasks
   // A DELETE is intercepted and turned into a `trashed` save by trash.pb.js's own
-  // e.app.save(), which fires no *Request hook — the same transition a PATCH makes, so it
-  // owes the same audit row, and it owes exactly ONE realtime envelope because trash.pb.js
-  // emits its own copy inline.
-  console.log("\n── (7) DELETE-to-trash writes the row a PATCH-trash writes, and one envelope ──");
+  // e.app.save(), which fires no *Request hook, yet it owes the `trashed` audit row and exactly
+  // ONE realtime envelope, because trash.pb.js emits its own copy inline.
+  console.log("\n── (7) DELETE-to-trash writes its audit row, and one envelope ──");
   const sse = new SSEListener(bob, `rt:project_items:${ALICE_WS}`);
   check("(fixture) Bob's realtime client connected", truthy(await sse.start()), true);
 
@@ -691,10 +679,8 @@ try {
   });
   check("(fixture) and one in the LIVE project, as the socket's liveness control", s, 200);
   const ctrl_id = ctrl_task.id ?? null;
-  [s] = await api("PATCH", `/api/collections/projects/records/${ptrash.id ?? null}`, alice, {
-    trashed: now_ts(),
-  });
-  check("(fixture) Alice trashes the second project", s, 200);
+  [s] = await api("DELETE", `/api/collections/projects/records/${ptrash.id ?? null}`, alice);
+  check("(fixture) Alice trashes the second project (DELETE)", s, 204);
   check(
     "(fixture) Bob (member) now 404s that task over HTTP, on both read surfaces",
     tup(
@@ -1047,10 +1033,8 @@ try {
     ]),
   );
   for (const [coll] of CREATE_BODIES) {
-    [s] = await api("PATCH", `/api/collections/${coll}/records/${live_for_update[coll]}`, alice, {
-      trashed: now_ts(),
-    });
-    check(`Alice PATCHes the live ${coll.slice(0, -1)} into the trash → 200`, s, 200);
+    [s] = await api("DELETE", `/api/collections/${coll}/records/${live_for_update[coll]}`, alice);
+    check(`Alice DELETEs the live ${coll.slice(0, -1)} into the trash → 204`, s, 204);
   }
   for (const [who, listener] of listeners) {
     for (const [coll] of CREATE_BODIES) {

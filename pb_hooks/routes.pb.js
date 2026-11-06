@@ -1621,3 +1621,51 @@ routerAdd(
   },
   $apis.requireAuth(),
 );
+
+// GET /api/tracker/workspaces/{id}/deletion-impact — what deleting a workspace takes with it, in
+// one read. Routes BYPASS collection rules, so the owner check is by hand; every other caller
+// (admin, superuser, unknown id) gets the same 404. Counts include rows the owner's lists hide.
+routerAdd(
+  "GET",
+  "/api/tracker/workspaces/{id}/deletion-impact",
+  (e) => {
+    const wsId = e.request.pathValue("id");
+    let ws;
+    try {
+      ws = e.app.findRecordById("workspaces", wsId);
+    } catch (_) {
+      throw new NotFoundError("workspace not found");
+    }
+    if (ws.get("owner") !== e.auth.id)
+      throw new NotFoundError("workspace not found");
+
+    const inWs = $dbx.hashExp({ workspace: wsId });
+    const live = $dbx.hashExp({ trashed: "" });
+    const items = ["tasks", "documents", "decisions", "milestones"];
+    let liveItems = 0;
+    let trashedItems = 0;
+    for (const c of items) {
+      const all = e.app.countRecords(c, inWs);
+      const l = e.app.countRecords(c, inWs, live);
+      liveItems += l;
+      trashedItems += all - l;
+    }
+    return e.json(200, {
+      items: liveItems,
+      trashed_items: trashedItems,
+      projects: e.app.countRecords(
+        "projects",
+        inWs,
+        $dbx.not($dbx.hashExp({ shadow: true })),
+      ),
+      // The owner's own roster row (signup provisions one) is not a member the delete removes.
+      members: e.app.countRecords(
+        "workspace_members",
+        inWs,
+        $dbx.not($dbx.hashExp({ user: ws.get("owner") })),
+      ),
+      saved_views: e.app.countRecords("saved_views", inWs),
+    });
+  },
+  $apis.requireAuth(),
+);
