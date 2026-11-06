@@ -8,8 +8,8 @@ pb_data/
 pb.log
 *.zip
 
-# bun install (prettier, typescript, the Railway IaC SDK)
-/node_modules/
+# bun install (prettier, typescript, the Railway IaC SDK; clients/tm/ is a workspace with its own)
+node_modules/
 
 # harness / editor noise
 logs/
