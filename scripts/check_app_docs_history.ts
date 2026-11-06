@@ -7,8 +7,7 @@
  * historical title/body still appears in that record's FINAL text. A re-seed migration is
  * expected to ADD and REWORD; it is not expected to delete a paragraph nobody noticed, which
  * is how the project_items trash-route wording disappeared. Bodies are read only from the
- * replayed sqlite DB — never by grepping migration source, whose quoting cannot be trusted
- * (.agents/memory/app-docs-quotes-apostrophe-tokenizer.md).
+ * replayed sqlite DB — never by grepping migration source, whose quoting cannot be trusted.
  *
  * Span unit: each title/body is cut at line breaks and sentence boundaries, whitespace
  * normalized, and chunks of at least MIN_SPAN_CHARS are tracked. The cut is derived, not

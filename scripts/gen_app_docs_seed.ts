@@ -3,7 +3,7 @@
  * Generate the app_settings + app_docs seed migration from a replayed pb_data, so the corpus is regenerable.
  *
  * Bodies are read from the replayed sqlite DB, never by grepping migration source, whose
- * quoting cannot be trusted (.agents/memory/app-docs-quotes-apostrophe-tokenizer.md).
+ * quoting cannot be trusted.
  *
  * With no pb_data_dir it replays pb_migrations/ into a throwaway temp dir and reads the corpus
  * back from there, so regenerating and drift-checking need no pre-existing replay:
