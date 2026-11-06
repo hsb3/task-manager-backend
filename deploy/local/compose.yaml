@@ -1,0 +1,13 @@
+# The production image (repo-root Dockerfile) on a local port; pb_data persists in a named volume.
+name: pb-local
+services:
+  pocketbase:
+    build:
+      context: ../..
+    platform: linux/amd64 # the Dockerfile fetches the amd64 PocketBase binary
+    ports:
+      - "127.0.0.1:${PB_PORT:-8090}:8080"
+    volumes:
+      - pb_data:/pb/pb_data
+volumes:
+  pb_data:
