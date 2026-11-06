@@ -146,7 +146,14 @@ require(`${__hooks}/lib/routes.js`).add(
         throw new BadRequestError(
           "filter names a field the items do not have, or is not a valid filter",
         );
-      throw err;
+      e.app
+        .logger()
+        .error(
+          "GET /api/tracker/project-items/counts read failed",
+          "error",
+          String(err),
+        );
+      throw new InternalServerError("The counts could not be read.");
     }
 
     const idList = function (raw) {

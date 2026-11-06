@@ -27,10 +27,10 @@ const FIELDS = [
 const QUERY_TYPES = ["string", "integer", "boolean"];
 const QUERY_KEYS = ["type", "description", "required", "enum"];
 
-// shortcut: regex literals, a nested template literal inside a `${}` hole, a computed or destructured add()/routerUse and a computed require path are not understood, upgrade if a hook needs one.
+// shortcut: deeper `${}` nesting, a regex after a token the lookbehind does not list (`)`, `]`, a name), a computed or destructured add()/routerUse and a computed require path are not understood, upgrade if a hook needs one.
 // Comments are blanked (newlines kept so reported line numbers stay right); strings too unless `keep_strings`.
 const SCAN =
-  /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\$]|\\[\s\S]|\$(?!\{)|\$\{[^}]*\})*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu;
+  /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\$]|\\[\s\S]|\$(?!\{)|\$\{(?:[^{}`]|`(?:[^`\\]|\\[\s\S])*`|\{[^{}]*\})*\})*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*|(?<=(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<!\.)\b(?:return|typeof|case|throw|in|of|new|delete|void|instanceof|yield|await|else|do))\s*)(?<!\+\+\s*|--\s*)\/(?:[^/\\\n[]|\\.|\[(?:[^\]\\\n]|\\.)*\])+\/[a-z]*/gu;
 export const lines_of = (text: string, keep_strings: boolean): string[] =>
   text
     .replace(SCAN, (m) => (keep_strings && /^["'`]/u.test(m) ? m : m.replace(/[^\n]/gu, "")))

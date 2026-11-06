@@ -60,7 +60,7 @@ passes green against a stranger's database. Bands + recipes: `.agents/rules/port
   migration), `schema/` regen, `openapi.json` regen, model tree regen. CI enforces.
 - Secret-bearing settings (smtp/oauth/backups S3) ride env boot hooks, NEVER
   migrations — a migration re-asserting them clobbers the hook on fresh boot.
-- Backfills are historical only — every DB (dev, rooms, prod) boots fresh from the current set.
+- Backfills are historical only — every DB (dev, rooms, prod) boots fresh from the current set; a migration never repairs rows (decision:every-database-boots-from-the-migration-set).
 
 ## Agent conduct
 

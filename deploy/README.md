@@ -1,7 +1,7 @@
 ---
 title: Deployment recipes
 status: current
-version: 13
+version: 14
 updated: 2026-11-06
 ---
 
@@ -44,20 +44,20 @@ are independent of each other):
    PocketBase's `/api/oauth2-redirect`. Each app issues its client id and secret.
 5. **`pocketbase` variables, all before its first boot.**
 
-   | variable | what it does | value comes from |
-   | --- | --- | --- |
-   | `PB_SUPERUSER_EMAIL`, `PB_SUPERUSER_PASSWORD` | the image creates this superuser on boot (`Dockerfile` CMD, `create` only) | owner's choice; the address must receive mail (login is MFA by emailed code), and until a Resend domain is verified only the Resend account owner's inbox does |
-   | `RESEND_API_KEY` | turns on real mail through Resend's SMTP bridge (`pb_hooks/mail.pb.js`) | Resend dashboard (step 3) |
-   | `MAIL_SENDER_ADDRESS` | the From address | an address on the Resend-verified domain; unset, Resend's sandbox sender |
-   | `PB_PUBLIC_URL` | the link base in verification and password-reset emails, which open PocketBase's own confirmation pages | `https://<pocketbase domain>` (step 1) |
-   | `PB_CORS_ORIGINS` | the CORS allowlist `serve` gets as `--origins` (`Dockerfile`) | the client app's origin; unset, `*` |
-   | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | enable GitHub sign-in (`pb_hooks/oauth.pb.js`); both or neither | GitHub OAuth app (step 4) |
-   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | enable Google sign-in (`pb_hooks/oauth.pb.js`); both or neither; a missing pair leaves that provider off, logged once at boot | Google OAuth client (step 4) |
-   | `APP_ADMIN_EMAILS` | comma-separated accounts, besides the superuser, allowed to approve new signups (`pb_hooks/routes.pb.js`) | owner's choice |
-   | `ALERT_EMAIL` | recipient of the error-rate alert mail (`pb_hooks/alerts.pb.js`); needs `RESEND_API_KEY` | owner's choice |
-   | `PB_BACKUPS_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY`, `_SECRET` | send backups to S3 (`pb_hooks/backups.pb.js`); bucket and secret both, or local backups on the volume | `pb-backups` credentials (step 2) |
-   | `PB_BACKUPS_CRON`, `PB_BACKUPS_CRON_MAX_KEEP` | backup schedule and how many to keep; an invalid schedule refuses boot | owner's choice; unset, daily 03:00 UTC and 30, but only while S3 backups are on (without them there is no backup cron) |
-   | `PB_FILES_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY`, `_SECRET` | store uploaded files in S3 (`pb_hooks/files.pb.js`); bucket and secret both, or files on the volume | `pb-files` credentials (step 2) |
+   | variable                                                                 | what it does                                                                                                                  | value comes from                                                                                                                                               |
+   | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `PB_SUPERUSER_EMAIL`, `PB_SUPERUSER_PASSWORD`                            | the image creates this superuser on boot (`Dockerfile` CMD, `create` only)                                                    | owner's choice; the address must receive mail (login is MFA by emailed code), and until a Resend domain is verified only the Resend account owner's inbox does |
+   | `RESEND_API_KEY`                                                         | turns on real mail through Resend's SMTP bridge (`pb_hooks/mail.pb.js`)                                                       | Resend dashboard (step 3)                                                                                                                                      |
+   | `MAIL_SENDER_ADDRESS`                                                    | the From address                                                                                                              | an address on the Resend-verified domain; unset, Resend's sandbox sender                                                                                       |
+   | `PB_PUBLIC_URL`                                                          | the link base in verification and password-reset emails, which open PocketBase's own confirmation pages                       | `https://<pocketbase domain>` (step 1)                                                                                                                         |
+   | `PB_CORS_ORIGINS`                                                        | the CORS allowlist `serve` gets as `--origins` (`Dockerfile`)                                                                 | the client app's origin; unset, `*`                                                                                                                            |
+   | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`                               | enable GitHub sign-in (`pb_hooks/oauth.pb.js`); both or neither                                                               | GitHub OAuth app (step 4)                                                                                                                                      |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                               | enable Google sign-in (`pb_hooks/oauth.pb.js`); both or neither; a missing pair leaves that provider off, logged once at boot | Google OAuth client (step 4)                                                                                                                                   |
+   | `APP_ADMIN_EMAILS`                                                       | comma-separated accounts, besides the superuser, allowed to approve new signups (`pb_hooks/routes.pb.js`)                     | owner's choice                                                                                                                                                 |
+   | `ALERT_EMAIL`                                                            | recipient of the error-rate alert mail (`pb_hooks/alerts.pb.js`); needs `RESEND_API_KEY`                                      | owner's choice                                                                                                                                                 |
+   | `PB_BACKUPS_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY`, `_SECRET` | send backups to S3 (`pb_hooks/backups.pb.js`); bucket and secret both, or local backups on the volume                         | `pb-backups` credentials (step 2)                                                                                                                              |
+   | `PB_BACKUPS_CRON`, `PB_BACKUPS_CRON_MAX_KEEP`                            | backup schedule and how many to keep; an invalid schedule refuses boot                                                        | owner's choice; unset, daily 03:00 UTC and 30, but only while S3 backups are on (without them there is no backup cron)                                         |
+   | `PB_FILES_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY`, `_SECRET`   | store uploaded files in S3 (`pb_hooks/files.pb.js`); bucket and secret both, or files on the volume                           | `pb-files` credentials (step 2)                                                                                                                                |
 
    What a missing one costs on the first boot: no superuser means no dashboard login (PocketBase's
    one-time installer link is unchecked behind Railway) until the variables are set and `pocketbase` redeploys (or `deploy/railway/set_railway_superuser.sh create`
@@ -65,6 +65,7 @@ are independent of each other):
    `PB_FILES_S3_*` means uploads land on the volume and are not moved to S3 when it is switched on
    later (`pb_hooks/files.pb.js` only repoints the storage setting).
    Every other variable is re-read on each boot, so setting it later and redeploying is enough.
+
 6. **Deploy-failure alert.** Re-create the notification rule in
    "When a pocketbase deploy fails" below; it is not in the IaC.
 7. **Verify.** The healthcheck is green, the superuser logs into `/_/` with its emailed code, and
@@ -94,9 +95,10 @@ migration, writes no superuser, never binds, and records neither planted migrati
          channelConfigs: [{type: "email"}, {type: "inapp"}], ephemeralEnvironments: false})
 
    Read it back with `notificationRules(workspaceId: "<workspace id>", projectId: "<project id>")
-   { eventTypes channels { config } ephemeralEnvironments }`. Auth is the CLI's OAuth token
+{ eventTypes channels { config } ephemeralEnvironments }`. Auth is the CLI's OAuth token
    (`user.accessToken` in `~/.railway/config.json`; `user.token` is refused) plus a `User-Agent`
    header. Email delivery confirmed by the owner: a fire test's failed deploy mailed the owner's inbox.
+
 2. **Confirm.** `railway deployment list --service pocketbase --environment production` shows the
    newest row FAILED; its log carries `failed to apply migration <file>` and
    `FATAL: PocketBase refused to start`.
@@ -129,7 +131,7 @@ migration, writes no superuser, never binds, and records neither planted migrati
   four green jobs there while `filter=all` shows `suite-battery` attempt 1 `failure`. Decide
   deliberately whether that is acceptable; it is invisible otherwise.
 - **Assert per-JOB conclusions, never the run's top-level `conclusion`.** A run whose required
-  job was *skipped* can still present as green at run level.
+  job was _skipped_ can still present as green at run level.
 - **Verify branch protection by what APPLIES, not by reading the ruleset.** A ruleset that both
   INCLUDES `~DEFAULT_BRANCH` and EXCLUDES `refs/heads/main` protects NOTHING, because main is
   the default branch — yet the ruleset page still reads as active.
@@ -152,6 +154,7 @@ migration, writes no superuser, never binds, and records neither planted migrati
 
   Any `big | grep -q`, `big | head`, `big | first-match-and-exit` under `pipefail` is the same
   bug. Reach for a here-string, `case`, or `[[ =~ ]]`.
+
 - **`git diff --name-only` QUOTES a path** containing non-ASCII, a double quote, a backslash or
   a tab — the leading `"` then defeats any `^` anchor. `core.quotePath=false` fixes only the
   non-ASCII third; the other three stay quoted. `--name-only -z` (plus `tr '\0' '\n'`) is the
@@ -170,7 +173,7 @@ migration, writes no superuser, never binds, and records neither planted migrati
   re-run green looks unblemished. `filter=all` shows the truth. `filter` also silently defaults
   to `latest`, and a typo'd value is ignored rather than rejected.
 - **The `compare` endpoint caps `files` at 300 and `--paginate` cannot lift it** — pagination
-  pages over *commits*; page 2 carries no `files` key at all and gh aborts with
+  pages over _commits_; page 2 carries no `files` key at all and gh aborts with
   `cannot iterate over: null`. The array is path-ordered, so late-alphabet directories are the
   ones truncation drops.
 - **A ruleset that INCLUDES `~DEFAULT_BRANCH` and EXCLUDES `refs/heads/main` protects nothing.**
@@ -194,13 +197,13 @@ migration, writes no superuser, never binds, and records neither planted migrati
   - `serviceInstanceDeployV2(commitSha, environmentId, serviceId)` — deploys an EXACT commit;
     the only form that cannot race a moving `main`.
   - `environmentTriggersDeploy(input: {projectId, environmentId, serviceId})` — deploys the
-    trigger branch's current TIP. Deploys *through* the trigger, so deleting the deployment
+    trigger branch's current TIP. Deploys _through_ the trigger, so deleting the deployment
     trigger destroys this escape hatch.
   - `serviceInstanceAutoDeployUpdate(input: {enabled, projectId, environmentId, serviceId})` —
     the switch that turns push auto-deploy off. Neither `deploymentTriggerUpdate` (only
     `branch`/`checkSuites`/`repository`/`rootDirectory`) nor `serviceInstanceUpdate` can do it.
-  Scalar service config (`healthcheckPath`, `healthcheckTimeout`, `watchPatterns`,
-  `rootDirectory`, `dockerfilePath`) is `serviceInstanceUpdate`.
+    Scalar service config (`healthcheckPath`, `healthcheckTimeout`, `watchPatterns`,
+    `rootDirectory`, `dockerfilePath`) is `serviceInstanceUpdate`.
 - **A volume "id" is a GROUP id shared across environments**; the per-env `volumeInstances` are
   distinct. The CLI and variables views show the same id for both and look like staging is
   sitting on prod's data when it isn't — confirm via `project.volumes.volumeInstances`.
@@ -224,6 +227,25 @@ migration, writes no superuser, never binds, and records neither planted migrati
 - `createBackup` needs ≥2× `pb_data` free and a restore needs ≥2× the archive; `cronMaxKeep`
   bounds the BUCKET, not the volume. Let PB autogenerate backup names and space creates out — an
   explicit name, or a second create in the same second, can 400 on a collision.
+
+## Replaying production data against the migration set
+
+`.github/workflows/backup-replay.yml` (manual `workflow_dispatch` plus weekly, Monday 06:17 UTC) downloads
+the newest zip from the `pb-backups` bucket and runs `scripts/replay_backup.sh`: unzip into a scratch
+`pb_data`, then the Dockerfile's `migrate up` preflight with the repo's `pb_migrations` and `pb_hooks`.
+A refusal fails the run and prints the migration. It is the earlier catch for a migration that replays on an
+empty database but is refused by production data (accepted risk in
+decision:refused-migration-fails-the-deploy); it does not gate a deploy.
+
+- **Repository secrets the owner must set** (same names as the Railway variables; values from
+  `railway bucket credentials --bucket pb-backups --json`): `PB_BACKUPS_S3_BUCKET`,
+  `PB_BACKUPS_S3_ENDPOINT`, `PB_BACKUPS_S3_REGION`, `PB_BACKUPS_S3_ACCESS_KEY`, `PB_BACKUPS_S3_SECRET`.
+  Without them the run fails before any download, naming the missing variable. Rotating the bucket keys
+  (`--reset`) means updating these too.
+- **Zip layout (measured, PB 0.40.4):** `data.db`, `auxiliary.db` and `types.d.ts` at the zip root, no
+  wrapping directory (measured on a room with no uploaded files).
+- **Local run, no network:** `bash scripts/replay_backup.sh --zip PATH [--migrations-dir DIR]`.
+- **Not exercised against the real bucket**; the download path was proven only up to key selection on a sample listing.
 
 ## PocketBase in production
 

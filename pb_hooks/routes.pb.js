@@ -355,12 +355,16 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/trash", (e) => {
       params,
     );
   } catch (err) {
-    // Validated above, so what PB refuses here is an unknown column the caller named.
-    if (filter || q.get("sort"))
+    // A rethrown Go error answers 400 (blames the caller), so any other failure is thrown as a 500.
+    const text = String(err);
+    if (filter && text.indexOf("invalid filter expression") !== -1)
       throw new BadRequestError(
-        "filter or sort names something project_items does not have",
+        "filter names a field the items do not have, or is not a valid filter",
       );
-    throw err;
+    if (q.get("sort") && text.indexOf("invalid sort field") !== -1)
+      throw new BadRequestError("sort names a field the items do not have");
+    e.app.logger().error("GET /api/tracker/trash read failed", "error", text);
+    throw new InternalServerError("The trashed items could not be read.");
   }
 
   if (group) {
