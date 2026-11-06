@@ -21,7 +21,10 @@ const FIELDS = [
   "responses",
   "denies",
   "docs",
+  "query",
 ];
+const QUERY_TYPES = ["string", "integer", "boolean"];
+const QUERY_KEYS = ["type", "description", "required", "enum"];
 
 // shortcut: a `//` inside a string literal is treated as a comment unless it follows `:`, upgrade if a hook ever needs one.
 // A block comment keeps its newlines so the line numbers reported below stay right.
@@ -35,6 +38,19 @@ const one_line = (s: unknown): boolean =>
   typeof s === "string" && s.trim() !== "" && !/[\r\n]/u.test(s);
 const is_obj = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
+const response_ok = (v: unknown): boolean =>
+  one_line(v) ||
+  (is_obj(v) &&
+    Object.keys(v).every((k) => k === "text" || k === "schema") &&
+    one_line(v.text) &&
+    is_obj(v.schema));
+const query_ok = (v: unknown): boolean =>
+  is_obj(v) &&
+  Object.keys(v).every((k) => QUERY_KEYS.includes(k)) &&
+  QUERY_TYPES.includes(v.type as string) &&
+  one_line(v.description) &&
+  (!("required" in v) || v.required === true) &&
+  (!("enum" in v) || (Array.isArray(v.enum) && v.enum.length > 0));
 
 function malformed(key: string, e: any): string[] {
   const bad: string[] = [];
@@ -54,10 +70,16 @@ function malformed(key: string, e: any): string[] {
     "responses" in e &&
     !(
       is_obj(e.responses) &&
-      Object.entries(e.responses).every(([k, v]) => /^[1-5]\d\d$/u.test(k) && one_line(v))
+      Object.entries(e.responses).every(([k, v]) => /^[1-5]\d\d$/u.test(k) && response_ok(v))
     )
   )
-    bad.push("responses, if present, must map 3-digit status strings to one non-empty line each");
+    bad.push(
+      "responses, if present, must map 3-digit status strings to one non-empty line each, or to { text: <one line>, schema: <object> }",
+    );
+  if ("query" in e && !(is_obj(e.query) && Object.values(e.query).every(query_ok)))
+    bad.push(
+      "query, if present, must map each name to { type: string|integer|boolean, description: <one line>, required?: true, enum?: [...] }",
+    );
   if ("denies" in e && !(JSON.stringify(e.denies) === '["superuser"]' && e.auth === "any"))
     bad.push('denies, if present, must be ["superuser"] on an auth "any" entry');
   if ("docs" in e && !(typeof e.docs === "string" && /^route:[a-z0-9-]+$/u.test(e.docs)))

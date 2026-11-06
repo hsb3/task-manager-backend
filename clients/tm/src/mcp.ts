@@ -20,10 +20,17 @@ const KIND = {
 };
 const FIELDS = {
   type: "object",
-  additionalProperties: { type: "string" },
+  additionalProperties: { type: ["string", "number", "boolean"] },
   description:
-    'Other text fields of the item by their API names, e.g. {"description": "...", "status": "..."}. The server validates them.',
+    'Other fields of the item by their API names, e.g. {"description": "...", "draft": true}. A yes/no field takes true or false and a number field a number; the text "true" or "7" is read the same way. The server validates them.',
 };
+// Compile-checked against the search answer's type, so the description cannot name a renamed field.
+const HIT_FIELDS = [
+  "id",
+  "kind",
+  "title",
+  "project",
+] as const satisfies readonly (keyof verbs.Found["results"][number])[];
 const PROJECT = { type: "string", description: "A project id." };
 const WORKSPACE = { type: "string", description: "A workspace id." };
 
@@ -34,14 +41,23 @@ export const TOOLS: ToolDef[] = [
   {
     name: "tm_list",
     description:
-      "List the items the key can see, newest change first. Optionally narrow to one project, one workspace or one kind. Returns an array of items, each the full record (id, kind, key, title, status and the rest); pass an id to tm_show, tm_edit or tm_comment.",
+      "List the items the key can see, newest change first, a page at a time. Optionally narrow to one project, one workspace or one kind. Returns an array of items, each the full record (id, kind, key, title, status and the rest); pass an id to tm_show, tm_edit or tm_comment.",
     inputSchema: {
       type: "object",
       properties: {
         project: PROJECT,
         workspace: WORKSPACE,
         kind: KIND,
-        limit: { type: "integer", minimum: 1, description: "How many to return (default 50)." },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          description: "How many to return per page (default 50).",
+        },
+        page: {
+          type: "integer",
+          minimum: 1,
+          description: "Which page of `limit` items to return (default 1).",
+        },
       },
     },
     annotations: { readOnlyHint: true },
@@ -56,15 +72,14 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: "tm_search",
-    description:
-      "Full-text search across the items the key can see. Returns matches with id, collection, title and project; the count and whether the list was cut short.",
+    description: `Full-text search across the items the key can see. Returns matches with ${HIT_FIELDS.join(", ")} (kind is task, document, decision, milestone or project); the count and whether the list was cut short.`,
     inputSchema: {
       type: "object",
       properties: { query: { type: "string", description: "Words to search for." } },
       required: ["query"],
     },
     annotations: { readOnlyHint: true },
-    run: (cfg, a) => verbs.search(cfg, a.query),
+    run: (cfg, a: { query: string }) => verbs.search(cfg, a.query),
   },
   {
     name: "tm_create",
@@ -87,7 +102,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "tm_edit",
     description:
-      "Change an item's title and/or other text fields by its id. Needs the id and at least one change, and a write key. Returns the item as it now is.",
+      "Change an item's title and/or other fields by its id. Needs the id and at least one change, and a write key. Returns the item as it now is.",
     inputSchema: {
       type: "object",
       properties: {
@@ -140,12 +155,7 @@ export async function call(
       const details = Object.keys(e.body.data).length ? `\n${JSON.stringify(e.body, null, 2)}` : "";
       return text(e.body.message + details, true);
     }
-    // The verbs word their refusals for the command line; the tools take the same names as inputs.
-    if (e instanceof UsageError)
-      return text(
-        e.message.replace("--set field=value", "fields").replace(/--(\w+)\b/g, "$1"),
-        true,
-      );
+    if (e instanceof UsageError) return text(e.message, true);
     throw e;
   }
 }

@@ -507,6 +507,7 @@ run_suite "test_owner_defaults"     bun tests/test_owner_defaults.ts
 run_suite "test_api_keys"           bun tests/test_api_keys.ts
 run_suite "test_tm_cli"             bun tests/test_tm_cli.ts
 run_suite "test_tm_mcp"             bun tests/test_tm_mcp.ts
+run_suite "test_tm_client_gen"      bun tests/test_tm_client_gen.ts
 run_suite "test_path_scope"         bun tests/test_path_scope.ts
 run_suite "test_search"             bun tests/test_search.ts
 run_suite "test_export"             bun tests/test_export.ts
@@ -670,6 +671,7 @@ run_suite "test_historical_migration_guard" bun tests/test_historical_migration_
 run_suite "test_keep_in_sync_checker" bun tests/test_keep_in_sync_checker.ts
 run_suite "test_route_registry_checker" bun tests/test_route_registry_checker.ts
 run_suite "test_openapi_routes" bun tests/test_openapi_routes.ts
+run_suite "test_route_errors" bun tests/test_route_errors.ts
 run_suite "test_py_helpers" bun tests/test_py_helpers.ts
 run_suite "test_argparse" bun tests/test_argparse.ts
 run_suite "test_ts_source" bun tests/test_ts_source.ts

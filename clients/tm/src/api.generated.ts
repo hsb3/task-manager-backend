@@ -953,29 +953,527 @@ export const COLLECTIONS = [
 ] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
-export const ROUTES = {
-  "/api/health": ["GET"],
-  "/api/tracker/admin/pending-users": ["GET"],
-  "/api/tracker/admin/pending-users/{id}/approve": ["POST"],
-  "/api/tracker/cycles/rollover": ["POST"],
-  "/api/tracker/export": ["POST"],
-  "/api/tracker/inspire": ["GET"],
-  "/api/tracker/invitations/mine": ["GET"],
-  "/api/tracker/invitations/{id}/accept": ["POST"],
-  "/api/tracker/invitations/{id}/decline": ["POST"],
-  "/api/tracker/me": ["GET"],
-  "/api/tracker/me/landing": ["GET"],
-  "/api/tracker/notifications/read-all": ["POST"],
-  "/api/tracker/project-items/counts": ["GET"],
-  "/api/tracker/search": ["GET"],
-  "/api/tracker/summary": ["GET"],
-  "/api/tracker/trash": ["GET"],
-  "/api/tracker/trash/purge": ["POST"],
-  "/api/tracker/users/{id}/settings": ["GET", "PATCH"],
-  "/api/tracker/workspaces/trash": ["GET"],
-  "/api/tracker/workspaces/{id}/deletion-impact": ["GET"],
-  "/api/tracker/workspaces/{id}/resolve-member-email": ["POST"],
-  "/api/tracker/workspaces/{id}/switch": ["GET"],
-  "/api/tracker/workspaces/{id}/transfer-ownership": ["POST"],
-  "/api/tracker/workspaces/{id}/vocab": ["POST"],
+export interface Paths {
+  "GET /api/health": { response: { code?: number; data?: unknown; message?: string } };
+  "GET /api/tracker/admin/pending-users": {
+    response: {
+      count: number;
+      users: {
+        approved: boolean;
+        created: string;
+        email: string;
+        id: string;
+        name: string;
+        verified: boolean;
+      }[];
+    };
+  };
+  "POST /api/tracker/admin/pending-users/{id}/approve": {
+    path: { id: string };
+    response: { approved: boolean; id: string };
+  };
+  "POST /api/tracker/cycles/rollover": { response: { rolled: number } };
+  "POST /api/tracker/export": {
+    body: { collections?: unknown; projects?: unknown; workspace: string };
+    response: {
+      data: Record<string, unknown>;
+      exported_at: string;
+      format_version: number;
+      scope: { collections: string[]; projects: string[] };
+      workspace: string;
+    };
+  };
+  "GET /api/tracker/inspire": { response: { author: string; quote: string; source: string } };
+  "GET /api/tracker/invitations/mine": {
+    response: {
+      items: {
+        created: string;
+        expired: boolean;
+        expires_at: string;
+        id: string;
+        role: string;
+        workspace: string;
+        workspace_name: string;
+      }[];
+    };
+  };
+  "POST /api/tracker/invitations/{id}/accept": {
+    path: { id: string };
+    response: { membership: unknown; role: string; status: string; workspace: string };
+  };
+  "POST /api/tracker/invitations/{id}/decline": {
+    path: { id: string };
+    response: { declined: boolean };
+  };
+  "GET /api/tracker/me": {
+    response: {
+      unread_notifications: number;
+      user: { id: string; name: string };
+      workspaces: {
+        capabilities: Record<string, unknown>;
+        counts: unknown;
+        id: string;
+        name: unknown;
+        role: string;
+        status: string;
+      }[];
+    };
+  };
+  "GET /api/tracker/me/landing": { response: { landing: unknown } };
+  "POST /api/tracker/notifications/read-all": {
+    query?: { workspace?: string };
+    response: { updated: number };
+  };
+  "GET /api/tracker/project-items/counts": {
+    query: {
+      filter?: string;
+      group: "project" | "status" | "priority" | "assignee" | "label" | "type";
+    };
+    response: { items: { count: number; key: unknown }[]; total: number };
+  };
+  "GET /api/tracker/search": {
+    query?: { q?: string; workspace?: string };
+    response: {
+      count: number;
+      query: string;
+      results: { collection: string; id: string; project: string; rank: number; title: string }[];
+      truncated: boolean;
+    };
+  };
+  "GET /api/tracker/summary": {
+    response: {
+      assignedToMe: number;
+      byStatus: Record<string, unknown>;
+      total: number;
+      user: string;
+    };
+  };
+  "GET /api/tracker/trash": {
+    query: {
+      filter?: string;
+      group?: "project" | "status" | "priority" | "assignee" | "label" | "type";
+      page?: number;
+      perPage?: number;
+      sort?: string;
+      time_zone?: string;
+      workspace: string;
+    };
+    response: unknown;
+  };
+  "POST /api/tracker/trash/purge": { response: { purged: number } };
+  "GET /api/tracker/users/{id}/settings": {
+    path: { id: string };
+    response: {
+      default_project: string;
+      default_view: string;
+      display_name: string;
+      font: string;
+      font_size: number;
+      theme: string;
+      time_zone: string;
+    };
+  };
+  "PATCH /api/tracker/users/{id}/settings": {
+    path: { id: string };
+    body: {
+      default_project?: string;
+      default_view?: string;
+      display_name?: string;
+      font?: "system" | "sans" | "mono";
+      font_size?: number;
+      theme?: "light" | "dark" | "system";
+      time_zone?: string;
+    };
+    response: {
+      default_project: string;
+      default_view: string;
+      display_name: string;
+      font: string;
+      font_size: number;
+      theme: string;
+      time_zone: string;
+    };
+  };
+  "GET /api/tracker/workspaces/trash": {
+    response: { count: number; items: WorkspacesRecord[]; truncated: boolean };
+  };
+  "GET /api/tracker/workspaces/{id}/deletion-impact": {
+    path: { id: string };
+    response: {
+      items: number;
+      members: number;
+      projects: number;
+      saved_views: number;
+      trashed_items: number;
+    };
+  };
+  "POST /api/tracker/workspaces/{id}/resolve-member-email": {
+    path: { id: string };
+    body: { email: string; role?: "admin" | "member" | "viewer" };
+    response: { invited: boolean; mail_sent: boolean };
+  };
+  "GET /api/tracker/workspaces/{id}/switch": {
+    path: { id: string };
+    response: {
+      allowed: boolean;
+      invitation: unknown;
+      reason: "not_found" | "suspended" | null;
+      workspace: string;
+    };
+  };
+  "POST /api/tracker/workspaces/{id}/transfer-ownership": {
+    path: { id: string };
+    body: { current_owner?: string; user: string };
+    response: { ok: boolean };
+  };
+  "POST /api/tracker/workspaces/{id}/vocab": {
+    path: { id: string };
+    body?: {
+      default_project?: string;
+      labels?: { id?: string; name: string }[];
+      name?: string;
+      priorities?: { id?: string; name: string }[];
+      statuses?: { id?: string; name: string; off_pipeline?: boolean; terminal?: boolean }[];
+    };
+    response: WorkspacesRecord;
+  };
+}
+
+export const FIELD_TYPES = {
+  api_keys: {
+    created: "string",
+    expires: "string",
+    id: "string",
+    key_hash: "string",
+    name: "string",
+    revoked: "boolean",
+    scope: "string",
+    updated: "string",
+    user: "string",
+  },
+  app_docs: {
+    body: "string",
+    created: "string",
+    id: "string",
+    refName: "string",
+    slug: "string",
+    title: "string",
+    updated: "string",
+  },
+  app_settings: {
+    created: "string",
+    id: "string",
+    key: "string",
+    updated: "string",
+    value: "unknown",
+  },
+  comments: {
+    author: "string",
+    body: "string",
+    created: "string",
+    decision: "string",
+    document: "string",
+    edited: "boolean",
+    id: "string",
+    parent: "string",
+    reactions: "unknown",
+    task: "string",
+    updated: "string",
+  },
+  cycles: {
+    created: "string",
+    ends_on: "string",
+    id: "string",
+    name: "string",
+    starts_on: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  decisions: {
+    attachments: "array",
+    author: "string",
+    consequences: "string",
+    context: "string",
+    created: "string",
+    decision: "string",
+    draft: "boolean",
+    id: "string",
+    key: "string",
+    project: "string",
+    status: "string",
+    title: "string",
+    trashed: "string",
+    trashed_by: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  documents: {
+    attachments: "array",
+    author: "string",
+    body: "string",
+    created: "string",
+    draft: "boolean",
+    id: "string",
+    key: "string",
+    project: "string",
+    title: "string",
+    trashed: "string",
+    trashed_by: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  invitation_events: {
+    created: "string",
+    email_key: "string",
+    id: "string",
+    inviter: "string",
+    kind: "string",
+    workspace: "string",
+  },
+  labels: {
+    color: "string",
+    core: "boolean",
+    created: "string",
+    description: "string",
+    id: "string",
+    name: "string",
+    project: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  milestones: {
+    attachments: "array",
+    author: "string",
+    created: "string",
+    description: "string",
+    draft: "boolean",
+    id: "string",
+    key: "string",
+    name: "string",
+    project: "string",
+    target: "string",
+    trashed: "string",
+    trashed_by: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  notifications: {
+    actor: "string",
+    comment: "string",
+    comment_preview: "string",
+    created: "string",
+    decision: "string",
+    dismissed: "boolean",
+    document: "string",
+    id: "string",
+    kind: "string",
+    read: "boolean",
+    read_at: "string",
+    snoozed_until: "string",
+    status_label: "string",
+    task: "string",
+    updated: "string",
+    user: "string",
+    workspace: "string",
+  },
+  project_items: {
+    active_admins: "string",
+    active_members: "string",
+    assignee: "string",
+    author: "string",
+    comment_count: "number",
+    created: "string",
+    cycle: "string",
+    dependencies: "string",
+    draft: "boolean",
+    due: "string",
+    has_due: "number",
+    has_priority: "number",
+    id: "string",
+    key: "string",
+    labels: "string",
+    milestone: "string",
+    open: "boolean",
+    ordinal: "number",
+    parent: "string",
+    priority: "string",
+    priority_rank: "number",
+    project: "string",
+    project_trashed: "number",
+    status: "string",
+    status_off_pipeline: "boolean",
+    status_terminal: "boolean",
+    title: "string",
+    trashed: "string",
+    type: "string",
+    updated: "string",
+    workspace: "string",
+    workspace_owner: "string",
+    workspace_trashed: "number",
+  },
+  project_stats: {
+    backlog: "unknown",
+    canceled: "unknown",
+    completed: "unknown",
+    id: "string",
+    name: "string",
+    owner: "string",
+    started: "unknown",
+    total: "number",
+    triage: "unknown",
+    unstarted: "unknown",
+    workspace: "string",
+  },
+  projects: {
+    created: "string",
+    description: "string",
+    id: "string",
+    item_seq: "number",
+    key: "string",
+    name: "string",
+    owner: "string",
+    shadow: "boolean",
+    trashed: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  saved_views: {
+    columns: "unknown",
+    created: "string",
+    density: "string",
+    description: "string",
+    filterData: "unknown",
+    group_by: "string",
+    id: "string",
+    mode: "string",
+    name: "string",
+    owner: "string",
+    position: "number",
+    project: "string",
+    scope: "string",
+    sort: "unknown",
+    updated: "string",
+    workspace: "string",
+  },
+  statuses: {
+    category: "string",
+    color: "string",
+    created: "string",
+    id: "string",
+    is_default: "boolean",
+    name: "string",
+    position: "number",
+    updated: "string",
+    workspace: "string",
+  },
+  task_activity: {
+    actor: "string",
+    created: "string",
+    field: "string",
+    from: "string",
+    id: "string",
+    operator: "string",
+    task: "string",
+    to: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  task_subscribers: {
+    created: "string",
+    id: "string",
+    task: "string",
+    updated: "string",
+    user: "string",
+  },
+  tasks: {
+    acceptanceCriteria: "unknown",
+    assignee: "string",
+    attachments: "array",
+    author: "string",
+    completedAt: "string",
+    created: "string",
+    cycle: "string",
+    dependencies: "array",
+    description: "string",
+    due: "string",
+    id: "string",
+    key: "string",
+    labels: "array",
+    milestone: "string",
+    ordinal: "number",
+    parent: "string",
+    priority: "string",
+    project: "string",
+    status: "string",
+    title: "string",
+    trashed: "string",
+    trashed_by: "string",
+    type: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  templates: {
+    created: "string",
+    id: "string",
+    name: "string",
+    project: "string",
+    templateData: "unknown",
+    type: "string",
+    updated: "string",
+    workspace: "string",
+  },
+  user_settings: {
+    created: "string",
+    default_project: "string",
+    default_view: "string",
+    font: "string",
+    font_size: "number",
+    id: "string",
+    theme: "string",
+    time_zone: "string",
+    updated: "string",
+    user: "string",
+  },
+  users: {
+    approved: "boolean",
+    avatar: "string",
+    created: "string",
+    email: "string",
+    emailVisibility: "boolean",
+    email_key: "string",
+    id: "string",
+    name: "string",
+    password: "string",
+    tokenKey: "string",
+    updated: "string",
+    verified: "boolean",
+  },
+  workspace_invitations: {
+    created: "string",
+    email: "string",
+    email_key: "string",
+    id: "string",
+    invited_by: "string",
+    role: "string",
+    workspace: "string",
+  },
+  workspace_members: {
+    created: "string",
+    id: "string",
+    role: "string",
+    status: "string",
+    updated: "string",
+    user: "string",
+    workspace: "string",
+  },
+  workspaces: {
+    created: "string",
+    default_project: "string",
+    id: "string",
+    name: "string",
+    owner: "string",
+    priorities: "unknown",
+    trashed: "string",
+    updated: "string",
+  },
 } as const;

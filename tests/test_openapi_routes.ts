@@ -63,14 +63,16 @@ const op_of = (key: string): any => {
 };
 const live = Object.entries(ROUTES).filter(([, s]) => s.internal !== true);
 
-// Handler text per registry key: from its `.add("KEY"` site to the next site in the same file.
+// Handler text per registry key: from its `.add("KEY"` site to the call's closing `)` at column 0 (prettier's layout).
 const SITE = /\.add\(\s*"([A-Z]+ \/[^"]+)"/gu;
 const HANDLER: Record<string, string> = {};
 const HOOKS = path.join(REPO_ROOT, "pb_hooks");
 for (const f of fs.readdirSync(HOOKS).filter((f) => f.endsWith(".pb.js"))) {
   const text = read_text(path.join(HOOKS, f));
-  const sites = [...text.matchAll(SITE)];
-  sites.forEach((m, i) => (HANDLER[m[1]!] = text.slice(m.index, sites[i + 1]?.index)));
+  for (const m of text.matchAll(SITE)) {
+    const end = text.slice(m.index).search(/\n\}?\)/u);
+    HANDLER[m[1]!] = text.slice(m.index, end < 0 ? undefined : m.index + end);
+  }
 }
 
 console.log("── POST/PATCH: request body and the statuses the handler returns ──");
@@ -88,14 +90,59 @@ for (const [key, spec] of live) {
 }
 for (const [key, spec] of live) {
   const op = op_of(key);
-  for (const [status, text] of Object.entries((spec.responses ?? {}) as Record<string, string>))
+  for (const [status, v] of Object.entries((spec.responses ?? {}) as Record<string, any>)) {
+    const text: string = typeof v === "string" ? v : v.text;
+    const want = typeof v === "string" ? { $ref: ERROR_REF } : v.schema;
     check(
-      `${key}: ${status} answer with the Error schema and its text in the description`,
-      op?.responses?.[status]?.content?.["application/json"]?.schema?.$ref === ERROR_REF &&
+      `${key}: ${status} answer with its schema (${typeof v === "string" ? "Error" : "its own"}) and its text in the description`,
+      Bun.deepEquals(op?.responses?.[status]?.content?.["application/json"]?.schema, want) &&
         op.responses[status].description === text &&
         (op.description ?? "").includes(text),
     );
+  }
 }
+
+console.log("── query parameters: declared iff the handler reads them, rendered as declared ──");
+const ALIAS = /\b(?:const|let|var)\s+(\w+)\s*=\s*e\.request\.url\.query\(\)/gu;
+function query_reads(text: string): string[] {
+  const aliases = ["query", ...[...text.matchAll(ALIAS)].map((m) => m[1]!)];
+  const READ = new RegExp(
+    `(?:\\.query\\(\\)|\\b(?:${aliases.join("|")}))(?:\\.(?:get|has)\\(\\s*"(\\w+)"\\s*\\)|\\[\\s*"(\\w+)"\\s*\\])`,
+    "gu",
+  );
+  return [...new Set([...text.matchAll(READ)].map((m) => (m[1] ?? m[2])!))].sort();
+}
+for (const [key, spec] of live) {
+  const op = op_of(key);
+  const declared = Object.keys(spec.query ?? {});
+  const reads = query_reads(HANDLER[key] ?? "");
+  check(
+    `${key}: query declared = query the handler reads (${reads.join(", ") || "none"})`,
+    Bun.deepEquals([...declared].sort(), reads),
+  );
+  const rendered = (op?.parameters ?? []).filter((p: any) => p.in === "query");
+  check(
+    `${key}: openapi query parameters are the declared ones, in order, with their types`,
+    Bun.deepEquals(
+      rendered.map((p: any) => [p.name, p.schema?.type, p.schema?.enum, p.required]),
+      Object.entries((spec.query ?? {}) as Record<string, any>).map(([n, q]) => [
+        n,
+        q.type,
+        q.enum,
+        !!q.required,
+      ]),
+    ),
+  );
+}
+
+console.log("── info: the malformed-body answer, as measured ──");
+// Measured on PB 0.40.4 (and provoked live by tests/test_route_errors.ts): body `{`, Content-Type application/json.
+const MALFORMED_BODY =
+  'A route that reads its request body refuses one that is not valid JSON with 400, the message "Something went wrong while processing your request." and empty data; the sign-in, one-time-code and password-reset endpoints word it "An error occurred while loading the submitted data."';
+check(
+  "info.description states the malformed-body answer",
+  (SPEC.info?.description ?? "").includes(MALFORMED_BODY),
+);
 
 console.log("── in-handler refusals match measured behaviour ──");
 const SUPERUSER_403 = "a superuser gets 403";
@@ -155,6 +202,48 @@ for (const [p, ops] of Object.entries(PATHS)) {
       !!TAGS.get(name) &&
       TAGS.get(name) !== `\`${name}\` collection endpoints.`,
   );
+}
+
+console.log("── tm client: Paths carries every request body and query parameter ──");
+const CLIENT = read_text(path.join(REPO_ROOT, "clients", "tm", "src", "api.generated.ts"));
+/** Top-level members of the `{ ... }` starting at `at`: name → its type text. */
+function members(text: string, at: number): Map<string, string> {
+  const out = new Map<string, string>();
+  let depth = 0;
+  let start = at + 1;
+  for (let i = at; i < text.length; i++) {
+    const c = text[i];
+    if (c === "{" || c === "(" || c === "[") depth++;
+    else if (c === "}" || c === ")" || c === "]") depth--;
+    if ((depth === 1 && c === ";") || depth === 0) {
+      const m = /^\s*"?([\w$]+)"?\??:\s*([\s\S]*)$/u.exec(text.slice(start, i));
+      if (m) out.set(m[1]!, m[2]!);
+      start = i + 1;
+      if (depth === 0) break;
+    }
+  }
+  return out;
+}
+const PATHS_AT = CLIENT.indexOf("export interface Paths {");
+for (const [p, ops] of Object.entries(PATHS)) {
+  if (!p.startsWith("/api/tracker/") && p !== "/api/health") continue;
+  for (const [m, op] of Object.entries(ops as Record<string, any>)) {
+    const key = `${m.toUpperCase()} ${p}`;
+    const at = PATHS_AT < 0 ? -1 : CLIENT.indexOf(`"${key}": {`, PATHS_AT);
+    const entry = at < 0 ? new Map() : members(CLIENT, CLIENT.indexOf("{", at + key.length + 2));
+    if (op.requestBody) check(`${key}: Paths entry has a body`, entry.has("body"));
+    const names = (op.parameters ?? [])
+      .filter((x: any) => x.in === "query")
+      .map((x: any) => x.name);
+    if (names.length) {
+      const query = entry.get("query") ?? "";
+      const declared = query.startsWith("{") ? [...members(query, 0).keys()] : [];
+      check(
+        `${key}: Paths entry's query names ${names.join(", ")}`,
+        Bun.deepEquals([...declared].sort(), [...names].sort()),
+      );
+    }
+  }
 }
 
 console.log("── whole document ──");

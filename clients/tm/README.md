@@ -6,8 +6,9 @@ so it works as well inside a script or an agent as it does by hand.
 
 ## Set up once
 
-Create an API key in the app (a read key can only read; a write key can also create, edit and
-comment). Then paste it:
+Run `bun install` from the repo root before first use; it installs the MCP SDK the `mcp` verb
+needs. Then create an API key in the app (a read key can only read; a write key can also create,
+edit and comment) and paste it:
 
 ```bash
 bun clients/tm/tm.ts login --url https://your-server.example
@@ -24,6 +25,7 @@ set `TM_URL` and `TM_API_KEY` in the environment instead; they win over the save
 ```bash
 tm list                                  # newest items you can see
 tm list --project <id> --kind task       # one project, one kind
+tm list --limit 20 --page 2              # the second page of 20
 tm show <id>
 tm search "launch checklist"
 tm create "Write the launch checklist" --project <id>
@@ -34,12 +36,13 @@ tm comment <id> "Done, see the attached draft"
 ```
 
 Kinds are `task` (the default), `document`, `decision` and `milestone`. `--set field=value` sets
-any other text field the server accepts for that kind; the server's own validation applies, and
-a yes/no field cannot be set this way yet.
+any other field the server accepts for that kind: a yes/no field takes `true` or `false` (for
+example `--set draft=true`), a number field takes a number, and anything else is any text you
+like. The server's own validation applies.
 
 Add `--json` to any verb to get the server's answer as JSON with the field names the API uses,
-plus a `kind` naming the kind. `list` prints each item's id first; that id is what `show`,
-`edit` and `comment` take.
+plus a `kind` naming the kind (a `search` hit on a project is kind `project`). `list` and
+`search` print each item's id first; that id is what `show`, `edit` and `comment` take.
 
 ## As an MCP server
 

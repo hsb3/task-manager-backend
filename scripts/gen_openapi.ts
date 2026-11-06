@@ -504,7 +504,7 @@ const AUTH: Record<string, string> = {
 };
 
 const ERROR_SHAPE =
-  'Every error body is {"status": <code>, "message": "<reason>", "data": {}}; ' +
+  'Unless an answer documents another body, every error body is {"status": <code>, "message": "<reason>", "data": {}}; ' +
   "a validation error lists the offending fields under data.";
 
 function rate_limit_text(rate: RateRule): string {
@@ -554,7 +554,10 @@ function route_paths(rate: RateRule, docs: Replay["docs"]): [any, number] {
     if (!(spec.auth in AUTH)) throw new Error(`route ${key} has unknown auth ${spec.auth}`);
     const api = p.startsWith("/api/");
     const keys = spec.auth === "superuser" ? "" : KEY_TEXT[key_access(method, p)];
-    const refusals = Object.entries((spec.responses ?? {}) as Record<string, string>);
+    const refusals = Object.entries((spec.responses ?? {}) as Record<string, any>).map(
+      ([s, v]): [string, string, any] =>
+        typeof v === "string" ? [s, v, null] : [s, v.text, v.schema],
+    );
     const lead = spec.docs ? docs.get(spec.docs)?.body : spec.summary;
     if (!lead) throw new Error(`route ${key} names ${spec.docs}, which has no app_docs record`);
     const rest = [
@@ -585,7 +588,10 @@ function route_paths(rate: RateRule, docs: Replay["docs"]): [any, number] {
       responses["403"] = _error_resp("An API key was sent; API keys are refused here.");
     }
     if (api) responses["429"] = _error_resp("Too many requests; wait out the rate-limit window.");
-    for (const [s, text] of refusals) responses[s] = _error_resp(text);
+    for (const [s, text, schema] of refusals)
+      responses[s] = schema
+        ? { description: text, content: { "application/json": { schema } } }
+        : _error_resp(text);
 
     const op: any = {
       tags: [p.startsWith("/api/tracker/") ? "tracker" : "system"],
@@ -599,13 +605,21 @@ function route_paths(rate: RateRule, docs: Replay["docs"]): [any, number] {
         required: !!(spec.request.required?.length || spec.request.minProperties),
         content: { "application/json": { schema: spec.request } },
       };
-    const params = [...p.matchAll(/\{([^}]+)\}/gu)].map((m) => ({
+    const params: any[] = [...p.matchAll(/\{([^}]+)\}/gu)].map((m) => ({
       name: m[1],
       in: "path",
       required: true,
       description: m[1] === "id" ? "Record id." : `The ${m[1]} path segment.`,
       schema: { type: "string" },
     }));
+    for (const [name, q] of Object.entries((spec.query ?? {}) as Record<string, any>))
+      params.push({
+        name,
+        in: "query",
+        required: !!q.required,
+        description: q.description,
+        schema: q.enum ? { type: q.type, enum: q.enum } : { type: q.type },
+      });
     if (params.length) op.parameters = params;
     (paths[p] ??= {})[method.toLowerCase()] = op;
   }
@@ -622,7 +636,9 @@ const INFO_DESCRIPTION =
   "Routes the server calls on itself are left out on purpose. Per-record access is " +
   "governed by each collection's API rules at runtime (not encoded here), " +
   "and relation `expand` is dynamic — the expanded shape depends on the " +
-  "`expand` query parameter and the caller's read access.";
+  "`expand` query parameter and the caller's read access. " +
+  // Measured on PB 0.40.4 with the body `{`.
+  'A route that reads its request body refuses one that is not valid JSON with 400, the message "Something went wrong while processing your request." and empty data; the sign-in, one-time-code and password-reset endpoints word it "An error occurred while loading the submitted data."';
 
 /** Assemble the full OpenAPI document from the replayed DB and the route registry. */
 function build_spec({ cols, docs, rate }: Replay): any {

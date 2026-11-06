@@ -108,6 +108,7 @@
 4	2	test_notification_actor
 1	1	test_app_docs_seed_idempotent
 1	1	test_tm_mcp
+1	1	test_tm_client_gen
 3	1	test_check_pb_pin
 1	1	test_decision_citations_checker
 2	1	test_historical_migration_guard
@@ -118,6 +119,7 @@
 2	1	test_invitation_expiry_list
 2	1	test_me_route
 2	1	test_notifications_suspended
+2	1	test_route_errors
 3	0	test_app_docs_down_up_checker
 3	0	test_app_docs_history_checker
 3	0	test_app_docs_quotes_checker
