@@ -34,7 +34,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "The user who owns the view; leave it empty and the server fills the caller, and naming anyone else at create is refused.",
+      "help": "The user who owns the view; omit it and the server fills the caller, naming anyone else at create is refused, and an update that names a different owner is refused.",
       "hidden": false,
       "id": "relation3070000002",
       "maxSelect": 1,

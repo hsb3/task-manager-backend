@@ -496,6 +496,34 @@ try {
   });
   check("PATCH status -> non-completed status", s, 200);
   check("completedAt cleared after crossing OUT of completed", r.completedAt, "");
+  // decision:server-owned-fields-locked: a sent completedAt is refused unless the status crosses the boundary or a superuser sends it.
+  const ca_url = `/api/collections/tasks/records/${ca_task_id}`;
+  [s] = await api("PATCH", ca_url, alice, { completedAt: "2020-01-01 00:00:00.000Z" });
+  check("PATCH completedAt alone (status stays Todo) → 400", s, 400);
+  [, r] = await api("GET", ca_url, alice);
+  check("completedAt still empty after the refused PATCH", r.completedAt, "");
+  [s, r] = await api("PATCH", ca_url, alice, {
+    status: ALICE_DONE,
+    completedAt: "2020-01-01 00:00:00.000Z",
+  });
+  check("PATCH status INTO completed with a sent completedAt → 200", s, 200);
+  const stamped = r.completedAt;
+  check(
+    "the server stamp replaces the sent completedAt",
+    tup(truthy(stamped), String(stamped).startsWith("2020")),
+    tup(true, false),
+  );
+  [s] = await api("PATCH", ca_url, alice, { completedAt: "2021-01-01 00:00:00.000Z" });
+  check("PATCH completedAt alone while Done → 400", s, 400);
+  [, r] = await api("GET", ca_url, alice);
+  check("completedAt unchanged after the refused PATCH", r.completedAt, stamped);
+  [s, r] = await api("PATCH", ca_url, su, { completedAt: "2020-01-01 00:00:00.000Z" });
+  check("superuser PATCH completedAt alone while Done → 200", s, 200);
+  [, r] = await api("GET", ca_url, alice);
+  check("completedAt stored as the superuser sent it", r.completedAt, "2020-01-01 00:00:00.000Z");
+  [s, r] = await api("PATCH", ca_url, alice, { status: ALICE_TODO, completedAt: "" });
+  check("PATCH status OUT of completed with completedAt '' → 200", s, 200);
+  check("completedAt cleared on the crossing-out PATCH", r.completedAt, "");
   [s] = await api("DELETE", `/api/collections/tasks/records/${ca_task_id}`, alice);
   check("cleanup: completedAt fixture task removed", s, 204);
 

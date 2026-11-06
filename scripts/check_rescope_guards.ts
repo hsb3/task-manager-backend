@@ -116,15 +116,6 @@ export const ALLOWLIST = new Map<string, AllowEntry>([
     },
   ],
   [
-    JSON.stringify(["saved_views", "owner"]),
-    {
-      why:
-        "PBTT-427 ruling (tests/test_rescope_guard.ts ALLOWLIST): the view's creator is a " +
-        "within-workspace attribution, not a tenant-anchor edge — saved_views.workspace is " +
-        "rule-pinned, so a repointed view stays inside its own tenant",
-    },
-  ],
-  [
     JSON.stringify(["tasks", "project"]),
     {
       why:

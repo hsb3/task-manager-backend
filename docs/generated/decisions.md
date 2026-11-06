@@ -602,6 +602,17 @@ Create admits the owner and active non-viewer members, and the `owner` in the bo
 
 Each hit is `{collection, id, title, project, rank}`, where `project` is the project id of an item hit and empty for a project hit.
 
+## server-owned-fields-locked
+
+- **Slug:** `decision:server-owned-fields-locked`
+- **Title:** A field the server owns is refused when a client sends it: the owner of a saved view and the core flag of a label are locked, and completedAt follows the status.
+
+The server owns some fields outright: it fills them, derives them or seeds them, and a client has no legitimate write to them. Three were still writable over the API: the owner of a saved view could be reassigned on update, the core flag of a label could be set at create or cleared on update, and completedAt on a task could be changed by an update that left the status alone.
+
+Prior art is Linear: a label marked as a workspace label cannot be deleted by members, and the completed timestamp of an issue is derived from its status and is never edited directly. The same ruling applies here: a server-owned field a client sends is refused, so the caller learns at once that the write did not happen, instead of reading back a value the server quietly replaced.
+
+Rulings. saved_views.owner: an update that sends a different owner answers as an unknown id does; sending the stored owner back is accepted; a superuser is exempt. labels.core: a create or an update that sends core, true or false, is refused for every caller but a superuser, with 400 at create and the unknown-id answer at update; the core labels stay undeletable (decision:core-labels-undeletable). tasks.completedAt: a value sent at create is still replaced, because the status at create decides it; on update it is refused with 400 unless the same request moves the status into or out of a completed status, and then the server value wins; a superuser is exempt, as with the two rule locks. Each field says so in its help text.
+
 ## shadow-project
 
 - **Slug:** `decision:shadow-project`

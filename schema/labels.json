@@ -99,7 +99,7 @@
       "type": "text"
     },
     {
-      "help": "True for the built-in labels every workspace starts with, which cannot be deleted; leave it unset on a label you create.",
+      "help": "True for the built-in labels every workspace starts with, which cannot be deleted; the server sets it, and a create or an update that sends it is refused.",
       "hidden": false,
       "id": "bool3000000006",
       "name": "core",
