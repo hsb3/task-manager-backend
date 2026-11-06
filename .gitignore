@@ -1,6 +1,9 @@
 # secrets & local config — at any depth. The *.example siblings stay tracked.
-.env
-.env.local
+.env*
+!.env*.example
+
+# owner's scratchpad, never committed
+NOTES.md
 
 # PocketBase binary + data (rebuild from pb_migrations/ + scripts/seed.ts, don't inherit a DB)
 /pocketbase
