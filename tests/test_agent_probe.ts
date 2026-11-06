@@ -247,10 +247,12 @@ try {
     ["Probe zephyr task v3"],
   ]);
   check("labels ~ label id", await items(`labels ~ '${LABEL}'`), [200, ["Probe zephyr task v3"]]);
-  check("filter by status NAME through the view", await items("status.name = 'In Progress'"), [
-    400,
-    { data: {}, message: "Something went wrong while processing your request.", status: 400 },
-  ]);
+  const [ns, nb] = await items("status.name = 'In Progress'");
+  check(
+    "filter by status NAME through the view names the field",
+    [ns, nb?.data?.status?.code],
+    [400, "not_expressible"],
+  );
 
   console.log("\n── comment, search ──");
   [s, r] = await api("POST", "/api/collections/comments/records", bob, {

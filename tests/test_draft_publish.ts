@@ -22,8 +22,8 @@
  * tiers on the view and collection surfaces; this suite is the author and owner positives, the
  * invited and stranger negatives, the base-collection and trash surfaces, and §6.
  *
- * §6 the one-way guard (pb_hooks/author.pb.js): create-as-draft, draft->draft and
- * draft->published are allowed; published->draft is refused 400 for the author, the owner and
+ * §6 the one-way guard (pb_hooks/author.pb.js): create-as-draft and draft->published are
+ * allowed; draft->draft and published->draft are refused 400 for the author, the owner and
  * an admin alike, with the refusal read off the WIRE rather than the hook source.
  *
  * Port 8148 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md).
@@ -598,7 +598,11 @@ try {
     [s, kept] = await api("PATCH", `/api/collections/${coll}/records/${rid}`, TOKEN.author!, {
       draft: true,
     });
-    check(`§6 ${coll.padEnd(11)} draft → draft → allowed`, tup(s, kept.draft), tup(200, true));
+    check(
+      `§6 ${coll.padEnd(11)} draft → draft → refused (one-way)`,
+      tup(s, kept.message),
+      tup(400, "A published item cannot be returned to draft. Move it to trash instead."),
+    );
     let pub: any;
     [s, pub] = await api("PATCH", `/api/collections/${coll}/records/${rid}`, TOKEN.author!, {
       draft: false,

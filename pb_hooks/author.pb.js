@@ -89,10 +89,42 @@ onRecordUpdateRequest((e) => {
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
   const su = e.auth && e.auth.isSuperuser();
+  // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
+  // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
+  const rq = e.requestEvent.request;
+  const sent = [];
+  const fromJson = (text) => {
+    try {
+      const b = JSON.parse(text);
+      if (b && typeof b === "object" && "draft" in b) sent.push(b.draft);
+    } catch (_) {}
+  };
+  if (String(rq.header.get("content-type")).indexOf("json") >= 0) {
+    fromJson(toString(rq.body));
+  } else {
+    // Every repeat of a field, not only the first: PocketBase applies the later ones too, and
+    // url.Values offers only its first value to the JSVM, so the form is read back encoded.
+    rq.postForm
+      .encode()
+      .split("&")
+      .forEach((pair) => {
+        const at = pair.indexOf("=");
+        if (at < 0) return;
+        const dec = (x) => decodeURIComponent(x.replace(/\+/g, " "));
+        const key = dec(pair.slice(0, at));
+        const val = dec(pair.slice(at + 1));
+        if (key === "@jsonPayload") fromJson(val);
+        else if (key === "draft")
+          sent.push(val === "true" ? true : val === "false" ? false : val);
+      });
+  }
+  if (sent.some((v) => v !== true && v !== false)) {
+    throw new BadRequestError("draft must be true or false");
+  }
   if (
     !su &&
-    !e.record.original().getBool("draft") &&
-    e.record.getBool("draft")
+    (sent.indexOf(true) !== -1 ||
+      (!e.record.original().getBool("draft") && e.record.getBool("draft")))
   ) {
     throw new BadRequestError(
       "A published item cannot be returned to draft. Move it to trash instead.",
@@ -106,10 +138,42 @@ onRecordUpdateRequest((e) => {
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
   const su = e.auth && e.auth.isSuperuser();
+  // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
+  // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
+  const rq = e.requestEvent.request;
+  const sent = [];
+  const fromJson = (text) => {
+    try {
+      const b = JSON.parse(text);
+      if (b && typeof b === "object" && "draft" in b) sent.push(b.draft);
+    } catch (_) {}
+  };
+  if (String(rq.header.get("content-type")).indexOf("json") >= 0) {
+    fromJson(toString(rq.body));
+  } else {
+    // Every repeat of a field, not only the first: PocketBase applies the later ones too, and
+    // url.Values offers only its first value to the JSVM, so the form is read back encoded.
+    rq.postForm
+      .encode()
+      .split("&")
+      .forEach((pair) => {
+        const at = pair.indexOf("=");
+        if (at < 0) return;
+        const dec = (x) => decodeURIComponent(x.replace(/\+/g, " "));
+        const key = dec(pair.slice(0, at));
+        const val = dec(pair.slice(at + 1));
+        if (key === "@jsonPayload") fromJson(val);
+        else if (key === "draft")
+          sent.push(val === "true" ? true : val === "false" ? false : val);
+      });
+  }
+  if (sent.some((v) => v !== true && v !== false)) {
+    throw new BadRequestError("draft must be true or false");
+  }
   if (
     !su &&
-    !e.record.original().getBool("draft") &&
-    e.record.getBool("draft")
+    (sent.indexOf(true) !== -1 ||
+      (!e.record.original().getBool("draft") && e.record.getBool("draft")))
   ) {
     throw new BadRequestError(
       "A published item cannot be returned to draft. Move it to trash instead.",
@@ -123,14 +187,156 @@ onRecordUpdateRequest((e) => {
   // straight at the collection endpoint, and exempts only a superuser: seeding and import are
   // superuser writes, and blocking them would block the fixtures that prove the rest.
   const su = e.auth && e.auth.isSuperuser();
+  // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
+  // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
+  const rq = e.requestEvent.request;
+  const sent = [];
+  const fromJson = (text) => {
+    try {
+      const b = JSON.parse(text);
+      if (b && typeof b === "object" && "draft" in b) sent.push(b.draft);
+    } catch (_) {}
+  };
+  if (String(rq.header.get("content-type")).indexOf("json") >= 0) {
+    fromJson(toString(rq.body));
+  } else {
+    // Every repeat of a field, not only the first: PocketBase applies the later ones too, and
+    // url.Values offers only its first value to the JSVM, so the form is read back encoded.
+    rq.postForm
+      .encode()
+      .split("&")
+      .forEach((pair) => {
+        const at = pair.indexOf("=");
+        if (at < 0) return;
+        const dec = (x) => decodeURIComponent(x.replace(/\+/g, " "));
+        const key = dec(pair.slice(0, at));
+        const val = dec(pair.slice(at + 1));
+        if (key === "@jsonPayload") fromJson(val);
+        else if (key === "draft")
+          sent.push(val === "true" ? true : val === "false" ? false : val);
+      });
+  }
+  if (sent.some((v) => v !== true && v !== false)) {
+    throw new BadRequestError("draft must be true or false");
+  }
   if (
     !su &&
-    !e.record.original().getBool("draft") &&
-    e.record.getBool("draft")
+    (sent.indexOf(true) !== -1 ||
+      (!e.record.original().getBool("draft") && e.record.getBool("draft")))
   ) {
     throw new BadRequestError(
       "A published item cannot be returned to draft. Move it to trash instead.",
     );
+  }
+  e.next();
+}, "milestones");
+
+// draft is a boolean on create: PocketBase would cast "yes" to false and publish; refuse it.
+// KEEP IN SYNC: draft-type create block (decisions / documents / milestones); the update blocks above read the value the same way.
+onRecordCreateRequest((e) => {
+  // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
+  // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
+  const rq = e.requestEvent.request;
+  const sent = [];
+  const fromJson = (text) => {
+    try {
+      const b = JSON.parse(text);
+      if (b && typeof b === "object" && "draft" in b) sent.push(b.draft);
+    } catch (_) {}
+  };
+  if (String(rq.header.get("content-type")).indexOf("json") >= 0) {
+    fromJson(toString(rq.body));
+  } else {
+    // Every repeat of a field, not only the first: PocketBase applies the later ones too, and
+    // url.Values offers only its first value to the JSVM, so the form is read back encoded.
+    rq.postForm
+      .encode()
+      .split("&")
+      .forEach((pair) => {
+        const at = pair.indexOf("=");
+        if (at < 0) return;
+        const dec = (x) => decodeURIComponent(x.replace(/\+/g, " "));
+        const key = dec(pair.slice(0, at));
+        const val = dec(pair.slice(at + 1));
+        if (key === "@jsonPayload") fromJson(val);
+        else if (key === "draft")
+          sent.push(val === "true" ? true : val === "false" ? false : val);
+      });
+  }
+  if (sent.some((v) => v !== true && v !== false)) {
+    throw new BadRequestError("draft must be true or false");
+  }
+  e.next();
+}, "decisions");
+
+onRecordCreateRequest((e) => {
+  // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
+  // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
+  const rq = e.requestEvent.request;
+  const sent = [];
+  const fromJson = (text) => {
+    try {
+      const b = JSON.parse(text);
+      if (b && typeof b === "object" && "draft" in b) sent.push(b.draft);
+    } catch (_) {}
+  };
+  if (String(rq.header.get("content-type")).indexOf("json") >= 0) {
+    fromJson(toString(rq.body));
+  } else {
+    // Every repeat of a field, not only the first: PocketBase applies the later ones too, and
+    // url.Values offers only its first value to the JSVM, so the form is read back encoded.
+    rq.postForm
+      .encode()
+      .split("&")
+      .forEach((pair) => {
+        const at = pair.indexOf("=");
+        if (at < 0) return;
+        const dec = (x) => decodeURIComponent(x.replace(/\+/g, " "));
+        const key = dec(pair.slice(0, at));
+        const val = dec(pair.slice(at + 1));
+        if (key === "@jsonPayload") fromJson(val);
+        else if (key === "draft")
+          sent.push(val === "true" ? true : val === "false" ? false : val);
+      });
+  }
+  if (sent.some((v) => v !== true && v !== false)) {
+    throw new BadRequestError("draft must be true or false");
+  }
+  e.next();
+}, "documents");
+
+onRecordCreateRequest((e) => {
+  // requestInfo().body is already cast ("yes" reads false), so draft is read raw: a JSON body, or a
+  // form whose @jsonPayload (every batch sub-request) holds JSON and whose draft field holds text.
+  const rq = e.requestEvent.request;
+  const sent = [];
+  const fromJson = (text) => {
+    try {
+      const b = JSON.parse(text);
+      if (b && typeof b === "object" && "draft" in b) sent.push(b.draft);
+    } catch (_) {}
+  };
+  if (String(rq.header.get("content-type")).indexOf("json") >= 0) {
+    fromJson(toString(rq.body));
+  } else {
+    // Every repeat of a field, not only the first: PocketBase applies the later ones too, and
+    // url.Values offers only its first value to the JSVM, so the form is read back encoded.
+    rq.postForm
+      .encode()
+      .split("&")
+      .forEach((pair) => {
+        const at = pair.indexOf("=");
+        if (at < 0) return;
+        const dec = (x) => decodeURIComponent(x.replace(/\+/g, " "));
+        const key = dec(pair.slice(0, at));
+        const val = dec(pair.slice(at + 1));
+        if (key === "@jsonPayload") fromJson(val);
+        else if (key === "draft")
+          sent.push(val === "true" ? true : val === "false" ? false : val);
+      });
+  }
+  if (sent.some((v) => v !== true && v !== false)) {
+    throw new BadRequestError("draft must be true or false");
   }
   e.next();
 }, "milestones");

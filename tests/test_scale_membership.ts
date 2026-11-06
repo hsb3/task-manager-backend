@@ -583,11 +583,11 @@ try {
       ["/api/collections/project_items/records?" + urlencode({ perPage: 25 }), page_answer, 25],
     ],
     [
-      "counts-shaped read (fields=status, perPage=500)",
+      "counts-shaped read (fields=status, perPage=200, the list's cap)",
       [
-        "/api/collections/project_items/records?" + urlencode({ fields: "status", perPage: 500 }),
+        "/api/collections/project_items/records?" + urlencode({ fields: "status", perPage: 200 }),
         page_answer,
-        500,
+        200,
       ],
     ],
     [

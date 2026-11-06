@@ -539,6 +539,12 @@ run_suite "test_visibility_invariants" bun tests/test_visibility_invariants.ts
 # ── decision:draft-private-publish-one-way: a draft reaches only its author, the owner and an active admin, and Publish is one-way.
 run_suite "test_draft_publish"   bun tests/test_draft_publish.ts
 
+# ── item writes: a project-only create takes its workspace from the project, and a draft write is a boolean that only ever publishes.
+run_suite "test_item_write_refusals" bun tests/test_item_write_refusals.ts
+
+# ── item list: the project_items list refuses a filter clause its field cannot answer and clamps its paging.
+run_suite "test_item_list_filters"   bun tests/test_item_list_filters.ts
+
 # ── security: a trashed workspace is unreadable but owner-enumerable and owner-restorable — self-booting.
 run_suite "test_workspace_trash"    bun tests/test_workspace_trash.ts
 

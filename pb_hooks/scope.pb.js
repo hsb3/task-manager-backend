@@ -21,6 +21,46 @@ onRecordCreateRequest((e) => {
   return e.next();
 }, "tasks");
 
+// KEEP IN SYNC: the tasks block above — documents / decisions / milestones derive workspace from project the same way.
+onRecordCreateRequest((e) => {
+  if (!e.record.get("workspace") && e.record.get("project")) {
+    let proj = null;
+    try {
+      proj = e.app.findRecordById("projects", e.record.get("project"));
+    } catch (_) {
+      proj = null;
+    }
+    if (proj) e.record.set("workspace", proj.get("workspace"));
+  }
+  return e.next();
+}, "documents");
+
+onRecordCreateRequest((e) => {
+  if (!e.record.get("workspace") && e.record.get("project")) {
+    let proj = null;
+    try {
+      proj = e.app.findRecordById("projects", e.record.get("project"));
+    } catch (_) {
+      proj = null;
+    }
+    if (proj) e.record.set("workspace", proj.get("workspace"));
+  }
+  return e.next();
+}, "decisions");
+
+onRecordCreateRequest((e) => {
+  if (!e.record.get("workspace") && e.record.get("project")) {
+    let proj = null;
+    try {
+      proj = e.app.findRecordById("projects", e.record.get("project"));
+    } catch (_) {
+      proj = null;
+    }
+    if (proj) e.record.set("workspace", proj.get("workspace"));
+  }
+  return e.next();
+}, "milestones");
+
 // milestones used to default their project from workspace.default_project here; decision:shadow-project
 // gave every item type one placement (pb_hooks/shadow.pb.js) and this one disagreed with it.
 
