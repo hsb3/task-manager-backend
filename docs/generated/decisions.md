@@ -324,6 +324,18 @@ The record id is the only real key; `key` on tasks, decisions, documents and mil
 - **The key follows the item.** An item key is minted once after create and is immutable afterwards; moving the item to another project keeps its key even though the prefix then differs from the new project, so no link or spoken name ever breaks or gets reused.
 - **Shadow project items stay keyless**, because the shadow project takes no prefix (decision:shadow-project).
 
+## item-filter-by-name
+
+- **Slug:** `decision:item-filter-by-name`
+- **Title:** An item list can be filtered by status name and label name, and a name that matches more than one record is refused.
+- **Ref:** `project_items`
+
+A caller filtering collection:project_items by status or label used to need the id, so an agent looked up projects, statuses and labels before its first filter. The list now takes `status.name` with = and != and `labels.name` with ~ and !~, each with an exact name, and `pb_hooks/item_list.pb.js` replaces the name with the id before the query runs, so the rows are exactly those of the id filter.
+
+- **Prior art.** The Linear issue filter takes a workflow state or a label by name (`state: { name: { eq } }`, `labels: { some: { name: { eq } } }`) and matches every state or label carrying that name, across teams. Here a status name is unique only inside a workspace and a label name only inside a workspace or a project, and every workspace starts with the same default statuses, so matching every record with the name would quietly mix workspaces. The call made here differs: the name must resolve to exactly one record.
+- **What a name resolves to.** The candidates are the statuses or labels with that exact name that the caller can read. A top-level `workspace =` clause narrows them to that workspace, and a `project =` clause to the workspace of that project, which need not be readable itself, so the shadow project scopes too, with labels limited to the ones of that project and the ones of its workspace that belong to no project.
+- **None or several is a 400.** No candidate answers 400 `value_not_found` and more than one answers 400 `value_ambiguous`, under `status` or `labels` in data, so a list never silently picks one. A record the caller cannot read is never a candidate, so neither answer reveals it.
+
 ## landing-and-switch-check
 
 - **Slug:** `decision:landing-and-switch-check`
@@ -619,6 +631,18 @@ The assignee hook in `pb_hooks/main.pb.js` only validates a submitted, changed a
 `user_settings` holds personal preferences: `theme`, `font`, `font_size`, `default_view`, `default_project` and `time_zone`. A unique index on `user` allows one row per user, so a second create is refused with 400. All five rules admit only the user named on the row, and an update cannot change `user`.
 
 The signup hook in `pb_hooks/main.pb.js` creates the row with `theme` and `font` set to `system`, and every provisioning path checks for an existing row first, so each user always has exactly one. The `user` relation cascades, so deleting an account deletes its settings.
+
+## user-settings-write-checks
+
+- **Slug:** `decision:user-settings-write-checks`
+- **Title:** A settings save refuses a blank name, a default project or view the caller cannot read, and an unknown time zone.
+- **Ref:** `user_settings`
+
+`users.name` and the `default_project`, `default_view` and `time_zone` of `user_settings` are checked on every save through the records API and through route:tracker-user-settings, by one shared check in `pb_hooks/lib/workspace_rules.js` that judges each value as the record stores it, so an id sent inside an array is judged as that id, because an agent writing through the API gets no client to check them first.
+
+- **A name cannot be blanked.** `users.name` is optional, so an account may have none and a signup may leave it empty. A name that changes, as `name` on users or as `display_name` on the settings route, must hold more than whitespace: a change to an empty or whitespace-only value answers 400 naming the field, and any other change is stored trimmed, like every required name (concept:write-normalisation). A resent unchanged name passes, so a form that saves every field still works on an account with no name, and a blank profile name from a sign-in provider is stored empty instead of refused, because the person did not type it.
+- **A default pointer must be readable.** A changed `default_project` or `default_view` must exist and pass the view rule of its collection for the caller, so a personal default never points into a workspace the person cannot read or at the personal view of someone else. A missing and an unreadable id answer the same 400, with the PocketBase missing-relation code `validation_missing_rel_records`, so the refusal reveals no record. The shadow project keeps its own refusal (concept:shadow-project). A pointer that becomes unreadable later, for example after the person leaves the workspace, stays stored and does not block saving other fields.
+- **A time zone must be real.** A changed `time_zone` must be an IANA name the server can load, such as Europe/Paris. Any other value, and Local (the server's own zone), answers 400 naming time_zone, because a stored typo would silently shift every day count by up to a day (decision:viewer-day-values). An empty value clears the setting.
 
 ## verified-login
 

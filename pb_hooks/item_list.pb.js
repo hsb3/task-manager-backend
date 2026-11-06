@@ -30,7 +30,7 @@ routerUse((e) => {
     status: [
       ["=", "!="],
       true,
-      'a status id from the statuses collection, or "" for none',
+      'a status id from the statuses collection, or "" for none, or status.name with = and != and its exact name',
     ],
     priority: [
       ["=", "!="],
@@ -41,7 +41,7 @@ routerUse((e) => {
     labels: [
       ["~", "!~", "=", "!="],
       true,
-      'a label id from the labels collection with ~ and !~, or "[]" for no labels with = and !=',
+      'a label id from the labels collection with ~ and !~, or "[]" for no labels with = and !=, or labels.name with ~ and !~ and its exact name',
     ],
     due: [
       ["=", "!=", "<", "<=", ">", ">=", "~", "!~"],
@@ -96,7 +96,7 @@ routerUse((e) => {
         v += filter[j++];
       }
       if (j >= filter.length) return e.next();
-      toks.push({ k: "lit", v: v, quoted: true });
+      toks.push({ k: "lit", v: v, quoted: true, s: i, e: j + 1 });
       i = j + 1;
     } else if (c === "(" || c === ")") {
       toks.push({ k: c });
@@ -118,7 +118,9 @@ routerUse((e) => {
       const ident =
         /^[A-Za-z_]/.test(w) && ["true", "false", "null"].indexOf(w) === -1;
       toks.push(
-        ident ? { k: "id", v: w } : { k: "lit", v: w === "null" ? "" : w },
+        ident
+          ? { k: "id", v: w, s: i, e: j }
+          : { k: "lit", v: w === "null" ? "" : w, s: i, e: j },
       );
       i = j;
     }
@@ -185,6 +187,27 @@ routerUse((e) => {
     }
     if (f.k !== "id") return null;
     const root = f.v.split(/[.:]/)[0];
+    if (NAMED[f.v]) {
+      if (NAMED[f.v][0].indexOf(op) === -1)
+        refuse(
+          root,
+          "operator_not_supported",
+          f.v +
+            " filters accept " +
+            NAMED[f.v][0].join(" ") +
+            " with an exact name",
+        );
+      if (!v.quoted || v.v === "")
+        refuse(
+          root,
+          "value_required",
+          f.v + " filters need a quoted exact name",
+        );
+      const id = resolveName(root, v.v);
+      edits.push({ s: f.s, e: f.e, text: root });
+      edits.push({ s: v.s, e: v.e, text: '"' + id + '"' });
+      return { field: root, op: op, value: id };
+    }
     if (f.v !== root) {
       if (f.v.indexOf(".") !== -1)
         refuse(
@@ -219,6 +242,77 @@ routerUse((e) => {
     // Only a quoted value is comparable as text; a macro such as @request.auth.id is not.
     return { field: root, op: op, value: v.quoted ? v.v : null };
   };
+  // decision:item-filter-by-name: a name resolves to the one readable record carrying it, narrowed by a top-level
+  // workspace or project equality clause; none or several answer 400 so no row set is silently guessed.
+  const NAMED = {
+    "status.name": [["=", "!="], "statuses", "status"],
+    "labels.name": [["~", "!~"], "labels", "label"],
+  };
+  const edits = [];
+  const scope = {};
+  (tree.join === "&&" ? tree.parts : [tree]).forEach((n) => {
+    if (!n.cmp || n.op !== "=") return;
+    const [f, v] = n.a.k === "id" ? [n.a, n.b] : [n.b, n.a];
+    if (f.k === "id" && v.quoted && (f.v === "workspace" || f.v === "project"))
+      scope[f.v] = v.v;
+  });
+  const resolveName = (root, name) => {
+    const spec = NAMED[root + ".name"];
+    const info = e.requestInfo();
+    const su = e.hasSuperuserAuth();
+    let where = "name = {:n}";
+    const params = { n: name, u: e.auth ? e.auth.id : "" };
+    if (scope.workspace) {
+      where += " && workspace = {:w}";
+      params.w = scope.workspace;
+    }
+    let found = [];
+    let proj = null;
+    if (scope.project) {
+      try {
+        proj = e.app.findRecordById("projects", scope.project);
+      } catch (_) {
+        proj = null;
+      }
+      // The project itself is not rule-checked (a shadow project is unreadable yet scopes rows); the candidates are.
+      where += " && workspace = {:pw}";
+      params.pw = proj ? proj.getString("workspace") : "";
+      if (spec[1] === "labels") {
+        where += " && (project = '' || project = {:p})";
+        params.p = scope.project;
+      }
+    }
+    if (e.auth && (proj || !scope.project)) {
+      // Narrowed to the caller's workspaces first so an unscoped name never walks every workspace; the rule decides.
+      if (!su)
+        where +=
+          ' && (workspace.owner = {:u} || (workspace.workspace_members_via_workspace.user ?= {:u} && workspace.workspace_members_via_workspace.status ?= "active"))';
+      found = e.app
+        .findRecordsByFilter(spec[1], where, "", su ? 2 : 0, 0, params)
+        .filter((r) => e.app.canAccessRecord(r, info, r.collection().viewRule));
+    }
+    if (!found.length)
+      refuse(
+        root,
+        "value_not_found",
+        "no " +
+          spec[2] +
+          ' named "' +
+          name +
+          "\" is readable in this filter's scope",
+      );
+    if (found.length > 1)
+      refuse(
+        root,
+        "value_ambiguous",
+        "more than one " +
+          spec[2] +
+          ' is named "' +
+          name +
+          '"; add a workspace or project clause to the filter, or filter by its id',
+      );
+    return found[0].id;
+  };
   const walk = (n) => {
     if (n.cmp) n.g = governed(n);
     else n.parts.forEach(walk);
@@ -252,5 +346,15 @@ routerUse((e) => {
         "the " + field + " clauses of this filter cannot all hold at once",
       );
   });
+  if (edits.length) {
+    let out = filter;
+    edits
+      .sort((x, y) => y.s - x.s)
+      .forEach((d) => {
+        out = out.slice(0, d.s) + d.text + out.slice(d.e);
+      });
+    q.set("filter", out);
+    e.request.url.rawQuery = q.encode();
+  }
   return e.next();
 });

@@ -73,28 +73,47 @@ routerAdd(
         ),
       });
     }
-    // Route saves skip the *Request hooks, so this re-applies the one user_settings refusal.
-    // KEEP IN SYNC: pb_hooks/scope.pb.js "that project cannot be chosen here; pick one from the project list"
-    if (body.default_project) {
-      let proj = null;
-      try {
-        proj = e.app.findRecordById("projects", body.default_project);
-      } catch (_) {
-        proj = null;
-      }
-      if (proj && proj.get("shadow")) {
-        throw new BadRequestError(
-          "that project cannot be chosen here; pick one from the project list",
-        );
-      }
+    const rules = require(`${__hooks}/lib/workspace_rules.js`);
+    const name =
+      "display_name" in body
+        ? rules.refuseBlankUserName(
+            "display_name",
+            body.display_name,
+            e.auth.getString("name"),
+          )
+        : null;
+    let stored = null;
+    try {
+      stored = e.app.findFirstRecordByFilter("user_settings", "user = {:u}", {
+        u: e.auth.id,
+      });
+    } catch (_) {
+      stored = null;
     }
+    // Route saves skip the *Request hooks, so this applies the user_settings write checks itself,
+    // to the values as the record normalises them (an array id is stored as its one id).
+    const probe = stored
+      ? stored.clone()
+      : new Record(e.app.findCollectionByNameOrId("pbc_300100008")); // user_settings
+    for (const k of keys) if (k !== "display_name") probe.set(k, body[k]);
+    const pick = (r) => ({
+      default_project: r ? r.getString("default_project") : "",
+      default_view: r ? r.getString("default_view") : "",
+      time_zone: r ? r.getString("time_zone") : "",
+    });
+    rules.validateUserSettings(
+      e.app,
+      e.requestInfo(),
+      pick(probe),
+      pick(stored),
+    );
     let user = null;
     let us = null;
     // A field error from txApp.save already answers 400 with PB's field data.
     e.app.runInTransaction((txApp) => {
       user = txApp.findRecordById("users", e.auth.id);
       if ("display_name" in body) {
-        user.set("name", body.display_name);
+        user.set("name", name);
         txApp.save(user);
       }
       try {

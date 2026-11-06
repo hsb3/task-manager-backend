@@ -220,9 +220,9 @@ try {
   ]);
 
   console.log("\n── a relation path names the field and the id it takes ──");
-  const [rs, rr] = await list(alice, { filter: `status.name = "Todo"` });
+  const [rs, rr] = await list(alice, { filter: `status.category = "started"` });
   check(
-    `status.name = "Todo" → 400 status:not_expressible`,
+    `status.category = "started" → 400 status:not_expressible`,
     [rs, rr?.data?.status?.code ?? null],
     [400, "not_expressible"],
   );
@@ -329,6 +329,145 @@ try {
     `due >= Jan && due >= Mar → the Mar rows only (10)`,
     await total(alice, inP(`due >= "${DUES[0]}" && due >= "${DUES[2]}"`)),
     [200, 10],
+  );
+
+  console.log("\n── 1t2f: a status or label name filters the same rows as its id ──");
+  const ids = async (token: string, filter: string) => {
+    const [s, r] = await list(token, { filter, perPage: 200, sort: "id" });
+    return [s, (r.items ?? []).map((x: any) => x.id)];
+  };
+  const NAME_A = sts.items[0].name;
+  const [p2s, proj2] = await api("POST", "/api/collections/projects/records", alice, {
+    name: "Name filter fixture",
+    workspace: WS,
+  });
+  if (p2s !== 200) throw new roomkit.SystemExit(`project create failed: ${py_str(proj2)}`);
+  const P2 = proj2.id;
+  const [, lbs] = await api(
+    "GET",
+    `/api/collections/labels/records?${urlencode({ filter: `workspace='${WS}' && project=''`, sort: "name" })}`,
+    alice,
+  );
+  const [LB_A, LB_B] = lbs.items;
+  const dup: Record<string, string> = {};
+  for (const proj of [P, P2]) {
+    const [ls, l] = await api("POST", "/api/collections/labels/records", alice, {
+      name: "Dup",
+      workspace: WS,
+      project: proj,
+    });
+    if (ls !== 200) throw new roomkit.SystemExit(`label create failed: ${py_str(l)}`);
+    dup[proj] = l.id;
+  }
+  for (const labels of [[LB_A.id], [LB_A.id, LB_B.id], [LB_B.id, dup[P2]], []]) {
+    const [s, r] = await api("POST", "/api/collections/tasks/records", su, {
+      title: "label task",
+      workspace: WS,
+      project: P2,
+      status: ST_A,
+      labels,
+    });
+    if (s !== 200) throw new roomkit.SystemExit(`task create failed: ${py_str(r)}`);
+  }
+  const inP2 = (f: string) => `project = "${P2}" && ${f}`;
+  for (const [who, tok] of [
+    ["owner", alice],
+    ["member", bob],
+  ] as const) {
+    const byId = await ids(tok, inP(`status = "${ST_A}"`));
+    check(
+      `${who}: status.name = "${NAME_A}" → the status = <id> rows (${byId[1].length})`,
+      await ids(tok, inP(`status.name = "${NAME_A}"`)),
+      byId,
+    );
+  }
+  check(
+    `status.name != "${NAME_A}" → the status != <id> rows`,
+    await ids(alice, inP(`status.name != "${NAME_A}"`)),
+    await ids(alice, inP(`status != "${ST_A}"`)),
+  );
+  check(
+    `workspace scope: workspace = WS && status.name = A → the id rows`,
+    await ids(alice, `workspace = "${WS}" && status.name = "${NAME_A}"`),
+    await ids(alice, `workspace = "${WS}" && status = "${ST_A}"`),
+  );
+  check(
+    `inside an OR: (status.name = A || status.name = B) → the id rows`,
+    await ids(alice, inP(`(status.name = "${NAME_A}" || status.name = "${sts.items[1].name}")`)),
+    await ids(alice, inP(`(status = "${ST_A}" || status = "${ST_B}")`)),
+  );
+  check(
+    `labels.name ~ "${LB_A.name}" → the labels ~ <id> rows (2)`,
+    await ids(alice, inP2(`labels.name ~ "${LB_A.name}"`)),
+    await ids(alice, inP2(`labels ~ "${LB_A.id}"`)),
+  );
+  check(
+    `labels.name !~ "${LB_B.name}" → the labels !~ <id> rows (2)`,
+    await ids(alice, inP2(`labels.name !~ "${LB_B.name}"`)),
+    await ids(alice, inP2(`labels !~ "${LB_B.id}"`)),
+  );
+  check(
+    `project scope picks that project's label: project = P2 && labels.name ~ "Dup" → 1 row`,
+    (await ids(alice, inP2(`labels.name ~ "Dup"`)))[1].length,
+    1,
+  );
+  const [shs, shTask] = await api("POST", "/api/collections/tasks/records", alice, {
+    title: "shadow task",
+    workspace: WS,
+    status: ST_A,
+  });
+  if (shs !== 200) throw new roomkit.SystemExit(`task create failed: ${py_str(shTask)}`);
+  check(
+    `project = <shadow project> && status.name = A → the id rows (1)`,
+    await ids(alice, `project = "${shTask.project}" && status.name = "${NAME_A}"`),
+    [200, [shTask.id]],
+  );
+  check(
+    `a resolved name still meets the conflict check: status = B && status.name = A → values_conflict`,
+    await refusal(alice, inP(`status = "${ST_B}" && status.name = "${NAME_A}"`), "status"),
+    [400, "values_conflict"],
+  );
+
+  console.log("\n── 1t2f: an ambiguous or unknown name answers 400 naming the field ──");
+  const [ws2s, ws2] = await api("POST", "/api/collections/workspaces/records", alice, {
+    name: "Second workspace",
+    owner: alice_id,
+  });
+  if (ws2s !== 200) throw new roomkit.SystemExit(`workspace create failed: ${py_str(ws2)}`);
+  check(
+    `two readable workspaces both name a status "${NAME_A}": unscoped → 400 status:value_ambiguous`,
+    await refusal(alice, `status.name = "${NAME_A}"`, "status"),
+    [400, "value_ambiguous"],
+  );
+  check(
+    `two projects both name a label "Dup": workspace = WS && labels.name ~ "Dup" → 400 labels:value_ambiguous`,
+    await refusal(alice, `workspace = "${WS}" && labels.name ~ "Dup"`, "labels"),
+    [400, "value_ambiguous"],
+  );
+  check(
+    `a status name no readable status carries → 400 status:value_not_found`,
+    await refusal(alice, inP(`status.name = "No such status"`), "status"),
+    [400, "value_not_found"],
+  );
+  check(
+    `anon: a real status name → 400 status:value_not_found (no status is readable)`,
+    await refusal(null as any, inP(`status.name = "${NAME_A}"`), "status"),
+    [400, "value_not_found"],
+  );
+  check(
+    `status.name ~ "x" → 400 status:operator_not_supported`,
+    await refusal(alice, inP(`status.name ~ "x"`), "status"),
+    [400, "operator_not_supported"],
+  );
+  check(
+    `labels.name = "x" → 400 labels:operator_not_supported`,
+    await refusal(alice, inP(`labels.name = "x"`), "labels"),
+    [400, "operator_not_supported"],
+  );
+  check(
+    `status.name = "" → 400 status:value_required`,
+    await refusal(alice, inP(`status.name = ""`), "status"),
+    [400, "value_required"],
   );
 
   console.log(

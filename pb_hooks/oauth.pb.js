@@ -102,6 +102,9 @@ onBootstrap((e) => {
 // If the provider could not verify the email we bail out and let the core engine
 // decide — we never invent a link or a verification on unverified input.
 onRecordAuthWithOAuth2Request((e) => {
+  // decision:user-settings-write-checks: a provider name the person never typed is stored trimmed, a blank one empty, never refused.
+  if (e.oAuth2User && typeof e.oAuth2User.name === "string")
+    e.oAuth2User.name = e.oAuth2User.name.trim();
   // NO-OP guard: without a verified email we have no safe basis to link or to
   // mark verified. Hand off to the core engine untouched.
   if (!e.oAuth2User || !e.oAuth2User.email) {

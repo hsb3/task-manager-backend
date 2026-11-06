@@ -412,8 +412,12 @@ try {
   );
   check("fake OpenID provider configured", s, 200);
 
-  const oauth_login = (email: string, subject: string): Promise<[number, any]> => {
-    PROVIDER_USER = { sub: subject, email: email, email_verified: true, name: "OAuth Person" };
+  const oauth_login = (
+    email: string,
+    subject: string,
+    name = "OAuth Person",
+  ): Promise<[number, any]> => {
+    PROVIDER_USER = { sub: subject, email: email, email_verified: true, name };
     return api(link_room.base_url, "POST", "/api/collections/users/auth-with-oauth2", {
       provider: "oidc",
       code: "fake-code",
@@ -526,6 +530,32 @@ try {
     !Bun.deepEquals(undotted, [other.id ?? null], true),
     true,
   );
+
+  // decision:user-settings-write-checks: a blank profile name from the provider is stored empty, never refused.
+  for (const [blank, mail] of [
+    ["", "blank.empty@example.com"],
+    ["   ", "blank.spaces@example.com"],
+  ]) {
+    [s] = await oauth_login(mail, `fake-subject-${mail}`, blank);
+    check(
+      `OAuth signup whose provider name is ${py_str(JSON.stringify(blank))} → 403 (approval gate, not a 400)`,
+      s,
+      403,
+    );
+    const con = sqlite_connect(path.join(link_room.data_dir, "data.db"), { timeout: 15 });
+    try {
+      check(
+        "…minted one account with an empty name",
+        con
+          .query("SELECT name FROM users WHERE email = ?")
+          .values(mail)
+          .map((r) => r[0]),
+        [""],
+      );
+    } finally {
+      con.close();
+    }
+  }
 } finally {
   await link_room.stop();
   link_room.cleanup_tmp();

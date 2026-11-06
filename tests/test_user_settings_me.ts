@@ -305,6 +305,187 @@ try {
     [r?.display_name !== "Renamed by key", r?.theme],
     [true, "light"],
   );
+
+  const USERS = `/api/collections/users/records/${alice_id}`;
+  const aliceRow = (await settingsRow(alice_id))[0]?.id;
+  const ROW = `/api/collections/user_settings/records/${aliceRow}`;
+  const nameBefore = await userName(alice_id);
+
+  console.log("\n── 2ghp: a blank name is refused on the route and on the users record ──");
+  for (const blank of ["", "   "]) {
+    [s, r] = await api("PATCH", ME, alice, { display_name: blank, theme: "dark" });
+    check(
+      `route display_name=${py_repr(blank)} → 400 naming display_name`,
+      [s, Boolean(r?.data?.display_name)],
+      [400, true],
+    );
+    [s, r] = await api("PATCH", USERS, alice, { name: blank });
+    check(
+      `users PATCH name=${py_repr(blank)} → 400 naming name`,
+      [s, Boolean(r?.data?.name)],
+      [400, true],
+    );
+  }
+  [s, r] = await api("POST", "/api/collections/users/records", null, {
+    email: "blank@example.com",
+    password: "test123456",
+    passwordConfirm: "test123456",
+    name: "  ",
+  });
+  check("signup with name='  ' → 400 naming name", [s, Boolean(r?.data?.name)], [400, true]);
+  check("users.name unchanged by the blank refusals", await userName(alice_id), nameBefore);
+  [s, r] = await api("POST", "/api/collections/users/records", null, {
+    email: "noname@example.com",
+    password: "test123456",
+    passwordConfirm: "test123456",
+    name: "",
+  });
+  check("signup with name='' → 200 (an account may have no name)", [s, r?.name], [200, ""]);
+  [s, r] = await api("PATCH", `/api/collections/users/records/${r?.id}`, su, {
+    name: "",
+    verified: true,
+  });
+  check("a resent unchanged empty name passes (form resave) → 200", [s, r?.verified], [200, true]);
+  check(
+    "theme unchanged by the refused route save",
+    (await settingsRow(alice_id))[0]?.theme,
+    "light",
+  );
+  [s, r] = await api("PATCH", ME, alice, { display_name: "  Alice Trimmed  " });
+  check("route display_name is stored trimmed", [s, r?.display_name], [200, "Alice Trimmed"]);
+  [s, r] = await api("PATCH", USERS, alice, { name: "  Alice Again " });
+  check("users PATCH name is stored trimmed", [s, await userName(alice_id)], [200, "Alice Again"]);
+
+  console.log("\n── 2ghp: a default project or view the caller cannot read is refused ──");
+  const bobProj = (
+    await api(
+      "GET",
+      "/api/collections/projects/records?" +
+        urlencode({ filter: `shadow=false && workspace.owner='${bob_id}'`, perPage: 1 }),
+      su,
+    )
+  )[1].items?.[0];
+  const [, bobView] = await api("POST", "/api/collections/saved_views/records", bob, {
+    workspace: bobProj?.workspace,
+    name: "Bob's board",
+    scope: "workspace",
+  });
+  const aliceWs = (await api("GET", `/api/collections/projects/records/${plainId}`, alice))[1]
+    .workspace;
+  const [, aliceView] = await api("POST", "/api/collections/saved_views/records", alice, {
+    workspace: aliceWs,
+    name: "Alice's board",
+    scope: "personal",
+  });
+  check(
+    "fixtures: bob's project, bob's view, alice's view",
+    [Boolean(bobProj?.id), Boolean(bobView?.id), Boolean(aliceView?.id)],
+    [true, true, true],
+  );
+  const missingCode = (await api("PATCH", ME, alice, { default_project: "zzzzzzzzzzzzzzz" }))[1]
+    ?.data?.default_project?.code;
+  for (const [field, id] of [
+    ["default_project", bobProj?.id],
+    ["default_view", bobView?.id],
+  ]) {
+    [s, r] = await api("PATCH", ME, alice, { [field]: id });
+    check(
+      `route ${field}=<bob's> → 400 answered like a missing id`,
+      [s, r?.data?.[field]?.code],
+      [400, missingCode],
+    );
+    [s, r] = await api("PATCH", ROW, alice, { [field]: id });
+    check(
+      `records PATCH ${field}=<bob's> → 400 naming ${field}`,
+      [s, Boolean(r?.data?.[field])],
+      [400, true],
+    );
+  }
+  check("a missing id is itself refused (400 code present)", Boolean(missingCode), true);
+  for (const [field, id, want] of [
+    ["default_project", bobProj?.id, missingCode],
+    ["default_view", bobView?.id, missingCode],
+  ]) {
+    [s, r] = await api("PATCH", ME, alice, { [field]: [id] });
+    check(
+      `route ${field}=[<bob's>] (an array) → 400 like the string form`,
+      [s, r?.data?.[field]?.code],
+      [400, want],
+    );
+  }
+  [s, r] = await api("PATCH", ME, alice, { default_project: [shadowId] });
+  check(
+    "route default_project=[<shadow>] (an array) → 400 shadow refusal",
+    [s, r?.message],
+    [400, SHADOW_MSG],
+  );
+  rows = await settingsRow(alice_id);
+  check(
+    "alice's pointers unchanged",
+    [rows[0]?.default_project, rows[0]?.default_view],
+    [plainId, ""],
+  );
+  [s, r] = await api("PATCH", ME, alice, { default_view: aliceView?.id });
+  check("route default_view=<alice's own> → 200", [s, r?.default_view], [200, aliceView?.id]);
+  [s, r] = await api("PATCH", ROW, alice, { default_view: "", default_project: plainId });
+  check("records PATCH a readable project, cleared view → 200", s, 200);
+  rows = await settingsRow(bob_id);
+  [s] = await api("DELETE", `/api/collections/user_settings/records/${rows[0]?.id}`, bob);
+  check("bob deletes his row again → 204", s, 204);
+  [s, r] = await api("POST", "/api/collections/user_settings/records", bob, {
+    user: bob_id,
+    default_project: plainId,
+  });
+  check(
+    "records CREATE default_project=<alice's> → 400 naming default_project",
+    [s, Boolean(r?.data?.default_project)],
+    [400, true],
+  );
+
+  console.log("\n── 1853: an unknown time zone is refused; empty clears; a real name saves ──");
+  for (const tz of ["Mars/Olympus", "Local", "Europe/Pariss"]) {
+    [s, r] = await api("PATCH", ME, alice, { time_zone: tz });
+    check(
+      `route time_zone=${py_repr(tz)} → 400 naming time_zone`,
+      [s, Boolean(r?.data?.time_zone)],
+      [400, true],
+    );
+  }
+  [s, r] = await api("PATCH", ROW, alice, { time_zone: "Not/AZone" });
+  check(
+    "records PATCH time_zone='Not/AZone' → 400 naming time_zone",
+    [s, Boolean(r?.data?.time_zone)],
+    [400, true],
+  );
+  [s, r] = await api("POST", "/api/collections/user_settings/records", bob, {
+    user: bob_id,
+    time_zone: "Mars/Olympus",
+  });
+  check(
+    "records CREATE time_zone='Mars/Olympus' → 400 naming time_zone",
+    [s, Boolean(r?.data?.time_zone)],
+    [400, true],
+  );
+  [s, r] = await api("POST", "/api/collections/user_settings/records", bob, {
+    user: bob_id,
+    time_zone: "America/New_York",
+  });
+  check(
+    "records CREATE time_zone='America/New_York' → 200",
+    [s, r?.time_zone],
+    [200, "America/New_York"],
+  );
+  check(
+    "alice's stored time_zone unchanged",
+    (await settingsRow(alice_id))[0]?.time_zone,
+    "Europe/Paris",
+  );
+  [s, r] = await api("PATCH", ME, alice, { time_zone: "" });
+  check("route time_zone='' clears it → 200", [s, r?.time_zone], [200, ""]);
+  [s, r] = await api("PATCH", ME, alice, { time_zone: "Europe/Paris" });
+  check("route time_zone='Europe/Paris' → 200", [s, r?.time_zone], [200, "Europe/Paris"]);
+  [s, r] = await api("PATCH", ROW, alice, { time_zone: "Asia/Tokyo" });
+  check("records PATCH time_zone='Asia/Tokyo' → 200", [s, r?.time_zone], [200, "Asia/Tokyo"]);
 } finally {
   if (server) await roomkit.stop(server);
   fs.rmSync(S, { recursive: true, force: true });
