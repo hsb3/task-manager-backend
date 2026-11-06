@@ -6,7 +6,9 @@
  * §2 a valid value and an unset variable both still boot healthy; §3 what the container start
  * guard reads — a migration refusing the database in front of it makes `serve` exit non-zero,
  * name the migration and never bind (PB 0.40.4; the guard reads that exit status); §4 the
- * fifth variable reaches PB's parser only with S3 armed, which is the deployed shape.
+ * fifth variable reaches PB's parser only with S3 armed, which is the deployed shape; §5 the
+ * Dockerfile CMD itself, run as written against a planted hook-refused migration, ends before
+ * superuser create and serve with the database as it was (decision:refused-migration-fails-the-deploy).
  *
  * Self-booting clean room (scratch copies of pb_migrations + pb_hooks), no seeded fixtures
  * and no auth: every assertion here is about the boot itself. Port 8122 + PB_PORT_OFFSET.
@@ -124,6 +126,7 @@ async function serve_until_exit(
   migrations_dir: string,
   env: Record<string, string | undefined>,
   timeout = 30,
+  argv: string[] = serve_argv(data_dir, migrations_dir),
 ): Promise<[number | null, string]> {
   /** Boot a room expected to refuse. Returns (exit status or None when it had to be
    * killed, output) — a killed room's negative status would otherwise read as a refusal, so
@@ -136,7 +139,7 @@ async function serve_until_exit(
   const log = fs.openSync(log_path, "w");
   let rc: number | null;
   try {
-    const proc = Bun.spawn(serve_argv(data_dir, migrations_dir), {
+    const proc = Bun.spawn(argv, {
       cwd: REPO_ROOT,
       env,
       stdout: log,
@@ -340,6 +343,142 @@ check(
   out.includes(ANONYMOUS_BACKUPS_ERROR),
   false,
 );
+
+// ── §5 The Dockerfile CMD, run as written, ends before superuser create and serve ────────
+// COVERS: boot:Dockerfile CMD
+console.log(
+  "\n── §5 the Dockerfile CMD against a planted hook-refused migration: refused before anything is written ──",
+);
+const BENIGN_PLANT = "1785199800_probe_benign.js";
+const REFUSED_PLANT = "1785199900_probe_hook_refused.js";
+const FATAL_LINE = "FATAL: PocketBase refused to start";
+
+/** The Dockerfile CMD argv with the image's paths and bind address swapped for this room's. */
+function container_cmd(data_dir: string, migrations_dir: string): string[] {
+  const m = /(?:^|(?<=\n))CMD .*/su.exec(read_text(path.join(REPO_ROOT, "Dockerfile")));
+  let argv: unknown = null;
+  try {
+    argv = m && JSON.parse(m[0].slice("CMD ".length).replaceAll("\\\n", " "));
+  } catch {
+    // fall through to the one refusal below
+  }
+  if (!Array.isArray(argv) || argv.length !== 3 || argv[1] !== "-c") {
+    throw new roomkit.SystemExit(
+      "the Dockerfile CMD is not a [shell, -c, script] JSON array ending the file, so §5 cannot run it as written",
+    );
+  }
+  const script = (argv[2] as string)
+    .replaceAll("/pb/pocketbase", PB_BIN)
+    .replaceAll("/pb/pb_data", data_dir)
+    .replaceAll("/pb/pb_migrations", migrations_dir)
+    .replaceAll("/pb/pb_hooks", HOOKS_DIR)
+    .replaceAll("0.0.0.0:", "127.0.0.1:");
+  if (script.includes("/pb/")) {
+    throw new roomkit.SystemExit(
+      `the Dockerfile CMD names an image path §5 does not substitute: ${script}`,
+    );
+  }
+  return [argv[0], "-c", script];
+}
+
+const container_env = (): Record<string, string | undefined> =>
+  room_env({
+    PORT: String(PORT),
+    PB_SUPERUSER_EMAIL: SU_EMAIL,
+    PB_SUPERUSER_PASSWORD: SU_PASSWORD,
+    PB_PUBLIC_URL: `http://127.0.0.1:${PORT}`,
+  });
+
+function column(data_dir: string, sql: string): string[] {
+  const db = sqlite_connect(path.join(data_dir, "data.db"));
+  try {
+    return (db.query(sql).all() as { v: string }[]).map((r) => r.v);
+  } finally {
+    db.close();
+  }
+}
+const superusers = (d: string) => column(d, "SELECT email AS v FROM _superusers ORDER BY email");
+const planted_recorded = (d: string) =>
+  column(d, "SELECT file AS v FROM _migrations WHERE file LIKE '%probe%' ORDER BY file");
+
+async function run_healthy(
+  argv: string[],
+  env: Record<string, string | undefined>,
+  log_path: string,
+): Promise<[boolean, string]> {
+  /** Run a start command expected to come up on PORT; stops it once healthy. Returns (healthy, output). */
+  await roomkit.require_free_port(PORT);
+  const log = fs.openSync(log_path, "w");
+  let healthy = false;
+  try {
+    const proc = Bun.spawn(argv, { cwd: REPO_ROOT, env, stdout: log, stderr: log });
+    try {
+      await roomkit.wait_for_health(`http://127.0.0.1:${PORT}`, proc, 30);
+      healthy = true;
+    } catch (e) {
+      if (!(e instanceof roomkit.RoomNotHealthy)) throw e;
+      console.log(`     start command never came up: ${e.message}`);
+    }
+    proc.kill("SIGTERM");
+    await proc.exited;
+  } finally {
+    fs.closeSync(log);
+  }
+  await roomkit.wait_for_port_free(PORT);
+  return [healthy, read_log(log_path)];
+}
+
+const MIG_PLANTED = path.join(S, "pb_migrations_planted");
+fs.cpSync(MIG_ALL, MIG_PLANTED, { recursive: true, dereference: true });
+fs.writeFileSync(path.join(MIG_PLANTED, BENIGN_PLANT), "migrate((app) => {}, (app) => {});\n");
+// counts.pb.js refuses a project_items listRule naming anything but @request.auth.id.
+fs.writeFileSync(
+  path.join(MIG_PLANTED, REFUSED_PLANT),
+  "migrate((app) => {\n" +
+    '  const c = app.findCollectionByNameOrId("project_items");\n' +
+    "  c.listRule = '@request.headers.x_probe = \"1\"';\n" +
+    "  app.save(c);\n" +
+    "}, (app) => {});\n",
+);
+// Migrated but with no superuser: whether the CMD writes one is the ordering assertion below.
+const CMD_DATA = path.join(S, "pb_data_cmd");
+[ok] = migrate_up(PB_BIN, CMD_DATA, MIG_ALL);
+check("the real set migrates into an empty database", ok, true);
+
+[rc, out] = await serve_until_exit(
+  CMD_DATA,
+  MIG_PLANTED,
+  container_env(),
+  60,
+  container_cmd(CMD_DATA, MIG_PLANTED),
+);
+check("CMD + planted: the start exits non-zero", rc !== null && rc !== 0, true);
+check(
+  `CMD + planted: a refusal line names ${REFUSED_PLANT}`,
+  refusal_lines(out).some((line) => line.includes(REFUSED_PLANT)),
+  true,
+);
+check("CMD + planted: the FATAL line names the cause", out.includes(FATAL_LINE), true);
+check("CMD + planted: it never announced a listening server", out.includes(SERVER_STARTED), false);
+check("CMD + planted: no superuser was written", superusers(CMD_DATA), []);
+check(
+  "CMD + planted: neither planted migration is recorded (the run rolled back whole)",
+  planted_recorded(CMD_DATA),
+  [],
+);
+
+// Same database, the clean set: the start that just refused still serves it, and only now
+// does the superuser from the environment appear.
+[healthy, out] = await run_healthy(
+  container_cmd(CMD_DATA, MIG_ALL),
+  container_env(),
+  CMD_DATA + ".control.log",
+);
+check("CMD, clean set: the same database boots healthy", healthy, true);
+check("CMD, clean set: no FATAL line", out.includes(FATAL_LINE), false);
+check("CMD, clean set: the superuser from the environment exists", superusers(CMD_DATA), [
+  SU_EMAIL,
+]);
 
 fs.rmSync(S, { recursive: true, force: true });
 console.log(`\n${failures ? "❌ " + failures + " failed check(s)" : "✅ all checks passed"}`);

@@ -76,7 +76,12 @@ are independent of each other):
 A refused boot migration takes pocketbase down until a good build is deployed; the old
 container is already stopped (`.agents/context/deploy.md`, the teardown line). The owner
 accepts that outage; the response is an alert and this manual recovery. Measured in throwaway
-environments unless marked.
+environments unless marked. Why nothing catches it earlier (Railway mounts no volume at pre-deploy time,
+and the start guard replays against the volume itself because a refused run records no migration and
+changes no application data) and the
+prior art weighed: decision:refused-migration-fails-the-deploy. The start command is proven as written in
+`tests/test_boot_refusals.ts` §5: against a planted hook-refused migration it exits non-zero naming the
+migration, writes no superuser, never binds, and records neither planted migration.
 
 1. **Signal.** A project-level Railway notification rule sends email and in-app notifications on
    `Deployment.failed` and `Deployment.crashed`, for every non-ephemeral environment. It is not in
