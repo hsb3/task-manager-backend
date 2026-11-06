@@ -618,9 +618,9 @@ try {
     );
   }
   [s] = await api("GET", `/api/tracker/trash?workspace=${WS}`, outsider);
-  check("non-member on /api/tracker/trash → 403", s, 403);
+  check("non-member on /api/tracker/trash → 404", s, 404);
   [s] = await api("GET", `/api/tracker/trash?workspace=${WS}`, suspended);
-  check("suspended member on /api/tracker/trash → 403", s, 403);
+  check("suspended member on /api/tracker/trash → 404", s, 404);
 
   // Named spot-checks, so a sweep that went uniformly empty could not pass it silently.
   const [, mrecs] = await list_all("project_items", member, { filter: `workspace='${WS}'` });

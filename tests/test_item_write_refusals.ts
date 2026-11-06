@@ -392,6 +392,112 @@ try {
     );
   }
 
+  console.log("\n── a move into a trashed project is refused (card 2vpm) ──");
+  // The updateRule reads the SUBMITTED project (an item already inside a trashed project stays
+  // editable in place: test_activity 7g); a rule-denied update answers 404 by the house idiom.
+  const bob_member4 = await tierkit.actor_at_tier(ALICE_WS, bob_id, "member", alice, "Bob");
+  [s, r] = await api("POST", URL("projects"), alice, {
+    name: "trashed-project moves",
+    workspace: ALICE_WS,
+  });
+  check("setup: owner creates a second project → 200", s, 200);
+  const TRASHED2 = r.id;
+  [s, r] = await api("POST", URL("tasks"), alice, { title: "move parent", project: TRASHED2 });
+  check("setup: owner creates a task inside it → 200", s, 200);
+  const PARENT2 = r.id;
+  [s] = await api("DELETE", `${URL("projects")}/${TRASHED2}`, alice);
+  check("setup: owner DELETE moves the second project to the trash → 204", s, 204);
+  for (const [who, tok] of [
+    ["owner", alice],
+    ["member", bob],
+  ] as const) {
+    for (const c of ALL) {
+      [s, r] = await api("POST", URL(c), tok, { [NAME[c]]: `${c} ${who} mover`, project: PROJ });
+      check(`${c}: ${who} creates an item in the live project → 200`, s, 200);
+      const id = r.id;
+      [s] = await api("PATCH", `${URL(c)}/${id}`, tok, { project: TRASHED2 });
+      check(
+        `${c}: ${who} PATCH {project} into a trashed project → 404`,
+        tup(who === "member" ? await bob_member4.now() : who, s),
+        tup(who, 404),
+      );
+      [, r] = await api("GET", `${URL(c)}/${id}`, su);
+      check(`${c}: …stored project unchanged`, r.project ?? null, PROJ);
+      [s, r] = await api("PATCH", `${URL(c)}/${id}`, tok, { project: TRASHED });
+      check(
+        `${c}: ${who} PATCH {project} into a live project → 200, stored`,
+        tup(s, r.project ?? null),
+        tup(200, TRASHED),
+      );
+    }
+    [s, r] = await api("POST", URL("tasks"), tok, { title: `subtask ${who} mover`, project: PROJ });
+    check(`tasks: ${who} creates a task for the parent probe → 200`, s, 200);
+    const sid = r.id;
+    // Measured, not new: a parent outside the task's own project is refused by the scope hook.
+    [s] = await api("PATCH", `${URL("tasks")}/${sid}`, tok, { parent: PARENT2 });
+    check(`tasks: ${who} PATCH {parent inside a trashed project} → 400`, s, 400);
+    [s] = await api("PATCH", `${URL("tasks")}/${sid}`, tok, { project: TRASHED2, parent: PARENT2 });
+    check(`tasks: ${who} PATCH {project, parent} into a trashed project → 404`, s, 404);
+    [, r] = await api("GET", `${URL("tasks")}/${sid}`, su);
+    check(
+      `tasks: …stored project and parent unchanged`,
+      tup(r.project ?? null, r.parent ?? null),
+      tup(PROJ, ""),
+    );
+  }
+  await bob_member4.done();
+  for (const c of ALL) {
+    const [, d] = await api(
+      "GET",
+      `/api/collections/app_docs/records?${urlencode({ filter: `slug='collection:${c}'` })}`,
+      su,
+    );
+    check(
+      `${c}: app_docs states the trashed-project move refusal`,
+      (d.items?.[0]?.body ?? "").includes("moves it into a project in the trash is refused"),
+      true,
+    );
+  }
+
+  console.log(
+    "\n── a viewer who is the assignee of the parent cannot create a subtask (card 2vpm) ──",
+  );
+  const bob_viewer2 = await tierkit.actor_at_tier(ALICE_WS, bob_id, "viewer", alice, "Bob");
+  [s, r] = await api("POST", URL("tasks"), alice, {
+    title: "viewer parent",
+    project: PROJ,
+    assignee: bob_id,
+  });
+  check(
+    "setup: owner creates a parent assigned to Bob → 200",
+    tup(s, r.assignee ?? null),
+    tup(200, bob_id),
+  );
+  [s] = await api("POST", URL("tasks"), bob, {
+    title: "viewer subtask",
+    workspace: ALICE_WS,
+    parent: r.id,
+  });
+  check(
+    "tasks: Bob (viewer, assignee of the parent) subtask create → 400",
+    tup(await bob_viewer2.now(), s),
+    tup("viewer", 400),
+  );
+  check("tasks: …stored nothing", await stored("tasks", "viewer subtask"), 0);
+  await bob_viewer2.done();
+  {
+    const [, d] = await api(
+      "GET",
+      `/api/collections/app_docs/records?${urlencode({ filter: "slug='collection:tasks'" })}`,
+      su,
+    );
+    check(
+      "tasks: app_docs no longer opens subtask creation to a viewer",
+      (d.items?.[0]?.body ?? "").includes("opens subtask creation to an active viewer"),
+      false,
+    );
+  }
+
   console.log("\n── measured (report only): trash with no workspace param ──");
   [s, r] = await api("GET", "/api/tracker/trash", alice);
   console.log(`  GET /api/tracker/trash (no workspace) → ${s} ${py_repr(r.message ?? r)}`);

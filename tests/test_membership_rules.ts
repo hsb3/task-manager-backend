@@ -1477,7 +1477,7 @@ for (const role of ["admin", "member", "viewer"]) {
       live ? tup(200, SEARCH_HITS) : tup(200, []),
     );
     [s] = await api("GET", `/api/tracker/trash?workspace=${GW}`, probe);
-    check(`${role}/${status} trash-list route`, s, live ? 200 : 403);
+    check(`${role}/${status} trash-list route`, s, live ? 200 : 404);
     [s, r] = await api("POST", "/api/tracker/export", probe, { workspace: GW });
     const exported = new Set<string>();
     for (const arr of Object.values((r.data || {}) as Record<string, any[]>)) {

@@ -543,6 +543,18 @@ export const ALLOWLIST = new Map<string, string>([
     '["1785188000_seed_app_docs.js", "collection:users", "The authRule is verified = true && approved = true: a new ac"]',
     "card 6n7n: the authRule sentence names provider sign-in (GitHub or Google), not GitHub OAuth alone",
   ],
+  [
+    '["1785188900_seed_app_docs.js", "collection:tasks", "Creating a SUBTASK under a parent mints a new record, so tha"]',
+    "card 2vpm: the createRule has no parent or assignee branch, so a viewer assignee of the parent is refused like any viewer; the record now says so",
+  ],
+  [
+    '["1785188900_seed_app_docs.js", "route:tracker-trash", "A TRASHED workspace is refused outright, the owner included,"]',
+    "card 7cns: an unknown or inaccessible workspace now answers 404 (decision:inaccessible-workspace-answers-404); the trashed-workspace sentence is reworded around it",
+  ],
+  [
+    '["1785188900_seed_app_docs.js", "route:tracker-trash", "The caller must be the workspace owner or hold an ACTIVE wor"]',
+    "card 7cns: the route answers 404, not 403, for a non-member and an unknown id (decision:inaccessible-workspace-answers-404)",
+  ],
 ]);
 
 export class Drop {

@@ -281,6 +281,17 @@ The provider credentials come from `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`
 
 **Superseded:** decision:oauth-providers-from-env replaces this record: GitHub and Google are each enabled by their own environment pair, both link by verified email, and the provider list is rewritten on every boot, so OAuth is disabled only when every pair is unset.
 
+## inaccessible-workspace-answers-404
+
+- **Slug:** `decision:inaccessible-workspace-answers-404`
+- **Title:** A route asked about a workspace the caller cannot read answers 404, whether the workspace is unknown, in the trash, or belongs to someone else.
+
+GET /api/tracker/trash answered 403 for a workspace the caller was not a member of and for an id that matched nothing, while the other workspace routes answer 404 for both and its own documentation said a trashed workspace gets the same 404 an unknown one gets. Measured on 2026-11-06 (card 7cns): a member asking for an unknown id got 403, a non-member asking for a live workspace got 403, and only a trashed workspace got 404.
+
+Prior art in this tree: POST /api/tracker/export, POST /api/tracker/workspaces/{id}/vocab and POST /api/tracker/workspaces/{id}/resolve-member-email answer 404 when the workspace does not exist, is in the trash, or the caller holds no admitting membership, and GET /api/tracker/workspaces/{id}/deletion-impact answers an admin and a superuser 404 like an unknown id: the same existence-hiding shape a denied view returns under the collection rules. Prior art outside it: the Linear API answers a request for an issue or team the caller cannot reach with an entity-not-found error, the same answer an id that never existed gets, so a stranger learns nothing from the answer.
+
+Ruling: the status changes, and the prose follows it. The trash route answers a user 404 for an unknown id, for a workspace the user is not an active member of, and for a trashed workspace alike. 403 stays reserved for a caller whose kind of credential is refused outright: an API key, an unverified account, or a superuser on a route that answers for a member, which the me, landing, counts and trash routes all are. A workspace route that still answers a user 403 for a resource that user cannot read is a bug under this decision.
+
 ## invitation-keyed-by-email
 
 - **Slug:** `decision:invitation-keyed-by-email`

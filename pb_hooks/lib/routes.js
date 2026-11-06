@@ -465,6 +465,7 @@ const ROUTES = {
     summary:
       "Lists the trashed items of one workspace a page at a time, or counts them in groups.",
     auth: "any",
+    denies: ["superuser"],
     docs: "route:tracker-trash",
     query: {
       workspace: {
@@ -506,8 +507,8 @@ const ROUTES = {
     },
     responses: {
       400: "The workspace is missing or blank, or the filter, sort, group or time zone is refused: a filter longer than 3500 characters, a filter or sort that reaches past the items' own fields, a group outside the listed ones, or a time zone that is not an IANA name.",
-      403: "The workspace does not exist, or the caller is neither its owner nor an active member.",
-      404: "The workspace is in the trash; its owner gets 404 too.",
+      403: "The caller is a superuser, who is no member of any workspace; the same refusal the other member-only workspace routes answer.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member; its owner gets 404 for a trashed workspace too.",
     },
     response: {
       status: 200,

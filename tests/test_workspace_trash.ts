@@ -1128,8 +1128,8 @@ try {
     [ADMIN]: 200,
     [MEMBER]: 200,
     [VIEWER]: 200,
-    [ASSIGNEE]: 403,
-    [OUTSIDER]: 403,
+    [ASSIGNEE]: 404,
+    [OUTSIDER]: 404,
     [ROOT]: 403,
   };
 
@@ -1196,8 +1196,9 @@ try {
     const search = live ? LIVE_SEARCH : from_keys(Object.keys(LIVE_SEARCH), 0);
     const exp = live ? LIVE_EXPORT : from_keys(Object.keys(LIVE_EXPORT), 404);
     // Trashing changes the answer only for someone who could read the route at all; a caller
-    // the membership check already refuses keeps the SAME 403, so the route never confirms a
-    // workspace exists to a stranger holding its id.
+    // the membership check already refuses keeps the SAME 404, so the route never confirms a
+    // workspace exists to a stranger holding its id (decision:inaccessible-workspace-answers-404);
+    // a superuser is refused 403 before any lookup, as on the other users-only workspace routes.
     const troute = live
       ? LIVE_TRASH_ROUTE
       : Object.fromEntries(
