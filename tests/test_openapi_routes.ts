@@ -258,6 +258,14 @@ check(
   !bare.length,
 );
 check("components.schemas.Error exists", !!SPEC.components?.schemas?.Error);
+const undescribed: string[] = [];
+for (const [name, schema] of Object.entries(SPEC.components?.schemas ?? {}) as [string, any][])
+  for (const [prop, ps] of Object.entries(schema.properties ?? {}) as [string, any][])
+    if (!ps?.description) undescribed.push(`${name}.${prop}`);
+check(
+  `every schema property has a description${undescribed.length ? ` (${undescribed.length} missing: ${undescribed.slice(0, 5).join(", ")}…)` : ""}`,
+  !undescribed.length,
+);
 // Prose describes behaviour: no file, script or server-mechanism names; a `hook:` slug is an address, not a mechanism.
 const MECHANISM =
   /pb_hooks\/|pb_migrations\/|scripts\/|\.pb\.js|\.(js|ts)\b|\bhooks?\b(?!:)|migration|\bcron\b|JSVM|\$http|\$app|\$apis|middleware|routerAdd|universal[- ]tier|\bSQL\b/iu;

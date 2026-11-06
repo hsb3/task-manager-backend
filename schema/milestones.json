@@ -19,7 +19,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The milestone name, stored trimmed; a name of only spaces is refused.",
       "hidden": false,
       "id": "text2000000021",
       "max": 200,
@@ -34,7 +34,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "Optional text describing what the milestone delivers.",
       "hidden": false,
       "id": "text2000000022",
       "max": 2000,
@@ -50,7 +50,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this milestone belongs to; it may be omitted when a project is sent, and it cannot be changed afterwards.",
       "hidden": false,
       "id": "relation2000000023",
       "maxSelect": 1,
@@ -82,7 +82,7 @@
       "type": "autodate"
     },
     {
-      "help": "",
+      "help": "When the milestone was moved to the trash, set by the server on DELETE; send it empty only to restore the milestone, any other change is refused.",
       "hidden": false,
       "id": "date3000000104",
       "max": "",
@@ -96,7 +96,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_484305853",
-      "help": "",
+      "help": "The project this milestone belongs to, which must be a project of the same workspace; if omitted it lands in the hidden project for unfiled items, with no key.",
       "hidden": false,
       "id": "relation4000000103",
       "maxSelect": 1,
@@ -108,7 +108,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "True while only the author, the workspace owner and admins can see it; send false to publish, which cannot be undone.",
       "hidden": false,
       "id": "bool4000000112",
       "name": "draft",
@@ -118,7 +118,7 @@
       "type": "bool"
     },
     {
-      "help": "",
+      "help": "The day the milestone aims to be done by; optional, and a value that is not a date is stored as empty.",
       "hidden": false,
       "id": "date3000000201",
       "max": "",
@@ -132,7 +132,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who moved the milestone to the trash, set by the server; a value sent at create is dropped, and it may only be cleared on restore.",
       "hidden": false,
       "id": "relation3110000004",
       "maxSelect": 1,
@@ -146,7 +146,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who created the milestone, filled by the server from the signed-in caller; a value sent is replaced and a later change is refused.",
       "hidden": false,
       "id": "relation4000000203",
       "maxSelect": 1,
@@ -158,7 +158,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "Up to 10 images or PDFs of 10 MB each; downloading one needs a short-lived file token.",
       "hidden": false,
       "id": "file4000000303",
       "maxSelect": 10,
@@ -183,7 +183,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The display key such as ENG-42, assigned by the server and fixed for life, empty outside a project; a value sent is ignored at create and refused later.",
       "hidden": false,
       "id": "text4300000013",
       "max": 32,

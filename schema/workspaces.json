@@ -19,7 +19,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The workspace name, for display only, stored trimmed; a name of only spaces is refused.",
       "hidden": false,
       "id": "text2000000001",
       "max": 200,
@@ -35,7 +35,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who owns the workspace; leave it empty and the server fills the caller, and it changes only through an ownership transfer.",
       "hidden": false,
       "id": "relation2000000002",
       "maxSelect": 1,
@@ -47,7 +47,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "The priority list as a JSON array of objects with id and name, most severe first; an entry sent without an id gets one.",
       "hidden": false,
       "id": "json2000000005",
       "maxSize": 100000,
@@ -80,7 +80,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "pbc_484305853",
-      "help": "",
+      "help": "The project members open first in this workspace, which must be a project of the same workspace.",
       "hidden": false,
       "id": "relation2000000120",
       "maxSelect": 1,
@@ -92,7 +92,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "When the workspace was moved to the trash by DELETE; send it empty to restore the workspace, any other change is refused.",
       "hidden": false,
       "id": "date3000000100",
       "max": "",

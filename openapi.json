@@ -5,21 +5,26 @@
         "description": "Paginated list of `api_keys` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/ApiKeysRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -36,27 +41,33 @@
         "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read or write), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "expires": {
+            "description": "When the key stops working, or empty for a key that never expires; it can be set only at create.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "key_hash": {
-            "description": "Hidden system field — not returned in API responses.",
+            "description": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced and a later change is refused. Hidden system field — not returned in API responses.",
             "type": "string"
           },
           "name": {
+            "description": "A label to tell your keys apart, up to 200 characters, stored trimmed; it may be renamed later.",
             "type": "string"
           },
           "revoked": {
+            "description": "Set to true to switch the key off for good; a revoked key cannot be switched back on.",
             "type": "boolean"
           },
           "scope": {
+            "description": "What the key may do: read allows only reads, write also allows changes; chosen at create and fixed afterwards.",
             "enum": [
               "read",
               "write"
@@ -64,11 +75,12 @@
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "user": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The account this key acts as; leave it empty and the server fills the signed-in caller, while naming another user is refused. Relation record id (target collection: users).",
             "type": "string"
           }
         },
@@ -84,21 +96,26 @@
         "description": "Paginated list of `app_docs` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/AppDocsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -115,25 +132,32 @@
         "description": "The self-documenting collection: one record per collection (collection:), concept (concept:), server behaviour (hook:), route (route:) and decision (decision:). Anyone may read it, including an anonymous caller; only a superuser may write. The server seeds it, so the docs travel with the app and rebuild on any fresh database. Query it at runtime with GET /api/collections/app_docs/records.\n\nA create or update that sends a body key the collection does not define is refused with a 400 error naming every unknown key. A slug, title or body made only of whitespace is refused with a 400 error. A title or body is stored without leading or trailing whitespace (concept:write-normalisation).\n\nA slug is an address rather than prose: lowercase letters and digits in segments joined by a single hyphen or underscore, optionally preceded by a namespace and a colon, as in collection:app_docs. The namespace, when present, must be one of collection:, concept:, decision:, hook: or route:; any other prefix, a misspelling included, is refused with a 400 error. The namespace IS the category of a record, so there is no separate category field that could disagree with the slug. A space, a slash, a capital letter, and a leading, trailing or doubled separator are each refused with a 400 error. Slugs are unique.",
         "properties": {
           "body": {
+            "description": "The full text of the entry in markdown; read-only for clients.",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "refName": {
+            "description": "The name of the collection this entry is mainly about, such as tasks, or empty when it concerns none; read-only for clients.",
             "type": "string"
           },
           "slug": {
+            "description": "The unique address of this entry, such as collection:tasks or decision:soft-delete-trash; entries are read-only for clients.",
             "type": "string"
           },
           "title": {
+            "description": "A one-line summary of the entry; read-only for clients.",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           }
@@ -150,21 +174,26 @@
         "description": "Paginated list of `app_settings` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/AppSettingsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -181,21 +210,25 @@
         "description": "A global key/value store, neither per user nor per workspace. Fields: key (text, required, unique) and value (json, required; holds a number, string or object).\n\nAccess: list and view are open to any authenticated user (@request.auth.id != \"\"). Create, update and delete have no rule, so only a superuser may write, through the PocketBase dashboard; any other write is refused with 403, the same posture as app_docs.\n\nSeeded keys:\n\n- trash_retention_days = 30 (the number 30): the soft-delete recovery window. The daily trash expiry sweep and POST /api/tracker/trash/purge purge an item trashed longer ago than this.\n- invitation_expiry_days = 7 (the number 7): the pending-invitation window, read by the invitation routes and the daily invitation sweep. See collection:workspace_invitations.\n\nA key made only of whitespace is refused with a 400 error. A key is an address rather than prose, so it must read as lowercase letters and digits in segments joined by a single hyphen or underscore, as in trash_retention_days: a space, a slash, a capital letter, and a leading, trailing or doubled separator are each refused with a 400 error.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "key": {
+            "description": "The name of the setting, such as trash_retention_days; unique, and read-only for clients.",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "value": {
-            "description": "Arbitrary JSON value."
+            "description": "The value of the setting as JSON, usually a number such as 30; every signed-in user may read it and no client may change it. Arbitrary JSON value."
           }
         },
         "required": [
@@ -209,9 +242,11 @@
         "description": "Response from the users auth endpoints.",
         "properties": {
           "record": {
-            "$ref": "#/components/schemas/UsersRecord"
+            "$ref": "#/components/schemas/UsersRecord",
+            "description": "The signed-in user."
           },
           "token": {
+            "description": "Auth token to send in the Authorization header.",
             "type": "string"
           }
         },
@@ -225,21 +260,26 @@
         "description": "Paginated list of `comments` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/CommentsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -256,42 +296,47 @@
         "description": "Fields: body (text, required, up to 5000 characters), author (relation to users), parent (self-relation, removed with its parent), reactions (json, emoji to user-id arrays), edited (bool), and EXACTLY ONE target among task, document and decision (each optional, each removed with its target).\n\n**Create.** The createRule requires exactly one target (zero, two or three targets is a 400) and scopes the caller to the workspace of that target: its owner or an active non-viewer member, plus the task assignee on the task path. The task path reads the workspace relation of the task itself, so a comment on a task in the shadow project has the same moderators as any other. A reply must name a parent that is a top-level comment on the SAME target, which makes threads single-level. author is stamped from the caller at create; a superuser create keeps a submitted author for seed and import fidelity. A body made only of whitespace is refused with a 400 error.\n\n**Read.** List and view are open to the workspace owner and ACTIVE members of the workspace of the target, plus the task assignee on the task path. A suspended membership reads nothing on any path: a suspended member who is still the assignee of a task reads, posts and reacts on its comments no more than a non-member. A list is rule-filtered (an outsider gets an empty page) while view, update and delete answer 404. A comment is also hidden when its parent task, document or decision is trashed, sits in a trashed project, or sits in a trashed workspace. That cut has no role carve-out: the workspace owner and an active admin lose the thread exactly as a plain member does, and restoring the parent, its project or its workspace brings the thread back unchanged.\n\n**Drafts.** On the document and decision paths a comment on a DRAFT parent is readable and postable only by the set that may read the draft itself: its author, the workspace owner, or an active admin. A comment on a task, or on a published document or decision, keeps the workspace-membership scope above. The narrower scope tracks the draft flag of the parent directly, so publishing the parent widens comment access in the same instant.\n\n**Write.** Every write rule opens with an authentication guard, so an anonymous caller cannot update or delete any comment, including a degenerate row with no target or no author. Update and delete also require the READ predicate, so no branch, the author branch included, can write a comment it cannot read. Within that, full edit and delete belong to the author, the workspace owner, or an active admin; an active non-viewer member (and the task assignee) may PATCH reactions only. Posting, editing and deleting are cut on the same three trash levels as reading, with no role carve-out: while the parent is hidden a write answers the same 404 any unreadable row answers, and the row survives to be read again once the parent comes back.\n\n**Field guards.** edited is server-set and tamper-proof: forced true when body changes, otherwise reset to its stored value, so a client can neither set nor clear it. author is refused on any change after create (400 author is immutable). reactions may be toggled by any caller allowed to react, but the server lets each caller add or remove ONLY their own id.\n\n**Re-scope.** An update that carries task, document, decision, author or parent AT ALL is refused with 404 on every branch, author and moderators included. Those relations ARE the tenant of the comment, and PocketBase evaluates an update rule against the OLD state only, so a move into a workspace the caller cannot read would never be re-checked. Editing body and toggling reactions are unaffected.\n\nparent also carries cascadeDelete, so a graft onto the thread of another tenant would let that tenant destroy the comment by deleting the parent. The server therefore re-asserts the create-time invariant, same target and top-level parent, on any save that CHANGES parent; a superuser PATCH and a programmatic save alike answer 400, and clearing parent stays allowed. A second guard re-counts the targets on create and on update and answers 400 above one, again for a superuser and a programmatic save. Both guards fire only when the guarded fields actually change, so a body edit or a reactions toggle never trips on a row already incoherent. The count is AT MOST one, not AT LEAST one: a zero-target row stays superuser-constructible. Moving the single target to another task, swapping task for document in one request, and clearing the last target all stay allowed. Bounded: a superuser bypasses collection rules, so a re-scope of task, document or decision is still reachable from the dashboard or an import; the author-immutability and parent-integrity guards have no such bypass.\n\n**Notifications.** A task comment subscribes its author to the task (collection:task_subscribers), fans out a commented notification, and fans out a mentioned notification to each active member or owner named with an @mention, on create and on an edit that adds a mention (collection:notifications). Document and decision comments have no subscriber model and notify no one.",
         "properties": {
           "author": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who wrote the comment, filled by the server from the signed-in caller; a value sent at create is replaced and a later change is refused. Relation record id (target collection: users).",
             "type": "string"
           },
           "body": {
+            "description": "The comment text, up to 5000 characters, stored trimmed; text of only spaces is refused, and changing it marks the comment edited.",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "decision": {
-            "description": "Relation record id (target collection: decisions).",
+            "description": "The decision this comment is on; send exactly one of task, document or decision at create, and it cannot be changed afterwards. Relation record id (target collection: decisions).",
             "type": "string"
           },
           "document": {
-            "description": "Relation record id (target collection: documents).",
+            "description": "The document this comment is on; send exactly one of task, document or decision at create, and it cannot be changed afterwards. Relation record id (target collection: documents).",
             "type": "string"
           },
           "edited": {
+            "description": "True once the body has been changed after posting; the server sets it, and a value sent is ignored.",
             "type": "boolean"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "parent": {
-            "description": "Relation record id (target collection: comments).",
+            "description": "The top-level comment on the same item that this one replies to, or empty to start a thread; replies do not nest and it cannot be changed later. Relation record id (target collection: comments).",
             "type": "string"
           },
           "reactions": {
-            "description": "Arbitrary JSON value."
+            "description": "A JSON object mapping each emoji to an array of user ids; each caller may add or remove only their own id. Arbitrary JSON value."
           },
           "task": {
-            "description": "Relation record id (target collection: tasks).",
+            "description": "The task this comment is on; send exactly one of task, document or decision at create, and it cannot be changed afterwards. Relation record id (target collection: tasks).",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           }
@@ -306,21 +351,26 @@
         "description": "Paginated list of `cycles` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/CyclesRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -337,29 +387,35 @@
         "description": "A cycle is the span a workspace plans and ships within. It is a WORKSPACE object, never a project one, so one set of cycles serves every project in the workspace. Fields: name (required, up to 200 characters), workspace (required, removed with its workspace), starts_on (required) and ends_on (optional on create). Tasks point at a cycle through tasks.cycle.\n\n**Shape.** A create that omits ends_on gets the DEFAULT TWO-WEEK SPAN, filled by the server as starts_on plus 14 days; sending both dates keeps a custom span. A cycle is a calendar-day object: the server normalizes starts_on and ends_on to midnight UTC, so a submitted time of day is discarded. Two guards then run on create and on update, on every write path so a write made in code is held to the same shape as an API write: a cycle must end after the day it starts, and NO TWO CYCLES IN ONE WORKSPACE MAY OVERLAP. Boundaries are inclusive, so the next cycle may begin the day after the previous one ends but not on the same day. Non-overlap keeps the next cycle unambiguous, which the rollover depends on. A name made only of whitespace is refused with a 400 error.\n\n**Access.** List and view are open to the workspace owner and every active member. Create, update and delete are the workspace owner or an active admin; a plain member, a viewer, a suspended member, a non-member and an anonymous caller get nothing. The workspace of a cycle is immutable, and an update that sends it is refused. A request that names a workspace (?workspace=) can view, update or delete a cycle only if it belongs to that workspace; otherwise it answers 404.\n\n**Not trashable.** Cycles carry no trashed field and a delete is a hard delete, because a cycle is workspace configuration that items point at, like labels, statuses, saved views and templates.\n\n**Automatic rollover.** When a cycle ends, the unfinished tasks on it move into the next cycle. A task rolls UNLESS its status category is completed or canceled, so a task in triage or with no status rolls too, while a completed or canceled task stays on the cycle that ended. A trashed task, or a task whose project is trashed, stays behind; once restored it rolls on the next sweep. Only tasks roll, and a rolling task keeps its project. Cycles of a trashed workspace are skipped.\n\nWhen the workspace has no later cycle, one is created: it runs the same number of days as the cycle that ended and starts on the first contiguous span of that length that has not itself already ended, so a workspace left dormant lands its work in a cycle that is still running. No placeholder cycles are created for the idle time. The created cycle is named Cycle followed by its start date, a placeholder anyone may rename. When a later cycle exists, it is used. An ended cycle with no unfinished work creates nothing.\n\nOne run works through every ended cycle oldest first, so a dormant workspace is caught up at once and a second run moves nothing. The sweep is idempotent rather than transactional: a run that stops part way leaves a consistent partial result the next one finishes, and a row that will not save holds up no other workspace, only a logged warning naming what it skipped. Once a day the server runs it at 06:00 UTC unless CYCLE_ROLLOVER_CRON says otherwise, and the superuser-only POST /api/tracker/cycles/rollover runs the same sweep on demand and returns the number of MOVES it made, one per task per cycle crossed.\n\nEach move is an ordinary task update: it is broadcast to realtime subscribers of the workspace, and it writes a task_activity row on the cycle field naming the cycle left and the one landed on. That history is the whole record of a rollover; neither the cycle nor the task keeps a separate counter.\n\n**Workspace trash.** While the workspace holding them is in the trash, cycles are frozen: a create is refused, and an update or a delete answers exactly as an unknown id does, for the workspace owner and an active admin as well as for everyone else. Reading them narrows to the set that can restore the workspace, its owner and an active admin; every other tier gets an empty listing and the unknown-id answer. Nothing is written on the rows, so restoring the workspace brings them back unchanged.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "ends_on": {
+            "description": "The last day of the cycle, after starts_on; leave it empty at create and the server sets it to two weeks after the start.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "name": {
+            "description": "The cycle name, up to 200 characters, stored trimmed; a cycle the server starts on its own is named after its start date.",
             "type": "string"
           },
           "starts_on": {
+            "description": "The first day of the cycle; the time of day is dropped, and two cycles of one workspace may not overlap.",
             "format": "date-time",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this cycle belongs to; required at create and cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -375,21 +431,26 @@
         "description": "Paginated list of `decisions` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/DecisionsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -406,62 +467,73 @@
         "description": "Fields: title (required), status, context, decision, consequences, workspace (relation, required, removed with its workspace), project (relation, optional, removed with its project), key (text, server-assigned, immutable), draft (bool), author (relation to users), trashed (date), trashed_by (relation to users) and attachments.\n\n**Scope.** A decision lives at the workspace level or inside one project of that workspace. A decision created without a project lands in the shadow project of its workspace (concept:shadow-project). A decision created with a project and no workspace takes the workspace of that project. The project must belong to the same workspace as the decision, and the workspace and project checks shared with tasks apply. Purging a project deletes the decisions inside it.\n\n**Identity.** key is the prefix of the project plus a number drawn from ONE sequence shared with tasks, documents and milestones; see collection:tasks for the mechanism. A decision in the shadow project carries no key, never gains one by moving into a real project, and a PATCH that submits key is refused with 400 (key is immutable).\n\n**Author and trash fields.** author is stamped from the authenticated caller at create and refused on any later change (400 author is immutable); a superuser create keeps a submitted author, and a programmatic create leaves it empty. trashed and trashed_by are set only by the delete-to-trash path; a create that submits either has it cleared. An update may change them only to restore the row: one that sets either, re-dates trashed or changes trashed_by while the row stays in the trash is refused with 400; a superuser is exempt.\n\n**Access.** The workspace owner or any ACTIVE member may list and view; the owner or an active non-viewer member may create, update and delete. A suspended membership loses read as well as write on every rule. DELETE moves a decision to the trash; a second DELETE on a trashed decision purges it and is limited to the workspace owner or an admin. A create that names a project in the trash is refused with 400 for the workspace owner and members alike; restore the project first.\n\n**Drafts.** List, view, update and delete all require that the decision is published, or that the caller is its author, the workspace owner, or an active admin. A peer member gets a filtered list and a 404 on view, update and delete. The predicate rides the write rules too because a blind PATCH by id returns the full record body, which would otherwise leak a draft the caller cannot GET. A draft with an empty author is owner and admin only. Publishing is one-way: setting draft back to true on a published decision is refused with 400. Sending draft as true on a decision still in draft is refused the same way, so an update can only publish; a superuser is exempt from both. draft takes the JSON values true or false, or the text true or false in a form field, and a create or update that sends anything else, batch requests included, is refused with 400.\n\n**Attachments.** attachments is an optional protected file field: up to 10 files, 10 MB each, jpeg, png, gif, webp, svg+xml or pdf, with a 200x200 thumb, the same configuration as tasks.attachments. A file URL needs a short-lived token from POST /api/files/token and still re-applies this viewRule: no token is 404, the uploader token is 200, and a valid token held by a non-member is 404.\n\n**Workspace trash.** While the workspace that holds a decision is in the trash, the decision is hidden and frozen for everyone, the workspace owner and an active admin included: a listing returns nothing, a read by id answers exactly as an unknown id does, and create, update and delete are all refused. Nothing is written on the decision itself, so restoring the workspace brings it back unchanged.",
         "properties": {
           "attachments": {
-            "description": "Stored filename (fetch via the files API).",
+            "description": "Up to 10 images or PDFs of 10 MB each; downloading one needs a short-lived file token. Stored filename (fetch via the files API).",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "author": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who created the decision, filled by the server from the signed-in caller; a value sent is replaced and a later change is refused. Relation record id (target collection: users).",
             "type": "string"
           },
           "consequences": {
+            "description": "What follows from the decision; an @mention of a workspace member notifies them once the decision is published.",
             "type": "string"
           },
           "context": {
+            "description": "The background that led to the decision; an @mention of a workspace member notifies them once the decision is published.",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "decision": {
+            "description": "What was decided; an @mention of a workspace member notifies them once the decision is published.",
             "type": "string"
           },
           "draft": {
+            "description": "True while only the author, the workspace owner and admins can see it; send false to publish, which cannot be undone.",
             "type": "boolean"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "key": {
+            "description": "The display key such as ENG-42, assigned by the server and fixed for life, empty outside a project; a value sent is ignored at create and refused later.",
             "type": "string"
           },
           "project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project this decision sits in, which must be a project of the same workspace; if omitted it lands in the hidden project for unfiled items. Relation record id (target collection: projects).",
             "type": "string"
           },
           "status": {
+            "description": "A free-text word for where the decision stands, up to 50 characters; any text is accepted.",
             "type": "string"
           },
           "title": {
+            "description": "The headline of the decision, stored trimmed; a title of only spaces is refused.",
             "type": "string"
           },
           "trashed": {
+            "description": "When the decision was moved to the trash, set by the server on DELETE; send it empty only to restore the decision, any other change is refused.",
             "format": "date-time",
             "type": "string"
           },
           "trashed_by": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who moved the decision to the trash, set by the server; a value sent at create is dropped, and it may only be cleared on restore. Relation record id (target collection: users).",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this decision belongs to; it may be omitted when a project is sent, and it cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -476,21 +548,26 @@
         "description": "Paginated list of `documents` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/DocumentsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -507,53 +584,61 @@
         "description": "Fields: title (required), body (markdown text), workspace (relation, required, removed with its workspace), project (relation, optional, removed with its project), key (text, server-assigned, immutable), draft (bool), author (relation to users), trashed (date), trashed_by (relation to users) and attachments.\n\n**Scope.** A document lives at the workspace level or inside one project of that workspace. A document created without a project lands in the shadow project of its workspace (concept:shadow-project). A document created with a project and no workspace takes the workspace of that project. The project must belong to the same workspace as the document, and the workspace and project checks shared with tasks apply. Purging a project deletes the documents inside it.\n\n**Identity.** key is the prefix of the project plus a number drawn from ONE sequence shared with tasks, decisions and milestones; see collection:tasks for the mechanism. A document in the shadow project carries no key, never gains one by moving into a real project, and a PATCH that submits key is refused with 400 (key is immutable).\n\n**Author and trash fields.** author is stamped from the authenticated caller at create and refused on any later change (400 author is immutable); a superuser create keeps a submitted author, and a programmatic create leaves it empty. trashed and trashed_by are set only by the delete-to-trash path; a create that submits either has it cleared. An update may change them only to restore the row: one that sets either, re-dates trashed or changes trashed_by while the row stays in the trash is refused with 400; a superuser is exempt.\n\n**Access.** The workspace owner or any ACTIVE member may list and view; the owner or an active non-viewer member may create, update and delete. A suspended membership loses read as well as write on every rule. DELETE moves a document to the trash; a second DELETE on a trashed document purges it and is limited to the workspace owner or an admin. A create that names a project in the trash is refused with 400 for the workspace owner and members alike; restore the project first.\n\n**Drafts.** List, view, update and delete all require that the document is published, or that the caller is its author, the workspace owner, or an active admin. A peer member gets a filtered list and a 404 on view, update and delete. The predicate rides the write rules too because a blind PATCH by id returns the full record body, which would otherwise leak a draft the caller cannot GET. A draft with an empty author is owner and admin only. Publishing is one-way: setting draft back to true on a published document is refused with 400. Sending draft as true on a document still in draft is refused the same way, so an update can only publish; a superuser is exempt from both. draft takes the JSON values true or false, or the text true or false in a form field, and a create or update that sends anything else, batch requests included, is refused with 400.\n\n**Attachments.** attachments is an optional protected file field: up to 10 files, 10 MB each, jpeg, png, gif, webp, svg+xml or pdf, with a 200x200 thumb, the same configuration as tasks.attachments. A file URL needs a short-lived token from POST /api/files/token and still re-applies this viewRule: no token is 404, the uploader token is 200, and a valid token held by a non-member is 404.\n\n**Workspace trash.** While the workspace that holds a document is in the trash, the document is hidden and frozen for everyone, the workspace owner and an active admin included: a listing returns nothing, a read by id answers exactly as an unknown id does, and create, update and delete are all refused. Nothing is written on the document itself, so restoring the workspace brings it back unchanged.",
         "properties": {
           "attachments": {
-            "description": "Stored filename (fetch via the files API).",
+            "description": "Up to 10 images or PDFs of 10 MB each; downloading one needs a short-lived file token. Stored filename (fetch via the files API).",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "author": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who created the document, filled by the server from the signed-in caller; a value sent is replaced and a later change is refused. Relation record id (target collection: users).",
             "type": "string"
           },
           "body": {
+            "description": "The document text in markdown, stored as sent; an @mention of a workspace member notifies them once the document is published.",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "draft": {
+            "description": "True while only the author, the workspace owner and admins can see it; send false to publish, which cannot be undone.",
             "type": "boolean"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "key": {
+            "description": "The display key such as ENG-42, assigned by the server and fixed for life, empty outside a project; a value sent is ignored at create and refused later.",
             "type": "string"
           },
           "project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project this document sits in, which must be a project of the same workspace; if omitted it lands in the hidden project for unfiled items. Relation record id (target collection: projects).",
             "type": "string"
           },
           "title": {
+            "description": "The title of the document, stored trimmed; a title of only spaces is refused.",
             "type": "string"
           },
           "trashed": {
+            "description": "When the document was moved to the trash, set by the server on DELETE; send it empty only to restore the document, any other change is refused.",
             "format": "date-time",
             "type": "string"
           },
           "trashed_by": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who moved the document to the trash, set by the server; a value sent at create is dropped, and it may only be cleared on restore. Relation record id (target collection: users).",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this document belongs to; it may be omitted when a project is sent, and it cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -572,9 +657,11 @@
             "type": "object"
           },
           "message": {
+            "description": "What was refused and why.",
             "type": "string"
           },
           "status": {
+            "description": "HTTP status of the answer.",
             "type": "integer"
           }
         },
@@ -589,21 +676,26 @@
         "description": "Paginated list of `invitation_events` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/InvitationEventsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -620,20 +712,24 @@
         "description": "A ledger of invitation sends and declines that only invitation writes and the daily sweep change. Fields: kind (select, required: mint or decline), inviter (relation to users, no cascade; set on a mint row), workspace (relation, no cascade), email_key (text, required, set on every row) and created (the time the row is written). Deleting the workspace clears workspace and keeps the row, so deleting a workspace does not refund its sends.\n\nAll five API rules are null, so no non-superuser request can reach it. Two indexes back the checks that read it: inviter and created for the rolling 24-hour send count, and workspace, email_key, kind and created for a recent decline to that address. The server writes the mint and decline rows, and deletes a mint row if the save that follows fails, so a refused invitation spends no slot. The daily expiry sweep deletes rows older than max(1, invitation_expiry_days) days, so the ledger never grows without bound. See decision:invitation-send-limit-and-decline-block.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "email_key": {
+            "description": "The normalised invited address used to count sends and declines; written by the server and never readable by clients.",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "inviter": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who sent the invitation, on a mint row; written by the server and never readable by clients. Relation record id (target collection: users).",
             "type": "string"
           },
           "kind": {
+            "description": "Whether the row records an invitation sent (mint) or declined (decline); written by the server and never readable by clients.",
             "enum": [
               "mint",
               "decline"
@@ -641,7 +737,7 @@
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace the invitation was for, emptied if that workspace is deleted; written by the server and never readable by clients. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -656,21 +752,26 @@
         "description": "Paginated list of `labels` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/LabelsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -687,6 +788,7 @@
         "description": "Fields: workspace (relation, required, removed with its workspace), project (relation, optional, removed with its project; a label lives at the workspace level or inside one project), name (required), color (select: gray, red, orange, yellow, green, teal, blue, indigo, purple or pink), description, and core (bool). Names are unique per workspace among workspace-level labels and per project among project labels (two partial unique indexes). name is trimmed of leading and trailing spaces before it is stored, on create, on update and through POST /api/tracker/workspaces/{id}/vocab, so a name that differs from an existing one only by surrounding spaces still fails the unique index. A name made only of whitespace is refused with a 400 error. Tasks reference labels through the multi-relation tasks.labels.\n\n**Access.** List and view are open to the workspace owner and its ACTIVE members. Create, update and delete are the owner or an ACTIVE admin, because labels are workspace configuration. A suspended membership gets nothing, read included. The workspace of a label is immutable: an update that sends it is refused.\n\n**Core labels.** Every workspace, however it is created, is seeded with three CORE labels: Bug, Feature and Improvement (core = true). They are undeletable: the server refuses the delete of a core label with 400 for every caller, a superuser included. A custom label (core = false) is deletable by the owner or an active admin, and PocketBase removes its id from every task that references it, because tasks.labels does not cascade.\n\n**Workspace trash.** While the workspace holding them is in the trash, labels are frozen: a create is refused, and an update or a delete answers exactly as an unknown id does, for the workspace owner and an active admin as well as for everyone else. Reading them narrows to the set that can restore the workspace, its owner and an active admin; every other tier gets an empty listing and the unknown-id answer. Nothing is written on the rows, so restoring the workspace brings them back unchanged.",
         "properties": {
           "color": {
+            "description": "The display color, from the shared palette; optional.",
             "enum": [
               "gray",
               "red",
@@ -702,31 +804,37 @@
             "type": "string"
           },
           "core": {
+            "description": "True for the built-in labels every workspace starts with, which cannot be deleted; leave it unset on a label you create.",
             "type": "boolean"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "description": {
+            "description": "Optional text explaining when to use the label.",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "name": {
+            "description": "The label name, stored trimmed and unique within its workspace or project; a name of only spaces is refused.",
             "type": "string"
           },
           "project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project this label is limited to, which must be a project of the same workspace; leave it empty for a label of the whole workspace. Relation record id (target collection: projects).",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this label belongs to; required at create and cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -741,21 +849,26 @@
         "description": "Paginated list of `milestones` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/MilestonesRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -772,57 +885,66 @@
         "description": "Fields: name (required), description, workspace (relation, required, removed with its workspace), project (relation, required, removed with its project), key (text, server-assigned, immutable), draft (bool), target (date, optional), author (relation to users), trashed (date), trashed_by (relation to users) and attachments. Tasks point at a milestone through tasks.milestone.\n\n**Scope.** Every milestone belongs to exactly one project inside its workspace, and the project must belong to the same workspace. A milestone created without a project lands in the shadow project of its workspace (concept:shadow-project) and carries no key. A milestone created with a project and no workspace takes the workspace of that project. Purging a project deletes its milestones.\n\n**Identity.** key is the prefix of the project plus a number drawn from ONE sequence shared with tasks, decisions and documents; see collection:tasks for the mechanism. A PATCH that submits key is refused with 400 (key is immutable).\n\n**target.** PocketBase date fields COERCE an unparseable value to an empty string with HTTP 200 rather than refusing it with 400, so a malformed target is silently emptied.\n\n**Author and trash fields.** author is stamped from the authenticated caller at create and refused on any later change (400 author is immutable); a superuser create keeps a submitted author, and a programmatic create leaves it empty. trashed and trashed_by are set only by the delete-to-trash path; a create that submits either has it cleared. An update may change them only to restore the row: one that sets either, re-dates trashed or changes trashed_by while the row stays in the trash is refused with 400; a superuser is exempt.\n\n**Access.** The workspace owner or any ACTIVE member may list and view; the owner or an active non-viewer member may create, update and delete. A suspended membership loses read as well as write on every rule. DELETE moves a milestone to the trash; a second DELETE on a trashed milestone purges it and is limited to the workspace owner or an admin. A milestone whose project is trashed is hidden with it. A create that names a project in the trash is refused with 400 for the workspace owner and members alike; restore the project first.\n\n**Drafts.** List, view, update and delete all require that the milestone is published, or that the caller is its author, the workspace owner, or an active admin. A peer member gets a filtered list and a 404 on view, update and delete. The predicate rides the write rules too because a blind PATCH by id returns the full record body, which would otherwise leak a draft the caller cannot GET. A draft with an empty author is owner and admin only. Publishing is one-way: setting draft back to true on a published milestone is refused with 400. Sending draft as true on a milestone still in draft is refused the same way, so an update can only publish; a superuser is exempt from both. draft takes the JSON values true or false, or the text true or false in a form field, and a create or update that sends anything else, batch requests included, is refused with 400.\n\n**Attachments.** attachments is an optional protected file field: up to 10 files, 10 MB each, jpeg, png, gif, webp, svg+xml or pdf, with a 200x200 thumb, the same configuration as tasks.attachments. A file URL needs a short-lived token from POST /api/files/token and still re-applies this viewRule: no token is 404, the uploader token is 200, and a valid token held by a non-member is 404.\n\n**Workspace trash.** While the workspace that holds a milestone is in the trash, the milestone is hidden and frozen for everyone, the workspace owner and an active admin included: a listing returns nothing, a read by id answers exactly as an unknown id does, and create, update and delete are all refused. Nothing is written on the milestone itself, so restoring the workspace brings it back unchanged.",
         "properties": {
           "attachments": {
-            "description": "Stored filename (fetch via the files API).",
+            "description": "Up to 10 images or PDFs of 10 MB each; downloading one needs a short-lived file token. Stored filename (fetch via the files API).",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "author": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who created the milestone, filled by the server from the signed-in caller; a value sent is replaced and a later change is refused. Relation record id (target collection: users).",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "description": {
+            "description": "Optional text describing what the milestone delivers.",
             "type": "string"
           },
           "draft": {
+            "description": "True while only the author, the workspace owner and admins can see it; send false to publish, which cannot be undone.",
             "type": "boolean"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "key": {
+            "description": "The display key such as ENG-42, assigned by the server and fixed for life, empty outside a project; a value sent is ignored at create and refused later.",
             "type": "string"
           },
           "name": {
+            "description": "The milestone name, stored trimmed; a name of only spaces is refused.",
             "type": "string"
           },
           "project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project this milestone belongs to, which must be a project of the same workspace; if omitted it lands in the hidden project for unfiled items, with no key. Relation record id (target collection: projects).",
             "type": "string"
           },
           "target": {
+            "description": "The day the milestone aims to be done by; optional, and a value that is not a date is stored as empty.",
             "format": "date-time",
             "type": "string"
           },
           "trashed": {
+            "description": "When the milestone was moved to the trash, set by the server on DELETE; send it empty only to restore the milestone, any other change is refused.",
             "format": "date-time",
             "type": "string"
           },
           "trashed_by": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who moved the milestone to the trash, set by the server; a value sent at create is dropped, and it may only be cleared on restore. Relation record id (target collection: users).",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this milestone belongs to; it may be omitted when a project is sent, and it cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -838,21 +960,26 @@
         "description": "Paginated list of `notifications` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/NotificationsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -869,35 +996,40 @@
         "description": "A server-written notification. Fields: user (relation to users, required, the recipient, removed with the user), kind (select, required: assigned, commented, status_done, mentioned or ownership_transferred), task, document, decision, workspace and comment (optional relations, each removed with its target), read (bool), snoozed_until (date), dismissed (bool), comment_preview (text, up to 140 characters), status_label (text, up to 100 characters), actor (optional relation to users) and read_at (date).\n\n**Producers.** The server writes assigned, commented, status_done and mentioned; POST /api/tracker/workspaces/{id}/transfer-ownership writes ownership_transferred. The createRule is null, so a client POST answers 403.\n\n**Actor.** actor names the user whose act raised the row: whoever assigned, completed or commented on the task, wrote the mention, or called the transfer. It is empty when a superuser acted, because a superuser is no users row, and it is emptied when that account is deleted, while the row stays with its recipient.\n\n**Row shapes.** A commented row, and a mentioned row raised by a comment, carry comment and comment_preview. A mentioned row raised by item prose carries neither and names its item through task, document or decision. A status_done row carries status_label, the name of the status the task moved into. An assigned row carries none of the three. comment_preview is a snapshot, at most the first 140 characters of the comment body when the row is written, so a later edit of the comment never rewrites it. An ownership_transferred row carries no task and no comment: it names the workspace whose ownership moved, and the route writes exactly TWO per completed transfer, one to the outgoing owner and one to the incoming one, inside the same transaction as the handover. Every notification about a task, document or decision carries workspace, the workspace of its item (for a comment, the workspace of its task).\n\n**Read.** Access is recipient-only, and list and view share ONE rule, byte for byte: user = @request.auth.id && (workspace = \"\" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= \"active\")) && (task = \"\" || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= \"active\")) && task.trashed = \"\" && (task.project = \"\" || (task.project.created != \"\" && task.project.trashed = \"\")) && task.workspace.trashed = \"\")) && (document = \"\" || ((document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= \"active\")) && document.trashed = \"\" && (document.project = \"\" || (document.project.created != \"\" && document.project.trashed = \"\")) && document.workspace.trashed = \"\")) && (decision = \"\" || ((decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= \"active\")) && decision.trashed = \"\" && (decision.project = \"\" || (decision.project.created != \"\" && decision.project.trashed = \"\")) && decision.workspace.trashed = \"\")) && (document = \"\" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= \"admin\" && document.workspace.workspace_members_via_workspace.status ?= \"active\")) && (decision = \"\" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= \"admin\" && decision.workspace.workspace_members_via_workspace.status ?= \"active\")) && dismissed = false\n\nSo a notification stays visible only while its item is still readable by its recipient: a notification whose task, document or decision is trashed, whose item sits in a trashed project, whose draft the recipient cannot read, or whose workspace the recipient has left (removed or suspended) leaves the inbox and answers 404 by id, then comes back when the item or the access is restored. That clause is load-bearing: comment_preview carries comment text, and a task_subscribers row outlives suspension and removal, so without it a departed member would keep receiving what colleagues write. A row that names a workspace lists only while its recipient owns that workspace or holds an active membership in it, so a member suspended from or removed from a workspace also stops seeing the ownership_transferred rows that name it. A notification naming no workspace, task, document or decision always lists. The list rule does not narrow to one workspace; a caller filters on workspace to show one workspace, including the rows that carry none.\n\n**Update.** update carries the same access predicate (without the dismissed clause, so a recipient can still write a dismissed row) and is field-locked: only read, snoozed_until and dismissed may change, and a PATCH that sets user, task, document, decision, workspace, kind, comment, comment_preview, status_label, actor or read_at is denied with 404. read_at is written by the server alone: the first write that turns a row read stamps the server time, marking an already read row read again keeps that time, and marking it unread clears it. A notification the recipient cannot see cannot be marked read or dismissed either: the write answers 404, indistinguishable from an id that never existed, and the row keeps its unread state until the item is restored. The predicate rides the write path because a successful write returns the record body and honours an expand of the linked item whatever the read rule says.\n\n**Dismiss.** dismissed marks a notification its recipient dismissed, set through the update rule like read. The list and a fetch by id both leave a dismissed row out (404 by id), yet the update rule still admits it, so the dismissing PATCH answers 200 with the row, and setting dismissed back to false lists the row again. The fan-out still counts a dismissed row as sent: a dismissed item-prose mention is not raised again by a later save of unchanged prose, while a later reassign or completion still sends its assigned or status_done row.\n\n**Delete.** The deleteRule is null, so a client DELETE answers 403 whether or not the row exists. Only the server removes rows: when a workspace goes into the trash, every notification about work inside it is deleted rather than hidden, whether the workspace is trashed by a DELETE or by writing its trashed field directly, so nobody holds an inbox item they cannot dismiss, and a restore brings the work back without the notifications.\n\n**Mark all read.** POST /api/tracker/notifications/read-all marks the whole unread inbox of the caller read in ONE statement, so an inbox of any size clears in one request and never half. It covers exactly what the list shows, skips dismissed rows, stamps read_at on every row it marks, and with ?workspace= marks only rows about that workspace plus rows that carry no workspace; with none it covers every workspace.\n\n**Unread count.** GET /api/tracker/me serves unread_notifications, decided row by row by this list rule, so it always equals the read=false total of the list (route:tracker-me).\n\n**Digest.** Once a day the server emails each user ONE summary of their unread notifications, counting only rows the list shows, so the number never names trashed or unreachable work and leaves dismissed rows out. It does nothing when SMTP is not configured.\n\n**Item prose mentions.** An @mention written into the description of a task, the body of a document, or the context, decision or consequences of a decision raises a mentioned notification for each named ACTIVE member or owner of that workspace, on create and on every later save; the row names the item and carries no comment and no preview. A handle resolves exactly as in a comment: the id reference form, or the local part of a member email matched case-insensitively, with an unknown or ambiguous handle naming nobody. A member already holding an item-prose mention row for that item is skipped, so re-saving unchanged prose notifies no one twice; a comment mention on the same item is a separate row. A DRAFT document or decision names nobody while it stays a draft, because the members it names cannot read it; publishing it sends the mentions. A member named in the prose of the same write that also reassigns or completes the task gets ONE row, the mention.\n\nSee collection:task_subscribers for who receives commented and status_done rows.",
         "properties": {
           "actor": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user whose action raised the notification, empty when a superuser acted; set by the server. Relation record id (target collection: users).",
             "type": "string"
           },
           "comment": {
-            "description": "Relation record id (target collection: comments).",
+            "description": "The comment that raised the notification, on comment rows and on mentions made in a comment; set by the server. Relation record id (target collection: comments).",
             "type": "string"
           },
           "comment_preview": {
+            "description": "The first 140 characters of the comment when the notification was written; set by the server and not updated by later edits.",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "decision": {
-            "description": "Relation record id (target collection: decisions).",
+            "description": "The decision the notification is about, set by the server; a change sent is refused. Relation record id (target collection: decisions).",
             "type": "string"
           },
           "dismissed": {
+            "description": "True once the recipient dismisses the notification, which hides it from the inbox; setting it back to false shows it again.",
             "type": "boolean"
           },
           "document": {
-            "description": "Relation record id (target collection: documents).",
+            "description": "The document the notification is about, set by the server; a change sent is refused. Relation record id (target collection: documents).",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "kind": {
+            "description": "What happened: an assignment, a comment, a task completed, a mention, or a change of workspace owner; set by the server.",
             "enum": [
               "assigned",
               "commented",
@@ -908,33 +1040,38 @@
             "type": "string"
           },
           "read": {
+            "description": "Whether the recipient has read the notification; the recipient may set it to true or false.",
             "type": "boolean"
           },
           "read_at": {
+            "description": "When the notification was last marked read; the server sets it and clears it when marked unread, and a value sent is refused.",
             "format": "date-time",
             "type": "string"
           },
           "snoozed_until": {
+            "description": "A time until which the recipient sets the notification aside; the recipient may set or clear it.",
             "format": "date-time",
             "type": "string"
           },
           "status_label": {
+            "description": "The name of the status the task moved into, on a completed-task notification; set by the server.",
             "type": "string"
           },
           "task": {
-            "description": "Relation record id (target collection: tasks).",
+            "description": "The task the notification is about, set by the server; a change sent is refused. Relation record id (target collection: tasks).",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "user": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The recipient of the notification, set by the server; a change sent is refused. Relation record id (target collection: users).",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace the notification concerns, set by the server; filter on it to show the inbox of one workspace. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -949,21 +1086,26 @@
         "description": "Paginated list of `project_items` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/ProjectItemsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -980,102 +1122,135 @@
         "description": "A VIEW collection: one row per item across tasks, decisions, documents and milestones, so a project list is ONE ordered, paginated, truly-totalled query instead of four merged and re-sorted by the caller. Create, update and delete are refused for everyone, superusers included.\n\n**Columns.** type (task, decision, document or milestone), title (the name of a milestone), key, project, workspace, created, updated, trashed, draft, author (the creator on every type, empty when a superuser or server code created it), assignee (empty on the other three types), ordinal (the task ordinal, 0 elsewhere), due (the due of a task, the target of a milestone), has_due, priority_rank, has_priority, project_trashed, workspace_trashed, comment_count, cycle, and the filter columns status (a task status id, a decision free-text status, empty for the other two), priority, parent, milestone, labels and dependencies (tasks only, empty elsewhere). Every column is cast to TEXT or a number, so a filter on cycle returns exactly the tasks in that cycle.\n\n- project_trashed is a 0/1 FLAG, not the trash date of the project, because that date is a fact about a record some readers of the row cannot view. It reads 1 for a row in a trashed project and for a row naming a project that does not exist (a create that raced its project purge), and 0 for a row with no project or a live project. workspace_trashed is the same 0/1 flag for the workspace.\n- comment_count counts every comment on a task, document or decision; it is 0 on a milestone and on a trashed row.\n- For tasks only: status_terminal, status_off_pipeline (canceled) and open (the status resolves in the workspace of the task and is not terminal; an empty or unresolvable status is not open).\n- labels and dependencies are id ARRAYS flattened to text, so they filter with ~ rather than ?~; substring matching is exact because every id is a fixed 15-character token that cannot occur inside another.\n\n**Subtask counts.** Every task and milestone row is served subtask_total and subtask_done: the child tasks of a task, or the tasks of a milestone, that are not trashed and whose project is live or empty. A child counts as done when its status, in its own workspace, has category completed or canceled. A trashed row, a decision and a document read 0. The counts are computed when a row is served, not view columns, so they cannot be filtered or sorted on.\n\n**Due window.** Every row is also served due_days and reason, computed the same way (decision:viewer-day-values). due_days counts the calendar days from today to the due date (the due of a task, the target of a milestone): 0 on the day itself, negative once it has passed, null when there is none. The due date is the calendar day it is stored on; today is the day in the viewer's time zone (their user_settings.time_zone, else a time_zone query parameter sent with the request, else UTC). time_zone takes an IANA name such as Europe/Paris; an unknown name, or Local, answers 400. reason says why a row needs the viewer. On a task assigned to them whose status is not completed or canceled it is overdue (due_days below 0), due_soon (0 to 3) or assigned (later, or no due date); on every other row it is empty.\n\n**Sort keys.** An empty value must sink to the BOTTOM in both directions, which one column cannot express, so each optional key ships as a pair: sort on has_due then due (either direction) and dateless rows stay last both ways; likewise has_priority then priority_rank. priority_rank is computed in the view: the index of the entry whose id equals the stored task priority inside the priorities array of the workspace (a task stores the entry id, not its name), so severity follows the declared order of that array, reordering the array re-ranks every task, and a custom vocabulary ranks by declaration. has_priority is 0 whenever the vocabulary does not hold the value: unset, the reserved none token, a retired entry, or any non-task row. Such a row sinks under both directions, and the rank it reports is an ordering-neutral placeholder, never a severity.\n\n**Rules.** The listRule reproduces per type exactly what the view rule of the base collection allows: the three prose types keep draft privacy (author, workspace owner, active admin), tasks have no draft privacy, and active membership is required everywhere. A trashed row, a row in a trashed project and a row in a trashed workspace are absent from every listing. The viewRule is the listRule OR a trash branch, so by id a trashed row is served to exactly whom GET /api/tracker/trash shows it: the owner or an active member, never in a trashed workspace, with drafts limited to their author, the owner and an active admin. A live item inside a trashed project is reachable from no read surface, not this view, not its base collection and not the trash route, until the project is restored.\n\n**Tenancy columns.** A union column cannot carry a relation type, so tenancy resolves through three TEXT columns computed per row by correlated subselect: workspace_owner holds the owner id of the workspace, while active_members and active_admins hold the ids of its active members and active admins as comma-delimited strings with each id wrapped in commas, so a substring match on a 15-character id never matches inside another. The rules compare the caller id to workspace_owner by equality and to the other two by substring match. A view field cannot be marked hidden on PocketBase 0.40.4, so all three are API surface: filterable, sortable and selectable through ?fields=. Any caller who can read an item row can therefore read the owner id and the active member and admin ids of that workspace. For the owner and any active member, the only callers the rules admit, this discloses nothing new, since the roster is already listable on workspace_members.\n\n**Filters and paging.** Every list request is checked before it runs. Six columns take only the operators that answer them, and a ? prefix (any of) counts as the plain operator: type takes = and != with a type name; status, priority and assignee take = and != with an id, or an empty string for none; labels takes ~ and !~ with a label id, or = and != with [] for no labels; due takes =, !=, <, <=, >, >=, ~ and !~ with a date, or = and != with an empty string for no due date. status also takes status.name with = and !=, and labels takes labels.name with ~ and !~, each with an exact name, which the server replaces by the id of the one status or label the caller can read that carries it (decision:item-filter-by-name), so the rows are those of the id filter. A top-level workspace = or project = clause narrows that search to the workspace, or to the project and the labels of its workspace that belong to no project; a name no readable record carries answers 400 value_not_found and a name more than one carries answers 400 value_ambiguous, under status or labels. Any other operator, a modifier, an empty value where one is needed, or any other relation path such as status.category answers 400 naming the column in data with a code: operator_not_supported, value_required or not_expressible. Quoted equality clauses on type, status, priority or assignee joined by && at the top of the filter, alone or as a group of the same column joined by ||, must share a value, and when they share none the request answers 400 values_conflict. Two due bounds need no rewriting, because && already keeps only the narrower one. A filter longer than 3500 characters is refused by the list API itself. perPage defaults to 25 and is capped at 200, page is at least 1, and a value that is not a number falls back to its default.\n\n**Realtime.** Like every view collection this one emits no record events; a caller keeps a list fresh by subscribing to the four base collections or to the rt:project_items:{workspaceId} topic, which the server broadcasts on every create, update and purge of an item and which is independent of this collection. GET /api/tracker/project-items/counts returns group counts over the same listRule. Its group parameter takes project, status, priority, assignee, label or type. See collection:project_stats and collection:tasks.",
         "properties": {
           "active_admins": {
+            "description": "The ids of the active admins of the workspace, each wrapped in commas, so a match on one id never hits part of another.",
             "type": "string"
           },
           "active_members": {
+            "description": "The ids of the active members of the workspace, each wrapped in commas, so a match on one id never hits part of another.",
             "type": "string"
           },
           "assignee": {
+            "description": "The id of the user a task is assigned to; empty when unassigned and on every other kind of item.",
             "type": "string"
           },
           "author": {
+            "description": "The id of the user who created the item, empty when a superuser or the server created it.",
             "type": "string"
           },
           "comment_count": {
+            "description": "How many comments the task, document or decision has; 0 for a milestone and for an item in the trash.",
             "type": "number"
           },
           "created": {
+            "description": "When the underlying item was created; read-only.",
             "type": "string"
           },
           "cycle": {
+            "description": "The id of the cycle a task is planned in, empty otherwise; filter on it to list the tasks of one cycle.",
             "type": "string"
           },
           "dependencies": {
+            "description": "The ids of the tasks blocking a task as one text value, filtered with ~ and a task id; empty on other kinds of item.",
             "type": "string"
           },
           "draft": {
+            "description": "True while the decision, document or milestone is an unpublished draft; always false for a task.",
             "type": "boolean"
           },
           "due": {
+            "description": "The due day of a task or the target day of a milestone, empty when there is none; filter on it with date comparisons.",
             "type": "string"
           },
           "has_due": {
+            "description": "1 when the item has a due or target day and 0 when not; sort on it before due to keep dateless rows last in both directions.",
             "type": "number"
           },
           "has_priority": {
+            "description": "1 when the task holds a priority from the current workspace list and 0 otherwise; sort on it before priority_rank to keep rows without a priority last.",
             "type": "number"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "key": {
+            "description": "The display key of the item such as ENG-42, empty for an item kept at the workspace level.",
             "type": "string"
           },
           "labels": {
+            "description": "The label ids of a task as one text value; filter with ~ and a label id, or with = [] for no labels.",
             "type": "string"
           },
           "milestone": {
+            "description": "The id of the milestone a task counts toward, empty otherwise.",
             "type": "string"
           },
           "open": {
+            "description": "True when a task has a status of its own workspace that is not completed or canceled; false for an empty or unknown status and for other kinds of item.",
             "type": "boolean"
           },
           "ordinal": {
+            "description": "The place of a task in its board column, and 0 for every other kind of item.",
             "type": "number"
           },
           "parent": {
+            "description": "The id of the parent task of a subtask, empty otherwise.",
             "type": "string"
           },
           "priority": {
+            "description": "The priority entry id of a task, empty when it has none and on every other kind of item.",
             "type": "string"
           },
           "priority_rank": {
+            "description": "The place of the task priority in the workspace priority list, 0 for the most severe; a row without a priority holds a placeholder that ranks nothing.",
             "type": "number"
           },
           "project": {
+            "description": "The id of the project the item sits in.",
             "type": "string"
           },
           "project_trashed": {
+            "description": "1 when the project of the item is in the trash or no longer exists, and 0 for a live project or no project.",
             "type": "number"
           },
           "status": {
+            "description": "The status id of a task, the free-text status of a decision, and empty for a document or milestone.",
             "type": "string"
           },
           "status_off_pipeline": {
+            "description": "True when a task sits in a canceled status of its own workspace; false for every other row.",
             "type": "boolean"
           },
           "status_terminal": {
+            "description": "True when a task sits in a completed or canceled status of its own workspace; false for every other row.",
             "type": "boolean"
           },
           "title": {
+            "description": "The title of the item, or the name when the item is a milestone.",
             "type": "string"
           },
           "trashed": {
+            "description": "When the item was moved to the trash, or empty while it is live; a listing shows only live items.",
             "type": "string"
           },
           "type": {
+            "description": "Which kind of item the row is: task, decision, document or milestone; filter on it with = or != to list one kind.",
             "type": "string"
           },
           "updated": {
+            "description": "When the underlying item was last changed; read-only.",
             "type": "string"
           },
           "workspace": {
+            "description": "The id of the workspace the item belongs to.",
             "type": "string"
           },
           "workspace_owner": {
+            "description": "The id of the user who owns the workspace of the item.",
             "type": "string"
           },
           "workspace_trashed": {
+            "description": "1 when the workspace of the item is in the trash and 0 otherwise.",
             "type": "number"
           }
         },
@@ -1088,21 +1263,26 @@
         "description": "Paginated list of `project_stats` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/ProjectStatsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1119,38 +1299,41 @@
         "description": "A VIEW collection backed by a query: projects LEFT JOIN tasks LEFT JOIN statuses, grouped by project. Columns: name, owner, workspace, total, and one count per status CATEGORY: triage, backlog, unstarted, started, completed and canceled. A task with no status counts in total but in no category bucket. Trashed projects and trashed tasks are excluded in the query, and so is the shadow project of each workspace (concept:shadow-project).\n\n**Access.** List and view are open to the owner of the workspace of the project and to any ACTIVE member of that workspace. The account that created the project gets no branch of its own, so a creator whose membership is suspended or removed reads none of these rows. The view query carries no membership join of its own, so these two rules are the only tenant control on it. Create, update and delete are refused (read-only).\n\n**Workspace trash.** A project whose workspace is in the trash produces no row at all. That exclusion lives in the view query rather than in a rule, so it applies to every caller without exception, and the row reappears when the workspace is restored.\n\n**Next milestone.** Each row is also served next_milestone, computed when the row is served and not a view column, so it cannot be filtered or sorted on (decision:viewer-day-values). It is the id of the milestone of the project, neither trashed nor a draft, whose target is the earliest calendar day on or after today in the viewer's time zone (their user_settings.time_zone, else a time_zone query parameter sent with the request, else UTC); when every such milestone is past, the one with the latest target; when the project has none with a target, empty. Milestones on the same day are ordered by id. A time_zone that is not an IANA name, or Local, answers 400.\n\n**Realtime.** PocketBase views emit NO realtime events; a caller recomputes on tasks events rather than subscribing to project_stats. Column ids of a view regenerate per boot, so never diff them.",
         "properties": {
           "backlog": {
-            "description": "Arbitrary JSON value."
+            "description": "How many tasks outside the trash in the project have a status in the backlog category. Arbitrary JSON value."
           },
           "canceled": {
-            "description": "Arbitrary JSON value."
+            "description": "How many tasks outside the trash in the project have a status in the canceled category. Arbitrary JSON value."
           },
           "completed": {
-            "description": "Arbitrary JSON value."
+            "description": "How many tasks outside the trash in the project have a status in the completed category. Arbitrary JSON value."
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "name": {
+            "description": "The name of the project.",
             "type": "string"
           },
           "owner": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The id of the user who created the project, for display only. Relation record id (target collection: users).",
             "type": "string"
           },
           "started": {
-            "description": "Arbitrary JSON value."
+            "description": "How many tasks outside the trash in the project have a status in the started category. Arbitrary JSON value."
           },
           "total": {
+            "description": "How many tasks outside the trash the project holds, including tasks with no status.",
             "type": "number"
           },
           "triage": {
-            "description": "Arbitrary JSON value."
+            "description": "How many tasks outside the trash in the project have a status in the triage category. Arbitrary JSON value."
           },
           "unstarted": {
-            "description": "Arbitrary JSON value."
+            "description": "How many tasks outside the trash in the project have a status in the unstarted category. Arbitrary JSON value."
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The id of the workspace the project belongs to. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -1165,21 +1348,26 @@
         "description": "Paginated list of `projects` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/ProjectsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1196,41 +1384,50 @@
         "description": "Fields: name (required), description, owner (relation to users, optional, emptied when that account is deleted while the project and its items stay; informational only, never read as an authorization signal), workspace (relation, required, removed with its workspace), trashed (date), key (text, up to 8 uppercase letters and digits), item_seq (int) and shadow (bool).\n\n**Read.** List and view are open to the workspace OWNER and its ACTIVE members; a suspended membership reads nothing. A trashed project is hidden from a plain member on list, view and update, while the workspace owner and an active admin keep all three, because the trashed projects of a workspace are enumerated through this listRule (projects have no trash route of their own). update carries the same predicate because PocketBase returns the whole record on a successful PATCH whatever the viewRule says, so restoring a project is the same actor set as trashing one.\n\n**Create.** The createRule is: @request.auth.id != \"\" && (owner = \"\" || owner = @request.auth.id) && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= \"viewer\" && workspace.workspace_members_via_workspace.status ?= \"active\")) && (workspace = \"\" || workspace.trashed = \"\") && @request.body.shadow:isset = false\n\nSo the caller is EITHER the workspace OWNER (who needs no workspace_members row) OR an active member whose role is not viewer; the workspace must not be in the trash; and a create that carries the shadow marker at all is refused, so no member can mint an invisible project. owner may be omitted: the server stamps the signed-in caller. A submitted owner must be the caller; naming anyone else is refused with a 400 error. A superuser keeps the owner it submits. A name made only of whitespace is refused with a 400 error.\n\n**Update.** The workspace OWNER or ANY active non-viewer member may update a live project, so a member who creates a project can edit it. The updateRule refuses any PATCH that submits owner, so no member, admin or workspace owner changes who owns a project through the API. The workspace of a project is immutable for ordinary callers, enforced by a server check on update. Collection rules and that check both stop applying to a superuser, so a superuser PATCH can still repoint owner or workspace.\n\n**Delete and trash.** DELETE is the workspace owner OR an ACTIVE admin: the deleteRule gates to exactly the trash-and-purge actor set, because trashing a project pulls shared work out from under every member. The first DELETE moves the project to the trash; a second DELETE on a trashed project purges it; a superuser DELETE hard-purges immediately. A PATCH clearing trashed restores the project AND its still-live items. A PATCH that sets or re-dates trashed is refused with 400, so only a DELETE moves a project into the trash; a superuser is exempt. The daily trash expiry sweep purges a project trashed longer than app_settings.trash_retention_days (30 by default) together with its items.\n\n**The shadow project.** Every workspace owns exactly one project with shadow = true; it holds every item created without a project. List, view, update and delete all exclude it for every role, so it can be neither read, renamed nor removed, no expanded project relation carries it, and an update carrying the shadow marker is refused so an ordinary project cannot be flipped invisible. See concept:shadow-project.\n\n**Identity.** key is the DISPLAY prefix of the project. A creator may choose it, otherwise it is suggested from the name (first three alphanumerics, uppercased); the server assigns it at create on every write path, so programmatically created projects get one too. It is unique per workspace (a partial unique index on workspace and key; a chosen duplicate is refused with 400) and IMMUTABLE afterwards (400 key is immutable). The shadow project takes no key. item_seq is the server-owned counter behind the ONE shared number every item type in the project draws from, incremented atomically; a PATCH that changes it is refused with 400. Neither ever addresses a project: routes carry the opaque record id. See decision:item-display-keys.\n\n**Workspace scope.** A request that names a workspace (?workspace=) can view, update or delete a project only if it belongs to that workspace; otherwise it answers 404. A request that names no workspace follows the usual rules.\n\n**Workspace trash.** While the workspace that holds a project is in the trash, the project is hidden and frozen for everyone, the workspace owner and an active admin included: a listing returns nothing, a read by id answers exactly as an unknown id does, and create, update and delete are all refused. The owner and admin carve-out for a trashed project applies only inside a live workspace. Nothing is written on the project itself, so restoring the workspace brings it back unchanged.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "description": {
+            "description": "Optional text describing the project.",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "item_seq": {
+            "description": "The counter behind the item numbers of this project, kept by the server; a change sent is refused.",
             "type": "number"
           },
           "key": {
+            "description": "The prefix of item keys, up to 8 uppercase letters and digits, unique in the workspace; suggested from the name when omitted and fixed after create.",
             "type": "string"
           },
           "name": {
+            "description": "The project name, stored trimmed; a name of only spaces is refused.",
             "type": "string"
           },
           "owner": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who created the project, for display only; leave it empty and the server fills the caller, and it cannot be changed later. Relation record id (target collection: users).",
             "type": "string"
           },
           "shadow": {
+            "description": "Marks the hidden home of items that have no project; only the server sets it, and a request that sends it is refused.",
             "type": "boolean"
           },
           "trashed": {
+            "description": "When the project was moved to the trash by DELETE; send it empty to restore the project with its items, any other change is refused.",
             "format": "date-time",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this project belongs to; required at create and cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -1245,21 +1442,26 @@
         "description": "Paginated list of `saved_views` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/SavedViewsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1276,13 +1478,15 @@
         "description": "Fields: workspace (relation, required, removed with its workspace), owner (relation to users, optional: deleting that account deletes its personal views and empties the owner of its workspace views, which stay listed and are then edited or deleted only by the workspace owner or an active admin), project (relation, optional, removed with its project; an empty project spans the workspace), name (text, required), description (text, optional), filterData (json: the filter clause array of field, op and value objects), columns (json: an ORDERED array of column keys, not a set), sort (json: a field and order object), position (number: the order among saved views), scope (select, required: personal or workspace), density (select, optional: compact or cozy), mode (select, optional: list or board) and group_by (select, optional: status, assignee, priority, none or project). An empty select reads back as an empty string; a caller treats that as the default (group_by none, density cozy, mode list). A name made only of whitespace is refused with a 400 error.\n\n**Visibility.** Visibility is scope-driven and enforced by rule alone: a PERSONAL view is visible only to its owner; a WORKSPACE view is visible to the workspace owner and every ACTIVE member of its workspace. A suspended membership sees no view at all.\n\n**Create.** The workspace owner or an active non-viewer member may create a view. owner may be omitted: the server stamps the signed-in caller. A submitted owner must be the caller; naming anyone else is refused with a 400 error. A superuser keeps the owner it submits. A superuser may create a view with no owner. An ownerless PERSONAL view is readable by no user, because a personal view is visible only to its owner; the workspace owner can still rename or delete it by id, a superuser reads it, and the deletion of a member account leaves it in place.\n\n**Update and delete.** Permitted to the owner of the view, the workspace owner, or an active admin, and every branch but workspace ownership requires an ACTIVE membership in the workspace of the view: a suspended member is refused with 404 on PATCH and DELETE of their OWN view, matching the 404 the read rules give them. The workspace of a view is immutable: an update that sends it is refused.\n\n**Stale-write refusal.** The server guards update AND delete on templates and saved_views. A PATCH may carry an expected_updated_at body key, and a DELETE the same key as a query parameter, naming the updated value the editor loaded; when the stored row has already moved past it the write is refused with HTTP 409, so the record keeps the other write. The 409 names its reason in a machine-readable code, data.expected_updated_at.code = stale_write, which is what a caller keys on, because the status alone is the generic state refusal; the message reads Someone else changed this since you opened it. OMITTING the key accepts last-write-wins. SENDING it means the caller believes it is guarded, so a value the check cannot compare (an empty string, a number, a boolean, null, an array, an object, or text naming no instant) is refused with 400 (This change could not be saved. Reload the page and try again.) rather than ignored or reported as a 409. Sending the key to a collection that carries no guard, or on any CREATE, is refused with 400 for the same reason. The key is not a collection field and is never stored. The delete guard runs ahead of every other delete check, so the refusal lands on every boot. Known ceiling: the value compared is the millisecond timestamp in updated, not a version counter, so the check sees only a write that MOVED it. Two writes in the same millisecond are both accepted and the earlier edit is lost, and a caller holding a value that a later write left unchanged is still accepted however much later it writes.\n\n**Workspace scope.** A request that names a workspace (?workspace=) can view, update or delete a view only if it belongs to that workspace; otherwise it answers 404. A request that names no workspace follows the usual rules.\n\n**Workspace trash.** While the workspace holding them is in the trash, saved views are frozen: a create is refused, and an update or a delete answers exactly as an unknown id does, for the workspace owner and an active admin as well as for everyone else. Reading them narrows to the set that can restore the workspace, its owner and an active admin; every other tier gets an empty listing and the unknown-id answer. Nothing is written on the rows, so restoring the workspace brings them back unchanged.",
         "properties": {
           "columns": {
-            "description": "Arbitrary JSON value."
+            "description": "The visible columns as an ordered JSON array of column keys. Arbitrary JSON value."
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "density": {
+            "description": "The row spacing of the view; empty means cozy.",
             "enum": [
               "compact",
               "cozy"
@@ -1290,12 +1494,14 @@
             "type": "string"
           },
           "description": {
+            "description": "Optional text describing what the view shows.",
             "type": "string"
           },
           "filterData": {
-            "description": "Arbitrary JSON value."
+            "description": "The saved filter as a JSON array of clause objects, each with field, op and value. Arbitrary JSON value."
           },
           "group_by": {
+            "description": "What the rows are grouped by; empty means none.",
             "enum": [
               "status",
               "assignee",
@@ -1306,9 +1512,11 @@
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "mode": {
+            "description": "Whether the view shows a list or a board; empty means list.",
             "enum": [
               "list",
               "board"
@@ -1316,20 +1524,23 @@
             "type": "string"
           },
           "name": {
+            "description": "The view name, stored trimmed; a name of only spaces is refused.",
             "type": "string"
           },
           "owner": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who owns the view; leave it empty and the server fills the caller, and naming anyone else at create is refused. Relation record id (target collection: users).",
             "type": "string"
           },
           "position": {
+            "description": "A number placing this view among the saved views.",
             "type": "number"
           },
           "project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project the view is limited to, which must be a project of the same workspace; leave it empty to span the whole workspace. Relation record id (target collection: projects).",
             "type": "string"
           },
           "scope": {
+            "description": "Who can see the view: personal for its owner only, workspace for every active member of the workspace.",
             "enum": [
               "personal",
               "workspace"
@@ -1337,14 +1548,15 @@
             "type": "string"
           },
           "sort": {
-            "description": "Arbitrary JSON value."
+            "description": "The sort order as a JSON object with a field and an order. Arbitrary JSON value."
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this view belongs to; required at create and cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -1360,21 +1572,26 @@
         "description": "Paginated list of `statuses` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/StatusesRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1391,6 +1608,7 @@
         "description": "Fields: workspace (relation, required, removed with its workspace), name (required), category (select, required: triage, backlog, unstarted, started, completed or canceled), color (select, the same palette as labels), position (int, column order) and is_default (bool). Names are unique per workspace, and at most one status per workspace is the default (partial unique index). name is trimmed of leading and trailing spaces before it is stored, on create, on update and through POST /api/tracker/workspaces/{id}/vocab, so a name that differs from an existing one only by surrounding spaces still fails the unique index. A name made only of whitespace is refused with a 400 error. Every served status record, expanded ones included, carries the computed flags terminal (category completed or canceled) and off_pipeline (category canceled).\n\n**Access.** List and view are open to the workspace owner and its ACTIVE members; create, update and delete are the owner or an ACTIVE admin, because statuses are workspace configuration. A suspended membership gets nothing, read included.\n\n**Default board.** Every workspace, however it is created, is seeded with five statuses covering the non-triage categories: Backlog (backlog, the default), Todo (unstarted), In Progress (started), Done (completed) and Canceled (canceled). The seeding runs after any workspace create and skips a workspace that already has statuses, so no workspace is left without a board.\n\n**Tasks.** A task references a status through tasks.status. The server checks that the status belongs to the workspace of the task and fills the workspace default when the status is omitted. tasks.completedAt is set and cleared by the server as the status crosses into and out of the completed category. Deleting a status still referenced by a task is refused by the server (see decision:status-delete-referenced). project_stats buckets task counts by category.\n\n**Workspace trash.** While the workspace holding them is in the trash, statuses are frozen: a create is refused, and an update or a delete answers exactly as an unknown id does, for the workspace owner and an active admin as well as for everyone else. Reading them narrows to the set that can restore the workspace, its owner and an active admin; every other tier gets an empty listing and the unknown-id answer. Nothing is written on the rows, so restoring the workspace brings them back unchanged.",
         "properties": {
           "category": {
+            "description": "The stage the status stands for; completed and canceled count as finished, and entering completed stamps the task completion time.",
             "enum": [
               "triage",
               "backlog",
@@ -1402,6 +1620,7 @@
             "type": "string"
           },
           "color": {
+            "description": "The display color, from the shared palette; optional.",
             "enum": [
               "gray",
               "red",
@@ -1417,27 +1636,33 @@
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "is_default": {
+            "description": "True for the status a new task gets when none is sent; at most one status per workspace may be the default.",
             "type": "boolean"
           },
           "name": {
+            "description": "The status name, stored trimmed and unique in the workspace; a name of only spaces is refused.",
             "type": "string"
           },
           "position": {
+            "description": "The order of the status among the board columns, as a whole number.",
             "type": "number"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this status belongs to; required at create and cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -1453,21 +1678,26 @@
         "description": "Paginated list of `task_activity` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/TaskActivityRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1484,38 +1714,45 @@
         "description": "A server-written audit trail for tasks and for workspace ownership transfers. Fields: task (relation, optional, removed with its task; empty on an ownership-transfer row), workspace (relation, optional, removed with its workspace; anchors a row that holds no task), actor (relation to users, optional: the user who made the change), operator (text, optional, up to 255 characters: the email address of a superuser who made the change), field (text, required: the changed field name), from and to (text: the JSON encoding of the old and new value; a quoted id for a single relation, a JSON id-array for a multi-relation such as labels).\n\n**Task rows.** The server writes exactly one row per changed field among status, assignee, priority, due, milestone, project, title, labels, trashed and cycle, on every save path, so a delete-to-trash, a cycle rollover and the leaver-unassign sweep write rows as well as an API PATCH. The task is saved first, so a refused write leaves no phantom row; a no-op save and a change to any other field write none. A member edit fills actor and leaves operator empty; a superuser edit through the API fills operator with the superuser email and leaves actor empty; a trash made through the delete path records trashed_by as actor; a save the server makes as a consequence rather than as a request edit, such as clearing the assignee of a removed member or a cycle rollover, leaves both empty and reads as a system action.\n\n**Ownership-transfer rows.** POST /api/tracker/workspaces/{id}/transfer-ownership writes ONE taskless row per completed transfer, anchored on workspace, inside the same transaction as the handover: field owner, from the outgoing owner id, to the incoming one, both as JSON strings. An owner-initiated transfer fills actor; a superuser-run one fills operator and leaves actor empty, because a superuser id is not a users relation. A refused transfer writes nothing.\n\n**Access.** No client writes: create, update and delete are null, so a client write answers 403. list and view share ONE rule with two legs. A row holding a task is read by the owner or an ACTIVE member of the workspace of the task (the rule reads the workspace relation of the task itself); a suspended membership reads nothing, a task assigned to them included. Such a row is also hidden while its task, the project of its task, or its workspace is in the trash, so trashing work hides its edit history, earlier titles included, and a restore brings that history back unchanged. A taskless row is read by the owner and the active members of its anchored workspace while that workspace is not in the trash. A row holding neither task nor workspace is readable by nobody.\n\nSee collection:tasks and collection:workspaces.",
         "properties": {
           "actor": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who made the change, empty for a superuser or a system change; written by the server only. Relation record id (target collection: users).",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "field": {
+            "description": "The name of the field that changed, such as status, or owner for a change of workspace owner; written by the server only.",
             "type": "string"
           },
           "from": {
+            "description": "The old value as JSON text, such as a quoted id; written by the server only.",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "operator": {
+            "description": "The email of the superuser who made the change, empty for user and system changes; written by the server only.",
             "type": "string"
           },
           "task": {
-            "description": "Relation record id (target collection: tasks).",
+            "description": "The task whose field changed, empty on a change of workspace owner; written by the server only. Relation record id (target collection: tasks).",
             "type": "string"
           },
           "to": {
+            "description": "The new value as JSON text, such as a quoted id; written by the server only.",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace the change belongs to, which anchors rows that name no task; written by the server only. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -1529,21 +1766,26 @@
         "description": "Paginated list of `task_subscribers` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/TaskSubscribersRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1560,22 +1802,25 @@
         "description": "The subscription join between a task and a user. Fields: task (relation, required, removed with its task) and user (relation, required, removed with the user). A UNIQUE index on task and user keeps the auto-subscribe upsert idempotent.\n\n**How rows appear.** AUTO: the server subscribes the creator on task create (and the assignee when set), a new assignee on an assign, and the commenter on a task comment. MANUAL: an ACTIVE non-viewer member (or the workspace owner) may subscribe THEMSELVES, since the createRule requires the row to name the caller, and anyone may unsubscribe by deleting their own row: the deleteRule is exactly user = @request.auth.id. Unsubscribing stops all future fan-out for that user on that task.\n\n**Access.** list and view are active-member-read, the same scope as comments, so a suspended membership sees nothing. list, view and create also carry the trash exclusion of the task, so a subscription is unreadable and cannot be created while its task, the project of its task, or its workspace is in the trash. update is null. Deleting your own subscription stays open at all times, even to a suspended member, because user = @request.auth.id is record-relative rather than membership-derived, so anyone can stop being notified about work they cannot see any more.\n\nSee collection:notifications and decision:notification-fanout-semantics.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "task": {
-            "description": "Relation record id (target collection: tasks).",
+            "description": "The task to follow; it must be a task the caller can see, outside the trash. Relation record id (target collection: tasks).",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "user": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The subscribed user; a client may subscribe only itself, so send the id of the signed-in user. Relation record id (target collection: users).",
             "type": "string"
           }
         },
@@ -1590,21 +1835,26 @@
         "description": "Paginated list of `tasks` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/TasksRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1621,104 +1871,116 @@
         "description": "Fields: title (required), workspace (relation, required, removed with its workspace), project (relation, optional on the way in, removed with its project), status (relation to statuses), labels (multi-relation to labels), key (text, server-assigned, immutable), completedAt (date), assignee (relation to users), parent (self-relation), milestone (relation), cycle (relation), dependencies (multi-relation to tasks), ordinal (number), acceptanceCriteria (json), attachments, description, priority, type, author (relation to users), trashed (date) and trashed_by (relation to users). A title made only of whitespace is refused with a 400 error.\n\n**Status.** status is optional: the server fills the workspace default when it is omitted and refuses a status from another workspace. completedAt is set by the server when the status crosses into the completed category and cleared when it crosses out.\n\n**Author and trash fields.** author is stamped from the authenticated caller at create, so a member who submits someone else as author is recorded as themselves; a superuser or server-code create keeps what it submitted, usually empty. It is immutable afterwards: an update that changes it is refused with 400 (author is immutable) for every caller. trashed and trashed_by are set only by the delete-to-trash path; a create that submits either has it cleared. An update may change them only to restore the row: one that sets either, re-dates trashed or changes trashed_by while the row stays in the trash is refused with 400; a superuser is exempt.\n\n**No draft stage.** Tasks carry no draft field: a task is visible to the whole workspace the moment it is created, while documents, decisions and milestones keep a draft stage read only by their author, the workspace owner and an active admin. See decision:draft-private-publish-one-way.\n\n**Relation visibility.** a relation field such as parent always returns the id it stores even when the caller cannot view the target record, because PocketBase strips nothing from the stored value at the app tier; the caller learns the target is hidden only from a missing entry in expand, so a client must treat an absent expand key as hidden state, not as an empty relation.\n\n**Identity.** key is the prefix of the project plus one number sequence SHARED with decisions, documents and milestones, so the item type never shows in the counter. The server assigns it atomically at create from projects.item_seq, and a partial unique index on workspace and key backs it, so parallel creates get unique keys. The key is STORED and IMMUTABLE: a PATCH that submits a changed key is refused with 400, and the key follows the item through a move to another project, where the prefix then differs from the project prefix; no item is ever re-keyed. A task created without a project lands in the shadow project of its workspace (concept:shadow-project) and carries no key for life: moving it into a real project does not mint one, because a key is a birth property and a second mint site would reopen the read-then-write hazard on the shared counter. See decision:item-display-keys.\n\n**Access.** The workspace owner or an ACTIVE member may list and view; the workspace owner or an ACTIVE non-viewer member may update; the owner or an active non-viewer member may create; DELETE moves a task to the trash and is the owner or any active non-viewer member, while a second DELETE on a trashed task purges it and is limited to the owner or an admin. A suspended membership loses READ as well as WRITE: the list comes back empty, view, update and delete answer 404 and create 400. No branch grants on assignment: a suspended member who is still the assignee of a task reads and writes it, and its comments, no more than a non-member. Creating a SUBTASK under a parent mints a new record, so that branch also requires an active membership in the workspace of the parent; it opens subtask creation to an active viewer who is the assignee of the parent. A task in a trashed project is hidden with it. A create that names a project in the trash is refused with 400 for the workspace owner and members alike, and so is a subtask whose parent sits in one; restore the project first.\n\n**Cycles.** cycle is optional and does not cascade. A cycle is a WORKSPACE time box with no project of its own, so assigning one never moves the task between projects, and two tasks in different projects of one workspace may hold the same cycle. On create and update, on every write path, the server refuses a cycle from another workspace with 400. Deleting a cycle CLEARS the pointer on every task that held it and deletes no task, the same native relation cleanup tasks.labels relies on. No other item type carries a cycle. See collection:cycles.\n\n**Workspace trash.** While the workspace that holds a task is in the trash, the task is hidden and frozen for everyone, the workspace owner and an active admin included: a listing returns nothing, a read by id answers exactly as an unknown id does, and create, update and delete are all refused. Nothing is written on the task itself, so restoring the workspace brings it back unchanged.\n\nSee hook:tasks-ordinal and hook:tasks-move for board order, and collection:task_activity for the edit history.",
         "properties": {
           "acceptanceCriteria": {
-            "description": "Arbitrary JSON value."
+            "description": "The checklist of the task as a JSON array of objects, each with text and done. Arbitrary JSON value."
           },
           "assignee": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user responsible for the task, who must be the workspace owner or an active member; it stays empty unless sent. Relation record id (target collection: users).",
             "type": "string"
           },
           "attachments": {
-            "description": "Stored filename (fetch via the files API).",
+            "description": "Up to 10 images or PDFs of 10 MB each; downloading one needs a short-lived file token. Stored filename (fetch via the files API).",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "author": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who created the task, filled by the server from the signed-in caller; a value sent is replaced and a later change is refused. Relation record id (target collection: users).",
             "type": "string"
           },
           "completedAt": {
+            "description": "When the task entered a completed status; the server sets and clears it as the status changes, so a client should not send it.",
             "format": "date-time",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "cycle": {
-            "description": "Relation record id (target collection: cycles).",
+            "description": "The cycle the task is planned in, which must be a cycle of the same workspace; an unfinished task moves on when its cycle ends. Relation record id (target collection: cycles).",
             "type": "string"
           },
           "dependencies": {
-            "description": "Relation record id (target collection: tasks).",
+            "description": "The tasks that block this one; each must be in the same project and cannot be this task, its parent or one of its subtasks. Relation record id (target collection: tasks).",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "description": {
+            "description": "The task text; an @mention of a workspace member notifies them.",
             "type": "string"
           },
           "due": {
+            "description": "The day the task is due; optional.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "key": {
+            "description": "The display key such as ENG-42, assigned by the server and fixed for life, empty outside a project; a value sent is ignored at create and refused later.",
             "type": "string"
           },
           "labels": {
-            "description": "Relation record id (target collection: labels).",
+            "description": "The labels on the task, each of which must be a label of the same workspace. Relation record id (target collection: labels).",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "milestone": {
-            "description": "Relation record id (target collection: milestones).",
+            "description": "The milestone this task counts toward, which must be in the same project as the task. Relation record id (target collection: milestones).",
             "type": "string"
           },
           "ordinal": {
+            "description": "The place of the task in its board column; the server sets it at create, ignoring a value sent, and a client may change it later.",
             "type": "number"
           },
           "parent": {
-            "description": "Relation record id (target collection: tasks).",
+            "description": "The task this one is a subtask of, which must be in the same project and cannot be the task itself. Relation record id (target collection: tasks).",
             "type": "string"
           },
           "priority": {
+            "description": "The id of an entry in the priority list of the workspace, or empty for no priority; a priority name is refused.",
             "type": "string"
           },
           "project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project this task belongs to, in the same workspace; when omitted a subtask takes the project of its parent and any other task lands in the hidden project for unfiled items. Relation record id (target collection: projects).",
             "type": "string"
           },
           "status": {
-            "description": "Relation record id (target collection: statuses).",
+            "description": "The workflow status, which must be a status of the same workspace; the workspace default is used when it is omitted. Relation record id (target collection: statuses).",
             "type": "string"
           },
           "title": {
+            "description": "The task title, stored trimmed; a title of only spaces is refused.",
             "type": "string"
           },
           "trashed": {
+            "description": "When the task was moved to the trash, set by the server on DELETE; send it empty only to restore the task, any other change is refused.",
             "format": "date-time",
             "type": "string"
           },
           "trashed_by": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who moved the task to the trash, set by the server; a value sent at create is dropped, and it may only be cleared on restore. Relation record id (target collection: users).",
             "type": "string"
           },
           "type": {
+            "description": "A free-text category for the task, up to 50 characters; optional, and any text is accepted.",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this task belongs to; it may be omitted when a project is sent, and it cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -1733,21 +1995,26 @@
         "description": "Paginated list of `templates` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/TemplatesRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1764,23 +2031,27 @@
         "description": "Fields: workspace (relation, required, removed with its workspace), project (relation, optional, removed with its project), type (select, required: task or document), name (text, required) and templateData (json). A name made only of whitespace is refused with a 400 error. A template bound to a project must live in the workspace of that project (400 on mismatch). Instantiation is done by the caller: fetch the template, read templateData, and POST a task or document with those fields.\n\n**Access.** The vocabulary tier, like labels and statuses: list and view are open to the workspace owner and any ACTIVE member; create, update and delete are the owner OR an ACTIVE admin. A plain member is denied (create 400, update and delete 404), and a suspended membership gets nothing, read included.\n\n**templateData shape.** On create and update the server parses templateData and requires a JSON OBJECT (an array, string or number is a 400). Every top-level key must be allowed for the type: for task, title, description, priority, type, labels, status, assignee, due, milestone and project; for document, title and body. An unknown key is a 400; an empty object, or an absent or null templateData, is allowed.\n\n**templateData values.** Values are validated at save, so a template the workspace cannot honour is refused on the admin who writes it rather than on the member who uses it later. Whenever a key carries a non-empty value: priority must be the id of an entry in the priorities vocabulary of the workspace (a priority name is refused); status, milestone, project and every entry of labels must belong to that same workspace; assignee must be the workspace owner or hold an ACTIVE membership there, the same set a task assignee is checked against; and due must name a date that parses. An EMPTY value stays allowed on every key, because a template may leave a field for the person instantiating it to fill. Each refusal is a 400 bound to the offending key: the data map carries a single entry named templateData followed by a dot and the key, with code template_data_value. The same checks run on create and on update, and a refused update persists nothing. The matching task-create refusals name their own field too: priority, status, assignee, labels, parent, milestone and dependencies each answer 400 with the field as the single key of the data map.\n\n**Stale-write refusal.** templates carries the same expected_updated_at guard on update and delete as saved_views, answered with 409 and data.expected_updated_at.code = stale_write; see collection:saved_views for the full contract and its millisecond ceiling.\n\n**Workspace scope.** A request that names a workspace (?workspace=) can view, update or delete a template only if it belongs to that workspace; otherwise it answers 404. A request that names no workspace follows the usual rules.\n\n**Workspace trash.** While the workspace holding them is in the trash, templates are frozen: a create is refused, and an update or a delete answers exactly as an unknown id does, for the workspace owner and an active admin as well as for everyone else. Reading them narrows to the set that can restore the workspace, its owner and an active admin; every other tier gets an empty listing and the unknown-id answer. Nothing is written on the rows, so restoring the workspace brings them back unchanged.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "name": {
+            "description": "The template name, stored trimmed; a name of only spaces is refused.",
             "type": "string"
           },
           "project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project this template is limited to, which must be a project of the same workspace; leave it empty for the whole workspace. Relation record id (target collection: projects).",
             "type": "string"
           },
           "templateData": {
-            "description": "Arbitrary JSON value."
+            "description": "The prefilled fields as a JSON object; a task template may hold task fields such as title and labels, a document template only title and body. Arbitrary JSON value."
           },
           "type": {
+            "description": "Whether the template produces a task or a document, which decides the keys templateData may hold.",
             "enum": [
               "task",
               "document"
@@ -1788,11 +2059,12 @@
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace this template belongs to; required at create and cannot be changed afterwards. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -1808,21 +2080,26 @@
         "description": "Paginated list of `user_settings` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/UserSettingsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1839,18 +2116,20 @@
         "description": "Personal preferences, exactly one row per user: a UNIQUE index on user makes a second row a 400 validation_not_unique. Fields: user (relation, required, removed with the user), theme (select, optional: light, dark or system), font (select, optional: system, sans or mono), font_size (number, optional, an integer from 12 to 24 inclusive), default_view (relation to saved_views, optional), default_project (relation to projects, optional) and time_zone (text, optional, up to 64 characters, an IANA zone id such as America/Chicago; empty means no stored zone). Neither relation cascades, so deleting the referenced view or project CLEARS the reference and keeps the settings row. A create or update refuses a changed time_zone that is not an IANA name, or is Local, with 400 naming time_zone, and a changed default_project or default_view that does not exist or that the caller cannot read with 400 validation_missing_rel_records under its key (decision:user-settings-write-checks); an empty time_zone clears it. When the server counts days for the user, a stored time_zone sets their today, and a value it cannot load is treated as unset (decision:viewer-day-values).\n\n**Access.** SELF-ONLY. list, view, create and delete are each @request.auth.id != \"\" && user = @request.auth.id, and update adds a lock so the user of a row cannot be changed.\n\n**Provisioning.** The server creates the row when the user is created, with theme system and font system; time_zone is left empty.\n\n**One call with the display name.** GET and PATCH /api/tracker/users/{id}/settings read and save users.name, as display_name, together with this row; see route:tracker-user-settings.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "default_project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project to open by default, which must be one the user can read; it is cleared if that project is deleted. Relation record id (target collection: projects).",
             "type": "string"
           },
           "default_view": {
-            "description": "Relation record id (target collection: saved_views).",
+            "description": "The saved view to open by default, which must be one the user can read; it is cleared if that view is deleted. Relation record id (target collection: saved_views).",
             "type": "string"
           },
           "font": {
+            "description": "The typeface family the app should use.",
             "enum": [
               "system",
               "sans",
@@ -1859,12 +2138,15 @@
             "type": "string"
           },
           "font_size": {
+            "description": "The text size as a whole number from 12 to 24; 0 means unset.",
             "type": "number"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "theme": {
+            "description": "The color scheme the app should use; system follows the device.",
             "enum": [
               "light",
               "dark",
@@ -1873,14 +2155,16 @@
             "type": "string"
           },
           "time_zone": {
+            "description": "An IANA time zone name such as Europe/Paris that sets the day for this user; empty means none, and Local is refused.",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "user": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user these settings belong to; it must be the signed-in user and cannot be changed. Relation record id (target collection: users).",
             "type": "string"
           }
         },
@@ -1894,21 +2178,26 @@
         "description": "Paginated list of `users` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/UsersRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -1925,47 +2214,54 @@
         "description": "Fields include email (emailVisibility false, so hidden from other users), name, verified, avatar, approved, and the hidden email_key. name is optional, but a changed name sent in a create or update is stored trimmed, and a change to an empty or whitespace-only name answers 400 naming name, while a blank name from a sign-in provider is stored empty (decision:user-settings-write-checks).\n\n**Access.** list and view are open to any authenticated user (@request.auth.id != \"\"); update and delete are self-only (id = @request.auth.id). Signup is open, but the create and update rules forbid a body that sets approved (@request.body.approved:isset = false), which answers 400 on create and 404 on self-update, so no account can approve itself. The authRule is verified = true && approved = true: a new account, password or GitHub OAuth, cannot sign in until its email is verified AND an app administrator approves it. Superusers bypass all of this.\n\n**Approval.** An APP ADMINISTRATOR approves a waiting account through GET /api/tracker/admin/pending-users and POST /api/tracker/admin/pending-users/{id}/approve, or a superuser does so in the PocketBase dashboard. The authority is app-level, not the per-workspace admin tier; see decision:signup-approval and decision:verified-login. Those routes bypass collection rules and re-check the caller themselves, and the approved guards above still bind every ordinary write.\n\n**Avatar.** avatar is a PUBLIC file field with thumbnails (100x100 and 0x200, up to 5 MB), served with no file token; only its owner can change it. See collection:tasks for the PROTECTED attachment counterpart.\n\n**Email identity.** The stored email is the address as typed, minus surrounding whitespace and case, with dots and plus tags intact, because that is where the mail lands. Uniqueness compares the HIDDEN field email_key instead: the address trimmed and lowercased, plus, for gmail.com and googlemail.com ONLY, the local part stripped of every dot and of everything from its first plus sign up to the at sign. Every other domain keeps dots and plus tags significant, and the two Gmail domains stay distinct. So one person cannot hold two accounts by adding a dot or a plus tag, while two different mailboxes at any other host stay two accounts. A partial unique index on email_key enforces it, and the server recomputes the key on EVERY write, programmatic ones included. A signup that folds onto an existing account is refused with 400 and the message An account with this email address already exists., and two fold-equivalent signups racing in parallel leave exactly one account (the loser gets a 400 from the index). Because email_key is hidden, PocketBase strips it from every non-superuser response, the account own included, and refuses it in a filter. GitHub OAuth account linking matches on the same key: a provider address that folds onto an existing account links to THAT account instead of creating a duplicate.\n\n**Verification email.** A signup through POST /api/collections/users/records sends the verification email itself, after the account is saved, so a client needs no second call. An account a superuser creates, as seeding and import do, gets no email, and neither does an account that is already verified when it is created. The signup does not wait for the mail server: the email goes out right after the response (decision:signup-mail-off-request). A failed send keeps the account and is logged; POST /api/collections/users/request-verification sends the email again. When the server has no mail transport configured, the signup sends nothing and logs a warning. Display name and settings are read and saved together through route:tracker-user-settings.",
         "properties": {
           "approved": {
+            "description": "Whether an app administrator has approved the account, which signing in requires; a value sent by a user is refused.",
             "type": "boolean"
           },
           "avatar": {
-            "description": "Stored filename (fetch via the files API).",
+            "description": "A public profile picture of up to 5 MB; only the account owner can change it. Stored filename (fetch via the files API).",
             "type": "string"
           },
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "email": {
-            "description": "Only returned when the record's emailVisibility flag is true.",
+            "description": "Sign-in email address of the account. Only returned when the record's emailVisibility flag is true.",
             "format": "email",
             "type": "string"
           },
           "emailVisibility": {
+            "description": "Whether other users can see the email of this account.",
             "type": "boolean"
           },
           "email_key": {
-            "description": "Hidden system field — not returned in API responses.",
+            "description": "The normalised email address that stops duplicate accounts; the server computes it on every save, it is never shown, and a value sent is replaced. Hidden system field — not returned in API responses.",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "name": {
+            "description": "The display name, stored trimmed; optional at signup, but changing it to an empty name is refused.",
             "type": "string"
           },
           "password": {
-            "description": "Hidden system field — not returned in API responses.",
+            "description": "Account password; write-only. Hidden system field — not returned in API responses.",
             "type": "string"
           },
           "tokenKey": {
-            "description": "Hidden system field — not returned in API responses.",
+            "description": "Server-kept token secret. Hidden system field — not returned in API responses.",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "verified": {
+            "description": "Whether the email address has been confirmed; set by the server.",
             "type": "boolean"
           }
         },
@@ -1979,21 +2275,26 @@
         "description": "Paginated list of `workspace_invitations` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/WorkspaceInvitationsRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -2010,24 +2311,28 @@
         "description": "A pending invitation, one row per workspace and email_key (unique index), whether or not an account exists yet for that address. Fields: workspace (relation, required, removed with its workspace), email (the address as typed, trimmed and lowercased), email_key (hidden, and the ONLY column ever compared: trimmed, lowercased, and for gmail.com and googlemail.com only with every dot in the local part and everything from the first plus sign to the at sign dropped, the same fold users.email_key uses, so an invitation means the same address as an account), role (admin, member or viewer) and invited_by (relation to users, optional, no cascade, so an admin leaving the workspace does not revoke a grant the workspace made). See decision:invitation-keyed-by-email.\n\n**Access.** create is the workspace owner, or an ACTIVE admin who may invite only as member. list, view and delete are the workspace owner and its ACTIVE admins only, narrower than the membership roster, because a pending invitation is an administrative act in progress. update is null: an invitation is revoked and re-issued, never edited. Every rule carries a workspace-not-trashed conjunct, so a trashed workspace resolves nobody. A request that names a workspace (?workspace=) can view or delete an invitation only if it belongs to that workspace; otherwise it answers 404.\n\n**Limits.** Sends are capped per inviter per rolling day and a decline blocks a repeat invitation from that workspace for a while; see collection:invitation_events and decision:invitation-send-limit-and-decline-block.\n\n**Expiry.** One app_settings row, invitation_expiry_days (default 7), sizes the window. A daily sweep deletes rows past it, and the accept route re-checks it itself, so an already-expired invitation cannot be accepted between sweeps. Every list and view also returns expires_at (created plus invitation_expiry_days in whole days, 7 when that setting is missing, non-numeric or negative) and expired (true once now reaches expires_at); both are computed on read and not stored.\n\n**Accept and decline.** POST /api/tracker/invitations/{id}/accept is open to the invitee only, matched on the folded email_key of the caller. It creates the workspace_members row at status active in the same transaction that deletes the invitation; when the caller already holds a membership there, that row is left exactly as it is, so a suspended member is never reactivated by accepting. POST /api/tracker/invitations/{id}/decline deletes the invitation and creates nothing. Both refuse an unknown id, an invitation addressed to someone else, or a trashed workspace with the identical 404 an unknown id gets, so neither route is an existence oracle.\n\n**Mine.** GET /api/tracker/invitations/mine answers which invitations belong to the caller. It is a route rather than a collection rule because email_key is hidden on users and PocketBase drops hidden fields from filter matching, so a rule attempting that comparison would return an empty 200 for everyone.\n\n**Mail.** Creating an invitation sends the invitee one email when a mail server is configured: it names the inviter, the workspace, the role, the address to sign in at, the invitation id with how to accept or decline it, and when it expires. The create answers before the mail is handed over, so a transport failure is logged as invitation email failed against the invitation id and the invitation stands. The create response carries mail_sent (on the collection create a key of the response only, never stored or listed; on the route a key beside invited): true when the mail is being sent, false when no mail server is configured (the invitation still exists and the inviter must tell the invitee themselves; the server logs invitation email skipped: SMTP disabled) or when a superuser created the row (seeding sends nothing). Inviting a pending address again through POST /api/tracker/workspaces/{id}/resolve-member-email sends the same invitation again, with its id and expiry unchanged and no daily slot spent; once that invitation has expired it is replaced by a fresh one with a new id, which spends a slot. Sending the same invitation again less than a minute after the previous resend answers 429; a first invitation is bounded by the daily limit only. See decision:invitation-mail-and-resend.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "email": {
+            "description": "The address to invite, stored trimmed and lowercased; no account needs to exist for it yet.",
             "type": "string"
           },
           "email_key": {
-            "description": "Hidden system field — not returned in API responses.",
+            "description": "The normalised address used to match the invitee; the server computes it, it is never shown, and a value sent is replaced. Hidden system field — not returned in API responses.",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "invited_by": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who sent the invitation; the server fills it from the caller, and a value sent is replaced. Relation record id (target collection: users).",
             "type": "string"
           },
           "role": {
+            "description": "The role the invitee gets on accepting; an admin may invite only as member.",
             "enum": [
               "admin",
               "member",
@@ -2036,7 +2341,7 @@
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace the invitation is for; required at create. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -2052,21 +2357,26 @@
         "description": "Paginated list of `workspace_members` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/WorkspaceMembersRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -2083,13 +2393,16 @@
         "description": "Links a user to a workspace, one row per workspace and user (unique index). Fields: workspace (relation, required, removed with its workspace), user (relation, required, removed with the user), role (select, required: admin, member or viewer) and status (select, required: active or suspended). An update that sends an empty or invalid role is refused with HTTP 400 and a field-level validation_required error, so every row carries exactly one role.\n\n**Only an active membership carries access.** Every membership branch of every workspace-scoped rule, list and view included, carries a same-row active-status conjunct beside its user check, so a suspended member gets a filtered-empty list, 404 on view, update and delete, and 400 on create, everywhere. Branches that grant on another basis stay ungated: workspace and record ownership, and the author and self paths. No branch grants on assignment, so a suspended member who is still the assignee of a task keeps no access to it. See decision:active-membership-grants-access.\n\n**Viewer writes only on an assigned task.** A viewer keeps every read a member has, and the membership branch that grants each create, update and delete across tasks, milestones, decisions, documents, comments, projects, saved_views and task_subscribers carries a role-is-not-viewer guard on the same membership row as the user check, so a member and an admin pass and a viewer is excluded. A task assigned to a viewer grants them no write: they may not edit it, comment on it, react to its comments, subscribe to it or add subtasks under it. Admin-only branches are untouched.\n\n**How a row is created.** The createRule is null, so no caller creates a membership through the collections API. A row comes into existence when the invited person accepts a pending invitation (POST /api/tracker/invitations/{id}/accept, see collection:workspace_invitations), which writes status active; when the caller already holds a membership in that workspace, accepting leaves that row untouched, so a suspended member is never reactivated by accepting. Every workspace create, through the collections API or a provisioning path, also gives the workspace owner a self-membership with role admin and status active. A membership created without a role is a member.\n\n**Read.** The roster is open to the workspace OWNER and any ACTIVE member, and any user may read their own membership row whatever its status.\n\n**Update.** The workspace owner may change role and status; an ACTIVE admin may change status but not role. Neither workspace nor user may change. Status moves only from active to suspended and from suspended back to active, superusers included; any other value or move is refused with HTTP 400 and a plain message.\n\n**The owner row is fixed.** Neither the owner nor an admin may change the role, status, workspace or user of the membership row that belongs to the workspace owner, or delete it: each answers HTTP 409 with a field-level last_active_owner error. A change that leaves the row admin and active is allowed, so an owner whose row was member when ownership arrived can raise it. A superuser is exempt, so an operator can still repair a roster. Ownership moves only through POST /api/tracker/workspaces/{id}/transfer-ownership (see route:workspaces-transfer-ownership), after which the row of the new owner is fixed and the row of the previous owner can be changed like any other.\n\n**Delete.** The workspace owner or an ACTIVE admin removes a member, and any member or admin may leave by deleting their own row; leaving is not an escalation, so a SUSPENDED member may still leave. The workspace OWNER cannot leave: transfer ownership or delete the workspace first. A member who leaves or is removed has their assigned tasks unassigned (see decision:leaver-tasks-unassigned).\n\n**Workspace scope.** A request that names a workspace (?workspace=) can view, update or delete a membership only if it belongs to that workspace; otherwise it answers 404. A request that names no workspace follows the usual rules.\n\n**Workspace trash.** While the workspace holding them is in the trash, membership rows are frozen: an update or a delete, leaving included, answers exactly as an unknown id does for every caller, so a member can leave again once the workspace is restored. Reading them narrows to the set that can restore the workspace, its owner and an active admin, with no carve-out for a user reading their own row; every other tier gets an empty listing and the unknown-id answer. Nothing is written on the rows, so restoring the workspace brings them back unchanged.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "role": {
+            "description": "What the member may do: admin also manages configuration, member edits work, viewer only reads; only the workspace owner may change it.",
             "enum": [
               "admin",
               "member",
@@ -2098,6 +2411,7 @@
             "type": "string"
           },
           "status": {
+            "description": "Whether the membership grants access: active does and suspended does not; the owner or an active admin may switch between the two, except on the row of the workspace owner.",
             "enum": [
               "active",
               "suspended"
@@ -2105,15 +2419,16 @@
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "user": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The member; set when an invitation is accepted and cannot be changed. Relation record id (target collection: users).",
             "type": "string"
           },
           "workspace": {
-            "description": "Relation record id (target collection: workspaces).",
+            "description": "The workspace of this membership; set when an invitation is accepted and cannot be changed. Relation record id (target collection: workspaces).",
             "type": "string"
           }
         },
@@ -2130,21 +2445,26 @@
         "description": "Paginated list of `workspaces` records.",
         "properties": {
           "items": {
+            "description": "The records of this page.",
             "items": {
               "$ref": "#/components/schemas/WorkspacesRecord"
             },
             "type": "array"
           },
           "page": {
+            "description": "The page returned, counting from 1.",
             "type": "integer"
           },
           "perPage": {
+            "description": "Records per page.",
             "type": "integer"
           },
           "totalItems": {
+            "description": "Records matching the filter across all pages.",
             "type": "integer"
           },
           "totalPages": {
+            "description": "Pages at this page size.",
             "type": "integer"
           }
         },
@@ -2161,31 +2481,36 @@
         "description": "The tenancy layer: user, then workspace, then project, then item. Fields: name (required), owner (relation to users, required, removed with the user), priorities (json: the pickable priority vocabulary), default_project (relation to projects, optional) and trashed (date). A workspace is addressed only by its opaque record id, so name is display-only: renaming moves no address and two workspaces may share a name. A name made only of whitespace is refused with a 400 error.\n\n**Access.** list and view are open to the OWNER and its ACTIVE members; a suspended member cannot list or view the workspace at all. create is any authenticated user: owner may be omitted and the server stamps the signed-in caller; a submitted owner must be the caller, and naming anyone else is refused with a 400 error; a superuser keeps the owner it submits. update is the owner or an ACTIVE admin, and an update that sends owner is refused, so ownership moves only through POST /api/tracker/workspaces/{id}/transfer-ownership. delete is owner-only. Deleting your last workspace provisions a fresh one with its seeded statuses, labels and priorities.\n\n**Landing and switching.** GET /api/tracker/me/landing names the workspace a signed-in user should open, as {landing: {workspace, reason, invitation}} or {landing: null} when there is nowhere to go. It takes, in order: the earliest-created workspace the user owns that is not trashed (reason owned); else the workspace of their earliest active membership that is not trashed (member); else the workspace of their earliest invitation that has not expired, in a workspace that is not trashed and where they hold no membership (invitation, and invitation carries that invitation id, because the user cannot open the workspace until they accept); else the workspace of their earliest membership that is not trashed, which by then is a suspended one (suspended). GET /api/tracker/workspaces/{id}/switch answers whether the caller may open that workspace, as {workspace, allowed, reason, invitation}: allowed for its owner and its active members; otherwise reason is suspended for a suspended member and not_found for everyone else, the same answer for a workspace that does not exist, one the caller cannot read and one in the trash, so the route reveals nothing a workspace read would not. When the answer is not_found and the caller holds an invitation to that workspace, expired or not, invitation is {id, expired}, so a client shows the invitation to accept or decline instead of sending the user to their landing; otherwise it is null. Both routes answer a signed-in user, a request without one with 401, and a superuser with 403. See decision:landing-and-switch-check.\n\n**Provisioning.** Every workspace, however it is created, gets its shadow project (concept:shadow-project), five default statuses, three core labels and, when priorities is empty or missing, the default priorities urgent, high, medium and low, from one after-create seeder. See decision:default-priority-vocabulary.\n\n**Priority vocabulary.** priorities is a JSON array of entries shaped {id, name}, most severe first. A task stores the id of its entry (an empty string for no priority), never the name, so renaming or reordering an entry changes no task, and a name may carry any character, a comma included. An entry sent without an id keeps the id of the stored entry with the same name unless that id is sent on another entry, and otherwise gets a fresh server-minted 15-character id of lowercase letters and digits; a supplied id must have that shape and may not repeat. Every name is trimmed before it is checked and stored. Every HTTP write is validated entry by entry and answers 400 on a non-array value, an entry that is not an object, a blank or non-string name, a malformed or repeated id, a name repeated exactly, or any casing of the reserved token none. A CASE VARIANT of another entry is ACCEPTED: High alongside high is two entries, matching the binary-collated unique indexes of statuses and labels. An UPDATE may not empty the vocabulary or send null, because nothing re-seeds on update; a CREATE may, because the seeder replaces it with the defaults. Programmatic writers write repo-controlled literals and are not re-validated. A task write whose priority is not the id of a current entry, a name included, is refused 400 with code priority_not_in_vocabulary, while a task holding the id of a removed entry keeps it and stays writable on its other fields. No priority is the UNSET state, not an entry, and is always accepted.\n\n**Trash.** The first DELETE moves a workspace to the trash; a second DELETE on a trashed workspace purges it. A PATCH that sets or re-dates trashed is refused with 400, so only the owner, with a DELETE, moves a workspace into the trash; a superuser is exempt. GET /api/tracker/workspaces/{id}/deletion-impact tells the owner beforehand what the workspace holds (route:workspaces-deletion-impact). A trashed workspace drops out of list and view for every caller; the owner and its active admins find it through GET /api/tracker/workspaces/trash and restore it with a PATCH clearing trashed. Once a day the server purges workspaces trashed longer than app_settings.trash_retention_days.\n\nWhile a workspace is in the trash, the work inside it, its projects and their tasks, documents, decisions and milestones, with the edit history and subscriptions that hang off them, is hidden from every member, the owner and an active admin included, and frozen so none of it can be created, edited or deleted. Unsubscribing from a task stays available throughout. Its configuration is frozen too: statuses, labels, cycles, templates, saved views and the member list refuse every create, update and delete, and reading them narrows to the owner and an ACTIVE admin. Nothing inside is stamped, so restoring the workspace brings all of it back at once. Notifications about that work are the one exception: they are deleted when the workspace is trashed and a restore brings none of them back. See decision:workspace-trash-cascades.",
         "properties": {
           "created": {
+            "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "default_project": {
-            "description": "Relation record id (target collection: projects).",
+            "description": "The project members open first in this workspace, which must be a project of the same workspace. Relation record id (target collection: projects).",
             "type": "string"
           },
           "id": {
+            "description": "Record id, assigned by the server.",
             "type": "string"
           },
           "name": {
+            "description": "The workspace name, for display only, stored trimmed; a name of only spaces is refused.",
             "type": "string"
           },
           "owner": {
-            "description": "Relation record id (target collection: users).",
+            "description": "The user who owns the workspace; leave it empty and the server fills the caller, and it changes only through an ownership transfer. Relation record id (target collection: users).",
             "type": "string"
           },
           "priorities": {
-            "description": "Arbitrary JSON value."
+            "description": "The priority list as a JSON array of objects with id and name, most severe first; an entry sent without an id gets one. Arbitrary JSON value."
           },
           "trashed": {
+            "description": "When the workspace was moved to the trash by DELETE; send it empty to restore the workspace, any other change is refused.",
             "format": "date-time",
             "type": "string"
           },
           "updated": {
+            "description": "When the record last changed; set by the server.",
             "format": "date-time",
             "type": "string"
           }

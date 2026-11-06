@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this label belongs to; required at create and cannot be changed afterwards.",
       "hidden": false,
       "id": "relation3000000001",
       "maxSelect": 1,
@@ -34,7 +34,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_484305853",
-      "help": "",
+      "help": "The project this label is limited to, which must be a project of the same workspace; leave it empty for a label of the whole workspace.",
       "hidden": false,
       "id": "relation3000000002",
       "maxSelect": 1,
@@ -47,7 +47,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The label name, stored trimmed and unique within its workspace or project; a name of only spaces is refused.",
       "hidden": false,
       "id": "text3000000003",
       "max": 100,
@@ -61,7 +61,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The display color, from the shared palette; optional.",
       "hidden": false,
       "id": "select3000000004",
       "maxSelect": 1,
@@ -85,7 +85,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "Optional text explaining when to use the label.",
       "hidden": false,
       "id": "text3000000005",
       "max": 0,
@@ -99,7 +99,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "True for the built-in labels every workspace starts with, which cannot be deleted; leave it unset on a label you create.",
       "hidden": false,
       "id": "bool3000000006",
       "name": "core",

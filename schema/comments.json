@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_2602490748",
-      "help": "",
+      "help": "The task this comment is on; send exactly one of task, document or decision at create, and it cannot be changed afterwards.",
       "hidden": false,
       "id": "relation2000000031",
       "maxSelect": 1,
@@ -34,7 +34,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who wrote the comment, filled by the server from the signed-in caller; a value sent at create is replaced and a later change is refused.",
       "hidden": false,
       "id": "relation2000000032",
       "maxSelect": 1,
@@ -47,7 +47,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The comment text, up to 5000 characters, stored trimmed; text of only spaces is refused, and changing it marks the comment edited.",
       "hidden": false,
       "id": "text2000000033",
       "max": 5000,
@@ -83,7 +83,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100004",
-      "help": "",
+      "help": "The top-level comment on the same item that this one replies to, or empty to start a thread; replies do not nest and it cannot be changed later.",
       "hidden": false,
       "id": "relation2000000041",
       "maxSelect": 1,
@@ -95,7 +95,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "A JSON object mapping each emoji to an array of user ids; each caller may add or remove only their own id.",
       "hidden": false,
       "id": "json2000000042",
       "maxSize": 2000000,
@@ -106,7 +106,7 @@
       "type": "json"
     },
     {
-      "help": "",
+      "help": "True once the body has been changed after posting; the server sets it, and a value sent is ignored.",
       "hidden": false,
       "id": "bool2000000043",
       "name": "edited",
@@ -118,7 +118,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100006",
-      "help": "",
+      "help": "The document this comment is on; send exactly one of task, document or decision at create, and it cannot be changed afterwards.",
       "hidden": false,
       "id": "relation2000000044",
       "maxSelect": 1,
@@ -132,7 +132,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100005",
-      "help": "",
+      "help": "The decision this comment is on; send exactly one of task, document or decision at create, and it cannot be changed afterwards.",
       "hidden": false,
       "id": "relation2000000045",
       "maxSelect": 1,

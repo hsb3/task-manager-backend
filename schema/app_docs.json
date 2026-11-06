@@ -19,7 +19,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The unique address of this entry, such as collection:tasks or decision:soft-delete-trash; entries are read-only for clients.",
       "hidden": false,
       "id": "text2560465762",
       "max": 150,
@@ -34,7 +34,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "A one-line summary of the entry; read-only for clients.",
       "hidden": false,
       "id": "text724990059",
       "max": 200,
@@ -49,7 +49,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The name of the collection this entry is mainly about, such as tasks, or empty when it concerns none; read-only for clients.",
       "hidden": false,
       "id": "text2005208156",
       "max": 150,
@@ -64,7 +64,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The full text of the entry in markdown; read-only for clients.",
       "hidden": false,
       "id": "text3685223346",
       "max": 20000,

@@ -29,7 +29,7 @@ const PATTERNS_FILE = path.join(REPO, "pb_hooks", "field_patterns.json");
 
 const RULE_KEYS = ["listRule", "viewRule", "createRule", "updateRule", "deleteRule"];
 
-function fetch_collections(): any[] {
+export function fetch_collections(migrations_dir: string = MIGRATIONS): any[] {
   /**
    * Replay migrations into a temp dir and return app (system=0) `_collections`
    * rows. Raises Error if ./pocketbase is absent or `migrate up` fails.
@@ -47,7 +47,7 @@ function fetch_collections(): any[] {
   let rows: any[];
   try {
     const mig = path.join(tmp, "pb_migrations");
-    fs.cpSync(MIGRATIONS, mig, { recursive: true, dereference: true });
+    fs.cpSync(migrations_dir, mig, { recursive: true, dereference: true });
     const data = path.join(tmp, "data");
     const [ok, out] = migrate_up(PB, data, mig);
     if (!ok) {

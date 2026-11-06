@@ -19,7 +19,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The project name, stored trimmed; a name of only spaces is refused.",
       "hidden": false,
       "id": "text1579384326",
       "max": 200,
@@ -34,7 +34,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "Optional text describing the project.",
       "hidden": false,
       "id": "text1843675174",
       "max": 2000,
@@ -50,7 +50,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who created the project, for display only; leave it empty and the server fills the caller, and it cannot be changed later.",
       "hidden": false,
       "id": "relation3479234172",
       "maxSelect": 1,
@@ -84,7 +84,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this project belongs to; required at create and cannot be changed afterwards.",
       "hidden": false,
       "id": "relation2000000051",
       "maxSelect": 1,
@@ -96,7 +96,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "When the project was moved to the trash by DELETE; send it empty to restore the project with its items, any other change is refused.",
       "hidden": false,
       "id": "date3000000101",
       "max": "",
@@ -109,7 +109,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The prefix of item keys, up to 8 uppercase letters and digits, unique in the workspace; suggested from the name when omitted and fixed after create.",
       "hidden": false,
       "id": "text4300000001",
       "max": 8,
@@ -123,7 +123,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The counter behind the item numbers of this project, kept by the server; a change sent is refused.",
       "hidden": false,
       "id": "number4300000002",
       "max": null,
@@ -136,7 +136,7 @@
       "type": "number"
     },
     {
-      "help": "",
+      "help": "Marks the hidden home of items that have no project; only the server sets it, and a request that sends it is refused.",
       "hidden": false,
       "id": "bool4300000003",
       "name": "shadow",

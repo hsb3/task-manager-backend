@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace the invitation is for; required at create.",
       "hidden": false,
       "id": "relation4100000001",
       "maxSelect": 1,
@@ -33,7 +33,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The address to invite, stored trimmed and lowercased; no account needs to exist for it yet.",
       "hidden": false,
       "id": "text4100000002",
       "max": 0,
@@ -48,7 +48,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The normalised address used to match the invitee; the server computes it, it is never shown, and a value sent is replaced.",
       "hidden": true,
       "id": "text4100000003",
       "max": 0,
@@ -62,7 +62,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The role the invitee gets on accepting; an admin may invite only as member.",
       "hidden": false,
       "id": "select4100000004",
       "maxSelect": 1,
@@ -80,7 +80,7 @@
     {
       "cascadeDelete": false,
       "collectionId": "_pb_users_auth_",
-      "help": "",
+      "help": "The user who sent the invitation; the server fills it from the caller, and a value sent is replaced.",
       "hidden": false,
       "id": "relation4100000005",
       "maxSelect": 1,

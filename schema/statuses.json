@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this status belongs to; required at create and cannot be changed afterwards.",
       "hidden": false,
       "id": "relation3100000001",
       "maxSelect": 1,
@@ -33,7 +33,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The status name, stored trimmed and unique in the workspace; a name of only spaces is refused.",
       "hidden": false,
       "id": "text3100000002",
       "max": 100,
@@ -47,7 +47,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The stage the status stands for; completed and canceled count as finished, and entering completed stamps the task completion time.",
       "hidden": false,
       "id": "select3100000003",
       "maxSelect": 1,
@@ -66,7 +66,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "The display color, from the shared palette; optional.",
       "hidden": false,
       "id": "select3100000004",
       "maxSelect": 1,
@@ -89,7 +89,7 @@
       ]
     },
     {
-      "help": "",
+      "help": "The order of the status among the board columns, as a whole number.",
       "hidden": false,
       "id": "number3100000005",
       "max": null,
@@ -102,7 +102,7 @@
       "type": "number"
     },
     {
-      "help": "",
+      "help": "True for the status a new task gets when none is sent; at most one status per workspace may be the default.",
       "hidden": false,
       "id": "bool3100000006",
       "name": "is_default",

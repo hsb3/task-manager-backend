@@ -19,7 +19,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The cycle name, up to 200 characters, stored trimmed; a cycle the server starts on its own is named after its start date.",
       "hidden": false,
       "id": "text3000000801",
       "max": 200,
@@ -35,7 +35,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this cycle belongs to; required at create and cannot be changed afterwards.",
       "hidden": false,
       "id": "relation3000000802",
       "maxSelect": 1,
@@ -47,7 +47,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "The first day of the cycle; the time of day is dropped, and two cycles of one workspace may not overlap.",
       "hidden": false,
       "id": "date3000000803",
       "max": "",
@@ -59,7 +59,7 @@
       "type": "date"
     },
     {
-      "help": "",
+      "help": "The last day of the cycle, after starts_on; leave it empty at create and the server sets it to two weeks after the start.",
       "hidden": false,
       "id": "date3000000804",
       "max": "",

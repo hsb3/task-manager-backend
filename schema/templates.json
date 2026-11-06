@@ -20,7 +20,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_300100001",
-      "help": "",
+      "help": "The workspace this template belongs to; required at create and cannot be changed afterwards.",
       "hidden": false,
       "id": "relation3060000001",
       "maxSelect": 1,
@@ -34,7 +34,7 @@
     {
       "cascadeDelete": true,
       "collectionId": "pbc_484305853",
-      "help": "",
+      "help": "The project this template is limited to, which must be a project of the same workspace; leave it empty for the whole workspace.",
       "hidden": false,
       "id": "relation3060000002",
       "maxSelect": 1,
@@ -46,7 +46,7 @@
       "type": "relation"
     },
     {
-      "help": "",
+      "help": "Whether the template produces a task or a document, which decides the keys templateData may hold.",
       "hidden": false,
       "id": "select3060000003",
       "maxSelect": 1,
@@ -62,7 +62,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "",
+      "help": "The template name, stored trimmed; a name of only spaces is refused.",
       "hidden": false,
       "id": "text3060000004",
       "max": 200,
@@ -76,7 +76,7 @@
       "type": "text"
     },
     {
-      "help": "",
+      "help": "The prefilled fields as a JSON object; a task template may hold task fields such as title and labels, a document template only title and body.",
       "hidden": false,
       "id": "json3060000005",
       "maxSize": 2000000,
