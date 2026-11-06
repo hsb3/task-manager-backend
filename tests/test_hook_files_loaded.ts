@@ -45,9 +45,9 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 const SU_EMAIL = "probe@example.com";
 const SU_PASSWORD = "probe123456";
 
-// Hook files whose ONLY registration is onBootstrap (settings wiring, cron registration).
-// They expose nothing a request can trip, so §1's boot scan is their whole cover — a probe
-// for them would have to assert something no client can observe.
+// Hook files with nothing a request in this room can observe: onBootstrap settings wiring, cron
+// registration, or a hook that acts only through an outside service (OAuth provider, SMTP), so
+// §1's boot scan is their whole cover here; their own suites probe them against that service.
 const BOOT_SCAN_ONLY = new Set([
   "_cron_env.pb.js",
   "alerts.pb.js",
@@ -438,6 +438,15 @@ try {
     tup(200, { items: [] }),
   );
 
+  // user_settings.pb.js: its settings route is registered (a missing file 404s on the caller's own id).
+  let settings_body: any;
+  [status, settings_body] = await api("GET", `/api/tracker/users/${alice_id}/settings`, alice);
+  check(
+    "user_settings.pb.js: GET /api/tracker/users/{id}/settings is registered",
+    tup(status, typeof settings_body?.display_name),
+    tup(200, "string"),
+  );
+
   console.log("\n── §3 every hook file is dispositioned ──");
   const probed = new Set([
     "activity.pb.js",
@@ -461,6 +470,7 @@ try {
     "scope.pb.js",
     "shadow.pb.js",
     "trash.pb.js",
+    "user_settings.pb.js",
   ]);
   // Reconciled against the ROOM's own hooksDir, never the repo's: a hook file simply
   // MISSING from the room prints nothing at all, so §1's boot scan cannot see it and a
