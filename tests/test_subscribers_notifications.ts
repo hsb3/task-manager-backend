@@ -2531,6 +2531,7 @@ try {
     '        n.set("workspace", _ws);\n' +
     '        n.set("kind", "commented");\n' +
     '        n.set("read", false);\n' +
+    '        n.set("actor", actor);\n' +
     '        n.set("comment", e.record.id);\n' +
     '        n.set("comment_preview", preview);';
   // An over-long preview (the column caps at 140) fails validation without touching any

@@ -469,6 +469,15 @@ try {
     tup(200, true),
   );
 
+  // me.pb.js: its me route is registered (a missing file 404s).
+  let me_body: any;
+  [status, me_body] = await api("GET", "/api/tracker/me", alice);
+  check(
+    "me.pb.js: GET /api/tracker/me is registered",
+    tup(status, Array.isArray(me_body?.workspaces)),
+    tup(200, true),
+  );
+
   console.log("\n── §3 every hook file is dispositioned ──");
   const probed = new Set([
     "activity.pb.js",
@@ -482,6 +491,7 @@ try {
     "keys.pb.js",
     "landing.pb.js",
     "main.pb.js",
+    "me.pb.js",
     "membership_status.pb.js",
     "names.pb.js",
     "notify.pb.js",

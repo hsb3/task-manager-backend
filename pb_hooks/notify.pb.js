@@ -188,6 +188,7 @@ onRecordUpdateRequest((e) => {
         n.set("workspace", _ws);
         n.set("kind", "assigned");
         n.set("read", false);
+        n.set("actor", actor);
         // The record this fan-out is about is already committed, so a failed row is dropped
         // and named in the log — never thrown, which would lose every recipient after it.
         try {
@@ -246,6 +247,7 @@ onRecordUpdateRequest((e) => {
         n.set("workspace", _ws);
         n.set("kind", "status_done");
         n.set("read", false);
+        n.set("actor", actor);
         n.set("status_label", newStatusName);
         // The record this fan-out is about is already committed, so a failed row is dropped
         // and named in the log — never thrown, which would lose every recipient after it.
@@ -498,6 +500,7 @@ onRecordCreateRequest((e) => {
         n.set("workspace", _ws);
         n.set("kind", "commented");
         n.set("read", false);
+        n.set("actor", actor);
         n.set("comment", e.record.id);
         n.set("comment_preview", preview);
         // The record this fan-out is about is already committed, so a failed row is dropped
@@ -531,6 +534,7 @@ onRecordCreateRequest((e) => {
         n.set("workspace", _ws);
         n.set("kind", "mentioned");
         n.set("read", false);
+        n.set("actor", actor);
         n.set("comment", e.record.id);
         n.set("comment_preview", preview);
         // The record this fan-out is about is already committed, so a failed row is dropped
@@ -808,6 +812,7 @@ onRecordUpdateRequest((e) => {
         n.set("workspace", _ws);
         n.set("kind", "mentioned");
         n.set("read", false);
+        n.set("actor", actor);
         n.set("comment", e.record.id);
         n.set("comment_preview", preview);
         // The record this fan-out is about is already committed, so a failed row is dropped
@@ -1051,6 +1056,7 @@ onRecordCreateRequest(
           n.set("workspace", wsId);
           n.set("kind", "mentioned");
           n.set("read", false);
+          n.set("actor", actor);
           // The record this fan-out is about is already committed, so a failed row is dropped
           // and named in the log — never thrown, which would lose every recipient after it.
           try {
@@ -1296,6 +1302,7 @@ onRecordUpdateRequest(
           n.set("workspace", wsId);
           n.set("kind", "mentioned");
           n.set("read", false);
+          n.set("actor", actor);
           // The record this fan-out is about is already committed, so a failed row is dropped
           // and named in the log — never thrown, which would lose every recipient after it.
           try {
@@ -1330,20 +1337,24 @@ routerAdd(
   "/api/tracker/notifications/read-all",
   (e) => {
     // [[read]] bracket-quoted (reserved-ish); NULL-safe so an unset flag still counts.
-    // KEEP IN SYNC (unread predicate): notifications.listRule (1785171300, 1785172400,
-    // 1785174200, 1785176700), the
+    // KEEP IN SYNC (unread predicate): notifications.listRule, the
     // digest cron below, and this route — what is marked read, what is counted and what the
     // inbox lists must be one set, so trashed work, work the recipient lost access to AND a
     // draft item the recipient cannot open are excluded on all three by the same
-    // predicate, through each of the three item links.
+    // predicate, through the workspace and each of the three item links.
     const ws = String(e.request.url.query().get("workspace") || "");
     const res = e.app
       .db()
       .newQuery(
         "UPDATE notifications SET [[read]] = true, " +
+          "[[read_at]] = strftime('%Y-%m-%d %H:%M:%fZ', 'now'), " +
           "[[updated]] = strftime('%Y-%m-%d %H:%M:%fZ', 'now') " +
           "WHERE ([[read]] IS NULL OR [[read]] = false) AND " +
           "([[dismissed]] IS NULL OR [[dismissed]] = false) AND " +
+          "(notifications.workspace = '' OR EXISTS (SELECT 1 FROM workspaces ow WHERE ow.id = notifications.workspace AND " +
+          "(ow.owner = [[notifications.user]] OR " +
+          "EXISTS (SELECT 1 FROM workspace_members om WHERE om.workspace = ow.id AND " +
+          "[[om.user]] = [[notifications.user]] AND om.status = 'active')))) AND " +
           "(notifications.task = '' OR EXISTS (SELECT 1 FROM tasks t " +
           "WHERE t.id = notifications.task AND t.trashed = '' AND " +
           "(t.project = '' OR EXISTS (SELECT 1 FROM projects p " +
@@ -1404,12 +1415,11 @@ onBootstrap((e) => {
       const settings = $app.settings();
       if (!settings.smtp.enabled) return;
       // [[read]] bracket-quoted (reserved-ish); NULL-safe so an unset flag still counts.
-      // KEEP IN SYNC (unread predicate): notifications.listRule (1785171300, 1785172400,
-      // 1785174200, 1785176700), the
+      // KEEP IN SYNC (unread predicate): notifications.listRule, the
       // read-all route above, and this cron — what is marked read, what is counted and what the
       // inbox lists must be one set, so trashed work, work the recipient lost access to AND a
       // draft item the recipient cannot open are excluded on all three by the same
-      // predicate, through each of the three item links.
+      // predicate, through the workspace and each of the three item links.
       const rows = arrayOf(new DynamicModel({ userId: "", c: 0 }));
       $app
         .db()
@@ -1417,6 +1427,10 @@ onBootstrap((e) => {
           "SELECT [[user]] AS userId, COUNT(*) AS c FROM notifications " +
             "WHERE ([[read]] IS NULL OR [[read]] = false) AND " +
             "([[dismissed]] IS NULL OR [[dismissed]] = false) AND " +
+            "(notifications.workspace = '' OR EXISTS (SELECT 1 FROM workspaces ow WHERE ow.id = notifications.workspace AND " +
+            "(ow.owner = [[notifications.user]] OR " +
+            "EXISTS (SELECT 1 FROM workspace_members om WHERE om.workspace = ow.id AND " +
+            "[[om.user]] = [[notifications.user]] AND om.status = 'active')))) AND " +
             "(notifications.task = '' OR EXISTS (SELECT 1 FROM tasks t " +
             "WHERE t.id = notifications.task AND t.trashed = '' AND " +
             "(t.project = '' OR EXISTS (SELECT 1 FROM projects p " +
@@ -1487,3 +1501,18 @@ onBootstrap((e) => {
     }
   });
 });
+
+// (11) read_at: stamped by the server when a row turns read, cleared when it turns unread.
+// Model tier, so a superuser write is stamped too; read-all's UPDATE stamps its own rows.
+onRecordCreate((e) => {
+  if (!e.record.getBool("read")) e.record.set("read_at", "");
+  else if (!e.record.getString("read_at"))
+    e.record.set("read_at", new DateTime());
+  return e.next();
+}, "notifications");
+onRecordUpdate((e) => {
+  if (!e.record.getBool("read")) e.record.set("read_at", "");
+  else if (!e.record.original().getBool("read"))
+    e.record.set("read_at", new DateTime());
+  return e.next();
+}, "notifications");
