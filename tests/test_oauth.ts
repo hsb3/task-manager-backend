@@ -4,9 +4,9 @@ clean-room `pocketbase serve` processes (temp --dir / --migrationsDir copy /
 --hooksDir with only oauth.pb.js) — never touches the repo's real
 pb_migrations, pb_hooks, or pb_data.
 
-Headless-provable: with no GITHUB_CLIENT_ID/SECRET, auth-methods shows oauth2
-disabled (boot hook no-ops); with dummy creds injected into the subprocess
-env, it advertises a github provider with a PKCE authURL (S256, correct
+Headless-provable: with no GITHUB_ or GOOGLE_CLIENT_ID/SECRET, auth-methods shows oauth2
+disabled (boot hook no-ops, one boot log line per missing pair); with dummy creds injected into
+the subprocess env, it advertises a github provider (a GOOGLE room does the same for google) with a PKCE authURL (S256, correct
 scope/state/client_id, secret never appears), the SDK's oauth2-redirect
 endpoint exists (307), and the boot hook's runtime save writes no migration
 file. A third room stands up a FAKE OpenID provider in-process (a provider entry
@@ -16,7 +16,7 @@ request hook's verified=true and its PBTT-529 account-linking on email_key.
 NOT provable here (needs a real GitHub login in a browser): GitHub's own consent
 round-trip and its profile-populated name/avatar.
 
-Ports 8099 (env UNSET room), 8094 (env SET room), 8099 again (the LINKING room),
+Ports 8099 (env UNSET room), 8094 (env SET room, then the GOOGLE room), 8099 again (the LINKING room),
 all + PB_PORT_OFFSET, run sequentially so they're never both in use. The fake
 provider binds an EPHEMERAL port (bind 0) — it is not a PocketBase room and takes
 no band.
@@ -50,6 +50,8 @@ const MFA_SUFFIX = "superuser_mfa.js";
 // vars; this only proves the boot hook reacts to *some* env values.
 const DUMMY_CLIENT_ID = "test_client_id_m17";
 const DUMMY_CLIENT_SECRET = "test_secret_m17_do_not_use";
+const DUMMY_GOOGLE_ID = "test_google_id_6n7n.apps.googleusercontent.com";
+const DUMMY_GOOGLE_SECRET = "test_google_secret_6n7n_do_not_use";
 
 let failures = 0;
 
@@ -177,11 +179,15 @@ class Room {
     const saved = Object.keys(this.extra_env).map((k) => [k, process.env[k]] as const);
     Object.assign(process.env, this.extra_env);
     try {
+      // --dev echoes the boot hook's logger lines into the log file; outside dev mode they reach
+      // only the logs DB, a few seconds after boot.
       this.proc = await roomkit.serve(
         this.port,
         this.data_dir,
         this.migrations_dir,
         this.hooks_dir,
+        null,
+        ["--dev"],
       );
     } finally {
       for (const [k, v] of saved) {
@@ -202,6 +208,19 @@ class Room {
   cleanup_tmp(): void {
     fs.rmSync(this.tmp, { recursive: true, force: true });
   }
+
+  // Boot-log lines carrying the hook's exact "pair missing" message for `prefix`.
+  boot_log_lines(prefix: string): number {
+    const text = fs.readFileSync(this.proc!.roomkit_log, "utf8");
+    return splitlines(text).filter((l) => l.includes(`no ${prefix}_CLIENT_ID/SECRET`)).length;
+  }
+
+  // Same pb_data, new env: what a redeploy with changed variables does to stored providers.
+  async restart(extra_env: Record<string, string>): Promise<void> {
+    await this.stop();
+    this.extra_env = extra_env;
+    await this.start();
+  }
 }
 
 function get_auth_methods(base_url: string): Promise<[number, any]> {
@@ -213,9 +232,9 @@ function providers_of(methods: any): any[] {
   return truthy(providers) ? providers : [];
 }
 
-function find_github_provider(auth_methods: any): any {
+function find_provider(auth_methods: any, name: string): any {
   for (const p of providers_of(auth_methods)) {
-    if (py_get(p, "name") === "github") {
+    if (py_get(p, "name") === name) {
       return p;
     }
   }
@@ -238,6 +257,9 @@ try {
   check("oauth2.enabled", py_get(py_get(methods, "oauth2", {}), "enabled"), false);
   const provider_names = providers_of(methods).map((p) => py_get(p, "name"));
   check("github NOT in providers", provider_names.includes("github"), false);
+  check("google NOT in providers", provider_names.includes("google"), false);
+  check("one boot log line names the missing GITHUB pair", unset_room.boot_log_lines("GITHUB"), 1);
+  check("one boot log line names the missing GOOGLE pair", unset_room.boot_log_lines("GOOGLE"), 1);
 } finally {
   await unset_room.stop();
   unset_room.cleanup_tmp();
@@ -256,8 +278,11 @@ try {
   check("auth-methods request succeeds", status, 200);
   check("oauth2.enabled", py_get(py_get(methods, "oauth2", {}), "enabled"), true);
 
-  const github = find_github_provider(methods);
+  const github = find_provider(methods, "github");
   check("github provider present", github !== null, true);
+  check("google NOT in providers (its pair is unset)", find_provider(methods, "google"), null);
+  check("one boot log line names the missing GOOGLE pair", set_room.boot_log_lines("GOOGLE"), 1);
+  check("no boot log line calls the GITHUB pair missing", set_room.boot_log_lines("GITHUB"), 0);
 
   if (github !== null) {
     const auth_url = py_get(github, "authURL", "");
@@ -345,6 +370,53 @@ try {
 } finally {
   await set_room.stop();
   set_room.cleanup_tmp();
+}
+
+// COVERS: boot:oauth.pb.js
+console.log(
+  "\n── GOOGLE room (dummy GOOGLE_CLIENT_ID/SECRET only): google provider live, github off ──",
+);
+const google_room = new Room(8094 + PORT_OFFSET, {
+  GOOGLE_CLIENT_ID: DUMMY_GOOGLE_ID,
+  GOOGLE_CLIENT_SECRET: DUMMY_GOOGLE_SECRET,
+});
+try {
+  await google_room.start();
+  [status, methods] = await get_auth_methods(google_room.base_url);
+  check("auth-methods request succeeds", status, 200);
+  check("oauth2.enabled", py_get(py_get(methods, "oauth2", {}), "enabled"), true);
+  const google = find_provider(methods, "google");
+  check("google provider present", google !== null, true);
+  const auth_url = google === null ? "" : py_get(google, "authURL", "");
+  const parsed = urlparse(auth_url);
+  check("authURL host+path", parsed.netloc + parsed.path, "accounts.google.com/o/oauth2/v2/auth");
+  const qs = parse_qs(parsed.query);
+  check("code_challenge_method", py_get(qs, "code_challenge_method", [null])[0], "S256");
+  check(
+    "client_id matches injected env clientId",
+    py_get(qs, "client_id", [null])[0],
+    DUMMY_GOOGLE_ID,
+  );
+  check("client secret never appears in authURL", auth_url.includes(DUMMY_GOOGLE_SECRET), false);
+  check("github NOT in providers (its pair is unset)", find_provider(methods, "github"), null);
+  check("one boot log line names the missing GITHUB pair", google_room.boot_log_lines("GITHUB"), 1);
+  check("no boot log line calls the GOOGLE pair missing", google_room.boot_log_lines("GOOGLE"), 0);
+
+  console.log(
+    "\n── same pb_data rebooted with NO pairs: stored providers go off, not just unlogged ──",
+  );
+  await google_room.restart({});
+  [status, methods] = await get_auth_methods(google_room.base_url);
+  check("auth-methods request succeeds", status, 200);
+  check(
+    "oauth2.enabled after reboot without env",
+    py_get(py_get(methods, "oauth2", {}), "enabled"),
+    false,
+  );
+  check("google gone after reboot without env", find_provider(methods, "google"), null);
+} finally {
+  await google_room.stop();
+  google_room.cleanup_tmp();
 }
 
 // COVERS: hook:oauth.pb.js#onRecordAuthWithOAuth2Request:users
@@ -438,6 +510,18 @@ try {
     }
   };
 
+  const verified_on_key = (key: string): any[] => {
+    const con = sqlite_connect(path.join(link_room.data_dir, "data.db"), { timeout: 15 });
+    try {
+      return con
+        .query("SELECT verified FROM users WHERE email_key = ?")
+        .values(key)
+        .map((r) => r[0]);
+    } finally {
+      con.close();
+    }
+  };
+
   const external_auths = (): any[] => {
     const con = sqlite_connect(path.join(link_room.data_dir, "data.db"), { timeout: 15 });
     try {
@@ -493,6 +577,11 @@ try {
   check("OAuth login for an unknown address → 403 (approval gate, not a link)", s, 403);
   const fresh_ids = users_on_key("brandnew@gmail.com");
   check("…minted exactly one NEW account", fresh_ids.length, 1);
+  check(
+    "…saved verified (the provider proved the address)",
+    verified_on_key("brandnew@gmail.com"),
+    [1],
+  );
   check("…which is not the linked one", !Bun.deepEquals(fresh_ids, [existing_id], true), true);
   check("…and the linked account is untouched", users_on_key("linktarget@gmail.com"), [
     existing_id,

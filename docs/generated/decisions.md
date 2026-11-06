@@ -121,6 +121,8 @@ The after-create event fires once for every committed account create: password s
 
 Only this first workspace, and the one re-provisioned when an owner deletes their last workspace (decision:last-workspace-reprovision), gets a default project. A workspace the user creates through the `workspaces` collection starts with its vocabulary and no visible project: someone who chose to make a second workspace does not need a project they did not ask for.
 
+**Superseded in part:** provider sign-in now means GitHub or Google (decision:oauth-providers-from-env); a first sign-in through either provisions, and linking either to an existing account creates no user.
+
 ## backend-owns-business-rules
 
 - **Slug:** `decision:backend-owns-business-rules`
@@ -276,6 +278,8 @@ The hook does nothing unless both bucket and secret are set, so local runs and t
 Both steps are idempotent and do nothing when already true. An OAuth signup still starts unapproved (decision:signup-approval).
 
 The provider credentials come from `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, written onto the `users` collection by a boot hook in the same file, because a collection migration keeps only the enabled flag and drops the provider credentials. With them unset, OAuth stays disabled.
+
+**Superseded:** decision:oauth-providers-from-env replaces this record: GitHub and Google are each enabled by their own environment pair, both link by verified email, and the provider list is rewritten on every boot, so OAuth is disabled only when every pair is unset.
 
 ## invitation-keyed-by-email
 
@@ -462,6 +466,18 @@ Every emitter in `pb_hooks/notify.pb.js`, and the ownership-transfer route, fill
 
 `POST /api/tracker/notifications/read-all` takes the same scope. With `?workspace=` it marks read only that workspace and the rows with no workspace, so clearing one workspace never marks unseen notices in another; without it, it marks the whole unread inbox. The daily digest email covers the whole account. This follows Linear, where an inbox belongs to one workspace.
 
+## oauth-providers-from-env
+
+- **Slug:** `decision:oauth-providers-from-env`
+- **Title:** GitHub and Google sign-in are each enabled by an environment pair and both link by verified email.
+- **Ref:** `users`
+
+This supersedes decision:github-oauth-verified-email-linking, which covered GitHub alone and said that with the GitHub credentials unset OAuth stays disabled. Prior art: Linear offers Google sign-in beside email login, passkeys and SAML, and no GitHub sign-in; GitHub is the provider this app already had.
+
+- **Providers from the environment.** Each provider has a client id and client secret pair in the environment. A provider is on only when both halves are set; a missing or half pair leaves that provider off, logged once at boot. The provider list is written on every boot, so removing a pair turns that provider off on the next deploy even though the earlier credentials were stored.
+- **Verified email, both providers.** A first sign-in through either provider with a provider-verified email is saved as verified, because the provider already proved the address and the users auth rule requires a verified account. A sign-in whose verified email folds onto an existing account (collection:users, email identity) links to that account instead of creating a duplicate. Both providers report an email only when they have verified it, so an unverified claim never matches. Both steps are idempotent and do nothing when already true. A provider signup still starts unapproved (decision:signup-approval).
+- **Accepted risk.** Google reports an address as verified for any domain whose mailbox it confirmed, Gmail or not, and that verdict outlives a custom domain changing hands, so a provider account on a lapsed domain could link to an existing password account holding the same address. GitHub carries the same class of risk; neither is mitigated here.
+
 ## project-items-membership-denormalised
 
 - **Slug:** `decision:project-items-membership-denormalised`
@@ -612,6 +628,8 @@ Signup stays open, but `users.approved` starts false and the `users` auth rule r
 Approval is an app-level power held by superusers and by accounts whose email is listed in the `APP_ADMIN_EMAILS` deployment setting. `GET /api/tracker/admin/pending-users` lists waiting accounts and `POST /api/tracker/admin/pending-users/{id}/approve` approves one. Custom routes skip collection rules, so both scope on the caller themselves, and both answer any other caller with 404, which reveals nothing about who is waiting.
 
 Owning or administering a workspace grants no approval power. Every signup provisions and owns its own workspace, so a workspace-tier power would let any stranger unlock any pending account. Approval is always a human act; nothing approves automatically.
+
+**Superseded in part:** provider sign-in now means GitHub or Google (decision:oauth-providers-from-env); a signup through either is verified by the provider and still lands unapproved.
 
 ## signup-mail-off-request
 

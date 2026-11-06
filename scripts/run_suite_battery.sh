@@ -443,8 +443,8 @@ run_suite "test_hardening" env \
 stop_room "$hard_pid"; kill "$hard_sink_pid" 2>/dev/null || true
 fi
 
-# ── test_oauth — self-booting; strips GITHUB_CLIENT_ID/SECRET so its "UNSET" room genuinely sees them absent ──
-run_suite "test_oauth" env -u GITHUB_CLIENT_ID -u GITHUB_CLIENT_SECRET bun tests/test_oauth.ts
+# ── test_oauth — self-booting; strips GITHUB_ and GOOGLE_CLIENT_ID/SECRET so its "UNSET" room genuinely sees them absent ──
+run_suite "test_oauth" env -u GITHUB_CLIENT_ID -u GITHUB_CLIENT_SECRET -u GOOGLE_CLIENT_ID -u GOOGLE_CLIENT_SECRET bun tests/test_oauth.ts
 
 # ── test_signup — self-booting; proves public signup + superuser approval gets the same
 #    auto-provisioned workspace/project/user_settings shape a seeded user gets ──

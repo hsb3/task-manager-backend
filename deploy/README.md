@@ -1,8 +1,8 @@
 ---
 title: Deployment recipes
 status: current
-version: 12
-updated: 2026-11-05
+version: 13
+updated: 2026-11-06
 ---
 
 # Deployment recipes
@@ -39,9 +39,9 @@ are independent of each other):
    `--reset` rotates them, see Backups below). Use the S3 name it reports, not the resource name.
 3. **Resend.** An API key from the Resend dashboard; a sender on a domain verified there if mail
    must reach anyone but the Resend account owner.
-4. **GitHub OAuth app.** Create it with the authorization callback URL of the client app that
-   runs the flow, which is the client's own route, not PocketBase's `/api/oauth2-redirect`.
-   The app issues the client id and secret.
+4. **OAuth apps (GitHub, Google; either, both or neither).** Create each with the authorization
+   callback URL of the client app that runs the flow, which is the client's own route, not
+   PocketBase's `/api/oauth2-redirect`. Each app issues its client id and secret.
 5. **`pocketbase` variables, all before its first boot.**
 
    | variable | what it does | value comes from |
@@ -52,6 +52,7 @@ are independent of each other):
    | `PB_PUBLIC_URL` | the link base in verification and password-reset emails, which open PocketBase's own confirmation pages | `https://<pocketbase domain>` (step 1) |
    | `PB_CORS_ORIGINS` | the CORS allowlist `serve` gets as `--origins` (`Dockerfile`) | the client app's origin; unset, `*` |
    | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | enable GitHub sign-in (`pb_hooks/oauth.pb.js`); both or neither | GitHub OAuth app (step 4) |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | enable Google sign-in (`pb_hooks/oauth.pb.js`); both or neither; a missing pair leaves that provider off, logged once at boot | Google OAuth client (step 4) |
    | `APP_ADMIN_EMAILS` | comma-separated accounts, besides the superuser, allowed to approve new signups (`pb_hooks/routes.pb.js`) | owner's choice |
    | `ALERT_EMAIL` | recipient of the error-rate alert mail (`pb_hooks/alerts.pb.js`); needs `RESEND_API_KEY` | owner's choice |
    | `PB_BACKUPS_S3_BUCKET`, `_ENDPOINT`, `_REGION`, `_ACCESS_KEY`, `_SECRET` | send backups to S3 (`pb_hooks/backups.pb.js`); bucket and secret both, or local backups on the volume | `pb-backups` credentials (step 2) |
@@ -67,8 +68,8 @@ are independent of each other):
 6. **Deploy-failure alert.** Re-create the notification rule in
    "When a pocketbase deploy fails" below; it is not in the IaC.
 7. **Verify.** The healthcheck is green, the superuser logs into `/_/` with its emailed code, and
-   `GET /api/collections/users/auth-methods` lists `github` under
-   `oauth2.providers`.
+   `GET /api/collections/users/auth-methods` lists each configured provider (`github`, `google`)
+   under `oauth2.providers`.
 
 ## When a pocketbase deploy fails
 
