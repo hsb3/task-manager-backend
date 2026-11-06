@@ -3,7 +3,7 @@
 
 // auth: "any" = any signed-in auth record (user, API key or superuser) · "users" = a signed-in user (an API key acts as its user) · "superuser" = superusers only · "none" = no sign-in.
 // internal: true = reachable only by the server itself (loopback); left out of openapi.json on purpose.
-// request = the body the handler reads · responses = the error statuses the handler itself returns · denies: ["superuser"] = refused in the handler with 403 · docs = the app_docs slug whose body leads the description.
+// request = the body the handler reads · query = the query parameters the handler reads · responses = the error statuses the handler itself returns, each one line (an Error body) or { text, schema } for a body of another shape · denies: ["superuser"] = refused in the handler with 403 · docs = the app_docs slug whose body leads the description.
 const ROUTES = {
   "GET /admin": {
     summary: "Redirects to the admin dashboard.",
@@ -152,6 +152,16 @@ const ROUTES = {
       "Returns a random quote and its author from an outside quote service.",
     auth: "any",
     docs: "route:tracker-inspire",
+    responses: {
+      502: {
+        text: "The outside quote service could not be reached or gave no usable quote; try again later.",
+        schema: {
+          type: "object",
+          properties: { error: { type: "string" } },
+          required: ["error"],
+        },
+      },
+    },
     response: {
       status: 200,
       schema: {
@@ -324,6 +334,13 @@ const ROUTES = {
     summary:
       "Marks the caller's unread notifications as read, optionally only those of one workspace.",
     auth: "any",
+    query: {
+      workspace: {
+        type: "string",
+        description:
+          "Marks only that workspace's notifications and those tied to no workspace; omitted marks every unread notification.",
+      },
+    },
     response: {
       status: 200,
       schema: {
@@ -343,6 +360,22 @@ const ROUTES = {
       "Counts the items the caller can see, grouped by project, status, priority, assignee, label or type.",
     auth: "any",
     denies: ["superuser"],
+    query: {
+      group: {
+        type: "string",
+        required: true,
+        enum: ["project", "status", "priority", "assignee", "label", "type"],
+        description: "What the items are counted by.",
+      },
+      filter: {
+        type: "string",
+        description:
+          "A filter over the items' own fields, at most 3500 characters, narrowing what is counted.",
+      },
+    },
+    responses: {
+      400: "The group is missing or not one of the listed ones, or the filter is longer than 3500 characters or reaches past the items' own fields.",
+    },
     response: {
       status: 200,
       schema: {
@@ -369,6 +402,21 @@ const ROUTES = {
     summary:
       "Searches the tasks, decisions, documents, milestones and projects the caller can read by title and text.",
     auth: "any",
+    query: {
+      q: {
+        type: "string",
+        description:
+          "The text to find in titles and bodies, ignoring case; omitted or blank answers no results.",
+      },
+      workspace: {
+        type: "string",
+        description:
+          "Narrows the search to one workspace id. Omitted searches every workspace the caller can read; present but blank is refused.",
+      },
+    },
+    responses: {
+      400: "The workspace parameter is present but blank.",
+    },
     response: {
       status: 200,
       schema: {
@@ -424,6 +472,49 @@ const ROUTES = {
       "Lists the trashed items of one workspace a page at a time, or counts them in groups.",
     auth: "any",
     docs: "route:tracker-trash",
+    query: {
+      workspace: {
+        type: "string",
+        required: true,
+        description: "The workspace id whose trash is listed.",
+      },
+      filter: {
+        type: "string",
+        description:
+          "A filter over the items' own fields, at most 3500 characters, narrowing the list.",
+      },
+      sort: {
+        type: "string",
+        description:
+          "A comma list of the items' fields, each optionally prefixed - or +; most recently trashed first when omitted. Ignored with group.",
+      },
+      group: {
+        type: "string",
+        enum: ["project", "status", "priority", "assignee", "label", "type"],
+        description:
+          "Counts the trashed items per group instead of listing them.",
+      },
+      time_zone: {
+        type: "string",
+        description:
+          "An IANA time zone name such as Europe/Paris, the day purge_days counts from; the caller's saved time zone wins over it.",
+      },
+      page: {
+        type: "integer",
+        description:
+          "The page to return, from 1; a missing or smaller value reads as 1.",
+      },
+      perPage: {
+        type: "integer",
+        description:
+          "Items per page, from 1 to 500; omitted is 500 and a value outside is brought to the nearer end.",
+      },
+    },
+    responses: {
+      400: "The workspace is missing or blank, or the filter, sort, group or time zone is refused: a filter longer than 3500 characters, a filter or sort that reaches past the items' own fields, a group outside the listed ones, or a time zone that is not an IANA name.",
+      403: "The workspace does not exist, or the caller is neither its owner nor an active member.",
+      404: "The workspace is in the trash; its owner gets 404 too.",
+    },
     response: {
       status: 200,
       schema: {
@@ -518,6 +609,9 @@ const ROUTES = {
     summary: "The caller's display name and personal settings.",
     auth: "users",
     docs: "route:tracker-user-settings",
+    responses: {
+      404: "The id in the path is not the caller; another account gets the same answer as an unknown id.",
+    },
     response: {
       status: 200,
       schema: {
@@ -633,6 +727,9 @@ const ROUTES = {
       "What deleting a workspace would take with it, counted for its owner.",
     auth: "any",
     docs: "route:workspaces-deletion-impact",
+    responses: {
+      404: "The workspace does not exist or the caller is not its owner; an admin and a superuser get 404 too.",
+    },
     response: {
       status: 200,
       schema: {

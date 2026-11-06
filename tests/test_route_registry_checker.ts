@@ -286,6 +286,30 @@ check(
 check("every v2 field well-formed: CLI exits 0", cli(root) === 0);
 fs.rmSync(root, { recursive: true, force: true });
 
+console.log("\n── (m) query parameters and object-form responses ──");
+expect_red(
+  "query value with a type outside string|integer|boolean",
+  (r) => plant_entry(r, PROBE, `{ ${BASE}, query: { q: { type: "number", description: "x" } } }`),
+  [MAL("query")],
+);
+expect_red(
+  "object-form response without text",
+  (r) => plant_entry(r, PROBE, `{ ${BASE}, responses: { "502": { schema: { type: "object" } } } }`),
+  [MAL("responses")],
+);
+root = mirror();
+plant_entry(
+  root,
+  PROBE,
+  `{ ${BASE}, query: { q: { type: "string", description: "Text.", required: true }, n: { type: "integer", description: "Count.", enum: [1, 2] } }, responses: { "400": "Bad.", "502": { text: "Upstream failed.", schema: { type: "object" } } } }`,
+);
+check(
+  "query and object-form response well-formed: no offences",
+  offenders(root).length === 0,
+  JSON.stringify(offenders(root)),
+);
+fs.rmSync(root, { recursive: true, force: true });
+
 console.log("\n── (h) no tracked source was rewritten ──");
 check("pb_hooks/ is byte-identical", tree_hash() === BEFORE);
 

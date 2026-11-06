@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 /**
- * tm CLI (clients/tm): login stores the key, every verb answers --json, create/show round-trip,
- * a read key's write exits 1 naming api_key_scope (decision:api-keys).
+ * tm CLI (clients/tm): login stores the key (and never echoes it at a terminal), every verb answers
+ * --json, create/show round-trip, search rows carry kind, list pages, --set is typed by the schema,
+ * usage is checked before config, a read key's write exits 1 naming api_key_scope
+ * (decision:api-keys).
  *
  * Fully self-contained clean-room server; runs the CLI as a subprocess. Port 8193 + PB_PORT_OFFSET.
  */
@@ -85,6 +87,40 @@ async function tm(args: string[], env: Record<string, string> = {}, stdin?: stri
     json = JSON.parse(stdout);
   } catch {}
   return { code, stdout, stderr, json };
+}
+
+// `tm` under a pseudo-terminal via macOS script(1); it refuses a socket stdin (Bun's pipes are sockets), so `cat |` hands it a real pipe.
+async function tm_pty(
+  tm_path: string,
+  args: string[],
+  env: Record<string, string>,
+  input: string,
+): Promise<{ code: number; out: string }> {
+  const { TM_API_KEY, TM_URL, ...clean } = process.env;
+  const proc = Bun.spawn(
+    ["sh", "-c", 'cat | script -q /dev/null "$@"', "sh", process.execPath, tm_path, ...args],
+    { cwd: S, env: { ...clean, HOME: S, ...env }, stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+  );
+  const timer = setTimeout(() => {
+    Bun.spawnSync(["pkill", "-P", String(proc.pid)]); // sh's children: cat and script
+    proc.kill();
+  }, 15_000);
+  const err = new Response(proc.stderr).text();
+  const dec = new TextDecoder();
+  let out = "";
+  let typed = false;
+  for await (const chunk of proc.stdout) {
+    out += dec.decode(chunk);
+    if (!typed && out.includes("Paste your API key")) {
+      proc.stdin.write(input);
+      proc.stdin.end();
+      typed = true;
+    }
+  }
+  if (!typed) proc.stdin.end();
+  const code = await proc.exited;
+  clearTimeout(timer);
+  return { code, out: out + (await err) };
 }
 
 let server: roomkit.Room | null = null;
@@ -282,6 +318,53 @@ try {
     tup(0, true, true),
   );
 
+  console.log(
+    "\n── one kind vocabulary: search rows carry kind next to the server's collection ──",
+  );
+  o = await tm(["search", "zephyr", "--json"], W);
+  const hit = o.json?.results?.find((x: any) => x.id === ID);
+  check(
+    "search --json row for the task carries kind task and collection tasks",
+    tup(hit?.kind ?? null, hit?.collection ?? null),
+    tup("task", "tasks"),
+  );
+  o = await tm(["search", "zephyr"], W);
+  const hit_line = o.stdout.split("\n").find((l) => l.startsWith(ID)) ?? "";
+  check(
+    "search (human) prints the kind task, not the collection tasks",
+    tup(hit_line.slice(ID.length).trimStart().startsWith("task "), hit_line.includes("tasks")),
+    tup(true, false),
+  );
+  o = await tm(["search", project.name, "--json"], W);
+  check(
+    "a project hit carries kind project",
+    o.json?.results?.find((x: any) => x.id === PROJECT)?.kind ?? null,
+    "project",
+  );
+
+  console.log("\n── paging: --page N walks pages of --limit items ──");
+  for (const t of ["one", "two", "three"]) {
+    o = await tm(["create", `zephyr page ${t}`, "--project", PROJECT, "--json"], W);
+    check(`create paging fixture ${t}`, o.code, 0);
+  }
+  const ids = (r: Run): string[] => (Array.isArray(r.json) ? r.json.map((x: any) => x.id) : []);
+  const scope = ["list", "--project", PROJECT, "--kind", "task", "--json"];
+  const all = ids(await tm(scope, W));
+  const p1 = ids(await tm([...scope, "--limit", "2", "--page", "1"], W));
+  const p2 = ids(await tm([...scope, "--limit", "2", "--page", "2"], W));
+  check(
+    "--limit 2 pages 1 and 2 are disjoint and together the first four items",
+    tup(
+      p1.length,
+      p2.length,
+      p1.some((id) => p2.includes(id)),
+      [...p1, ...p2],
+    ),
+    tup(2, 2, false, all.slice(0, 4)),
+  );
+  o = await tm(["list", "--page", "0", "--json"], W);
+  check("--page 0 → exit 2", tup(o.code, o.stdout), tup(2, ""));
+
   console.log("\n── the other item kinds create and show through the same verbs ──");
   o = await tm(["create", "zephyr memo", "--kind", "document", "--workspace", WS, "--json"], W);
   check(
@@ -313,6 +396,58 @@ try {
     "create --kind milestone",
     tup(o.code, o.json?.kind, o.json?.name),
     tup(0, "milestone", "zephyr m1"),
+  );
+
+  console.log("\n── --set is typed by the schema: yes/no and number fields ──");
+  o = await tm(
+    [
+      "create",
+      "zephyr drafted",
+      "--kind",
+      "decision",
+      "--project",
+      PROJECT,
+      "--set",
+      "draft=true",
+      "--json",
+    ],
+    W,
+  );
+  check(
+    "create a decision with --set draft=true → draft is true",
+    tup(o.code, o.json?.draft),
+    tup(0, true),
+  );
+  o = await tm(["edit", ID, "--set", "ordinal=7", "--json"], W);
+  check(
+    "edit a task with --set ordinal=7 → ordinal is the number 7",
+    tup(o.code, o.json?.ordinal),
+    tup(0, 7),
+  );
+  o = await tm(
+    [
+      "create",
+      "zephyr maybe",
+      "--kind",
+      "decision",
+      "--project",
+      PROJECT,
+      "--set",
+      "draft=yes",
+      "--json",
+    ],
+    W,
+  );
+  check(
+    "--set draft=yes → exit 2 naming draft and true or false, nothing on stdout",
+    tup(o.code, o.stderr.includes("draft takes true or false"), o.stdout),
+    tup(2, true, ""),
+  );
+  o = await tm(["edit", ID, "--set", "ordinal=seven", "--json"], W);
+  check(
+    "--set ordinal=seven → exit 2 naming ordinal",
+    tup(o.code, o.stderr.includes("ordinal takes a number")),
+    tup(2, true),
   );
 
   console.log("\n── errors: exit 1, the server's message on stderr ──");
@@ -355,6 +490,18 @@ try {
     tup(o.code, o.stderr.includes("not a URL"), o.stderr.includes("    at ")),
     tup(1, true, false),
   );
+  o = await tm(["list", "--json"], { TM_URL: "http://127.0.0.1:1", TM_API_KEY: WRITE_KEY });
+  check(
+    "an unreachable server → exit 1, says it cannot reach it, no raw error mechanism",
+    tup(o.code, o.stderr.includes("cannot reach"), /ECONNREFUSED|fetch/i.test(o.stderr)),
+    tup(1, true, false),
+  );
+  o = await tm(["create", "zephyr nowhere", "--json"], W);
+  check(
+    "create with neither project nor workspace → exit 2 naming both as inputs",
+    tup(o.code, o.stderr.includes("create needs a project or a workspace")),
+    tup(2, true),
+  );
   const BROKEN = path.join(S, "broken-xdg");
   fs.mkdirSync(path.join(BROKEN, "tm"), { recursive: true });
   fs.writeFileSync(path.join(BROKEN, "tm", "config.json"), "null\n");
@@ -368,6 +515,64 @@ try {
     ),
     tup(1, true, false),
   );
+
+  console.log("\n── the command line is checked before any saved login is needed ──");
+  const NOWHERE = { HOME: path.join(S, "nohome"), XDG_CONFIG_HOME: path.join(S, "noxdg") };
+  for (const args of [
+    ["list", "--limit", "0", "--json"],
+    ["list", "--page", "x", "--json"],
+    ["list", "--kind", "sprint", "--json"],
+    ["create", "x", "--kind", "decision", "--project", "p", "--set", "draft=yes"],
+    ["show", "--json"],
+    ["create", "foo"],
+    ["edit", "abc"],
+    ["frobnicate"],
+  ]) {
+    o = await tm(args, NOWHERE);
+    check(
+      `${args.join(" ")} with no login anywhere → exit 2 with the usage text`,
+      tup(o.code, o.stderr.includes("usage: tm"), o.stderr.includes("no server or key")),
+      tup(2, true, false),
+    );
+  }
+
+  console.log("\n── login at a terminal: the pasted key is never echoed ──");
+  if (process.platform !== "darwin" || !Bun.which("script")) {
+    console.log("  ⏭  skipped: needs macOS script(1) to drive a pseudo-terminal");
+  } else {
+    const PTY_XDG = path.join(S, "pty-xdg");
+    const pty = await tm_pty(
+      TM,
+      ["login", "--url", BASE_URL],
+      { XDG_CONFIG_HOME: PTY_XDG },
+      `${WRITE_KEY}\n`,
+    );
+    const pty_cfg = path.join(PTY_XDG, "tm", "config.json");
+    const pty_saved = fs.existsSync(pty_cfg) ? JSON.parse(fs.readFileSync(pty_cfg, "utf8")) : {};
+    check(
+      "login at a terminal exits 0 and saves the key",
+      tup(pty.code, pty_saved.key === WRITE_KEY),
+      tup(0, true),
+    );
+    check("the key never appears on the terminal", pty.out.includes(WRITE_KEY), false);
+    // Self-check: the same run without raw mode echoes the key, so the terminal really echoes.
+    const NO_RAW = path.join(S, "no-raw");
+    fs.cpSync(path.join(path.dirname(TM), "src"), path.join(NO_RAW, "src"), { recursive: true });
+    const real = fs.readFileSync(TM, "utf8");
+    const src = real.replace("process.stdin.setRawMode(true);", "");
+    fs.writeFileSync(path.join(NO_RAW, "tm.ts"), src);
+    const echo = await tm_pty(
+      path.join(NO_RAW, "tm.ts"),
+      ["login", "--url", BASE_URL],
+      { XDG_CONFIG_HOME: path.join(S, "no-raw-xdg") },
+      `${WRITE_KEY}\n`,
+    );
+    check(
+      "self-check: without raw mode the terminal echoes the key",
+      tup(src !== real, echo.out.includes(WRITE_KEY)),
+      tup(true, true),
+    );
+  }
 } finally {
   if (server !== null) await roomkit.stop(server);
   fs.rmSync(S, { recursive: true, force: true });

@@ -2208,7 +2208,7 @@
     }
   },
   "info": {
-    "description": "OpenAPI description of this app's PocketBase REST API, generated from the app's own collection definitions, their documentation records and its table of custom routes. Routes the server calls on itself are left out on purpose. Per-record access is governed by each collection's API rules at runtime (not encoded here), and relation `expand` is dynamic — the expanded shape depends on the `expand` query parameter and the caller's read access.",
+    "description": "OpenAPI description of this app's PocketBase REST API, generated from the app's own collection definitions, their documentation records and its table of custom routes. Routes the server calls on itself are left out on purpose. Per-record access is governed by each collection's API rules at runtime (not encoded here), and relation `expand` is dynamic — the expanded shape depends on the `expand` query parameter and the caller's read access. A route that reads its request body refuses one that is not valid JSON with 400, the message \"Something went wrong while processing your request.\" and empty data; the sign-in, one-time-code and password-reset endpoints word it \"An error occurred while loading the submitted data.\"",
     "title": "task-manager API",
     "version": "1.0.0"
   },
@@ -2216,7 +2216,7 @@
   "paths": {
     "/admin": {
       "get": {
-        "description": "Redirects to the admin dashboard. Who may call: anyone; no sign-in is needed. API keys are refused here with 403. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Redirects to the admin dashboard. Who may call: anyone; no sign-in is needed. API keys are refused here with 403. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "302": {
             "description": "Redirects to the dashboard."
@@ -7339,7 +7339,7 @@
     },
     "/api/collections/users/auth-refresh": {
       "post": {
-        "description": "Refresh the current auth token. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Refresh the current auth token. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7377,7 +7377,7 @@
     },
     "/api/collections/users/auth-with-oauth2": {
       "post": {
-        "description": "Authenticate with an OAuth2 provider (basic). Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Authenticate with an OAuth2 provider (basic). Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7429,7 +7429,7 @@
     },
     "/api/collections/users/auth-with-password": {
       "post": {
-        "description": "Authenticate with identity (email) + password. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Authenticate with identity (email) + password. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7473,7 +7473,7 @@
     },
     "/api/collections/users/confirm-password-reset": {
       "post": {
-        "description": "Confirm a password reset with a token + new password. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Confirm a password reset with a token + new password. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7513,7 +7513,7 @@
     },
     "/api/collections/users/confirm-verification": {
       "post": {
-        "description": "Confirm email verification with a token. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Confirm email verification with a token. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7798,7 +7798,7 @@
     },
     "/api/collections/users/request-password-reset": {
       "post": {
-        "description": "Request a password-reset email. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Request a password-reset email. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -7831,7 +7831,7 @@
     },
     "/api/collections/users/request-verification": {
       "post": {
-        "description": "Request an email-verification message. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Request an email-verification message. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -8653,7 +8653,7 @@
     },
     "/api/tracker/admin/pending-users": {
       "get": {
-        "description": "Lists the accounts still waiting for approval or for email confirmation; for app administrators only. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. API keys are refused here with 403. 404: A caller who is not an app administrator gets 404, the same status a route that does not exist answers. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Lists the accounts still waiting for approval or for email confirmation; for app administrators only. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. API keys are refused here with 403. 404: A caller who is not an app administrator gets 404, the same status a route that does not exist answers. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -8762,7 +8762,7 @@
     },
     "/api/tracker/admin/pending-users/{id}/approve": {
       "post": {
-        "description": "Approves a pending account so it can sign in; for app administrators only. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. API keys are refused here with 403. 404: A caller who is not an app administrator gets 404, the same status a route that does not exist answers; an administrator gets 404 for an unknown account. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Approves a pending account so it can sign in; for app administrators only. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. API keys are refused here with 403. 404: A caller who is not an app administrator gets 404, the same status a route that does not exist answers; an administrator gets 404 for an unknown account. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -8851,7 +8851,7 @@
     },
     "/api/tracker/cycles/rollover": {
       "post": {
-        "description": "Moves the unfinished tasks of every ended cycle into the next cycle now, instead of waiting for the daily run. Who may call: superusers only. A missing or invalid token gets 401; a user or an API key gets 403. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Moves the unfinished tasks of every ended cycle into the next cycle now, instead of waiting for the daily run. Who may call: superusers only. A missing or invalid token gets 401; a user or an API key gets 403. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -8916,7 +8916,7 @@
     },
     "/api/tracker/export": {
       "post": {
-        "description": "Auth required: an anonymous POST is 401. The JSON body names one workspace to export ({workspace, projects, collections}); workspace is mandatory and a blank or missing value is 400. projects and collections, when present and not null, must each be an array of strings; any other value, such as a single string or an array holding a number, is refused with 400 before anything is read. The caller must be able to read that workspace, as its owner or through a member row, or the route answers 404, the same existence-hiding shape a denied view returns. Routes bypass collection rules and the reads run in superuser context, so every per-collection read boundary is re-enforced in the handler rather than inherited.\n\n**Scope.** projects null or empty exports every readable project in the workspace; a supplied list is intersected with the readable set and can only narrow, never widen. A narrowing selection also filters the project-bearing content (tasks, documents, decisions, milestones, labels, saved views) to the selected projects plus the rows inside the shadow project of the workspace (concept:shadow-project), which are kept by naming that container. collections null exports the default set; a supplied list is intersected with it.\n\n**Data.** The response carries workspaces, workspace_members, projects, tasks, comments, documents, decisions, milestones, labels, statuses, saved_views, task_activity, task_subscribers, notifications, user_settings and users, and every relation field stays the stored record id. The graph is NOT closed: an item in the shadow project carries the id of that container, which is deliberately absent from the exported projects array, so an importer places those rows itself; exporting the container would undo its invisibility.\n\nPer-collection cuts match the live read rules: trashed rows are excluded; a draft document, decision or milestone reaches only its author, the workspace owner or an admin; a saved view is included only when it is workspace-scoped or owned by the caller; comments and task subscribers are included only when their parent row is in the export; an activity row naming a task is included only when that task is exported, and the workspace-level activity rows that name no task, such as an ownership handover, are always included, so the export carries the whole audit trail of the workspace without a narrowed export gaining another project activity; notifications are the own rows of the caller, from any workspace, that the notifications list rule returns, so a dismissed row and a row about an item the caller cannot read, such as one in a workspace where the caller is suspended, are left out; user_settings is the own row of the caller only; workspace_members honours its own read rule. The users block holds only the accounts referenced by exported rows (authors, assignees, owners, actors and members), each reduced to id, name, avatar, verified, approved, created and updated; email rides only the own row of the caller, and password and tokenKey are never emitted.\n\n**Attachments.** tasks, documents, decisions and milestones export an attachments array of the stored filenames on every row, present and empty when a row holds no files. Bounded: the export carries filenames only, with no file bytes, download URL or file token, so it is not a self-contained backup and an importer fetches and re-uploads the bytes separately; and it is a point-in-time read with no incremental or paging cursor.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. 400: The workspace is missing or blank, or projects or collections is neither null nor a list of strings. 404: The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required: an anonymous POST is 401. The JSON body names one workspace to export ({workspace, projects, collections}); workspace is mandatory and a blank or missing value is 400. projects and collections, when present and not null, must each be an array of strings; any other value, such as a single string or an array holding a number, is refused with 400 before anything is read. The caller must be able to read that workspace, as its owner or through a member row, or the route answers 404, the same existence-hiding shape a denied view returns. Routes bypass collection rules and the reads run in superuser context, so every per-collection read boundary is re-enforced in the handler rather than inherited.\n\n**Scope.** projects null or empty exports every readable project in the workspace; a supplied list is intersected with the readable set and can only narrow, never widen. A narrowing selection also filters the project-bearing content (tasks, documents, decisions, milestones, labels, saved views) to the selected projects plus the rows inside the shadow project of the workspace (concept:shadow-project), which are kept by naming that container. collections null exports the default set; a supplied list is intersected with it.\n\n**Data.** The response carries workspaces, workspace_members, projects, tasks, comments, documents, decisions, milestones, labels, statuses, saved_views, task_activity, task_subscribers, notifications, user_settings and users, and every relation field stays the stored record id. The graph is NOT closed: an item in the shadow project carries the id of that container, which is deliberately absent from the exported projects array, so an importer places those rows itself; exporting the container would undo its invisibility.\n\nPer-collection cuts match the live read rules: trashed rows are excluded; a draft document, decision or milestone reaches only its author, the workspace owner or an admin; a saved view is included only when it is workspace-scoped or owned by the caller; comments and task subscribers are included only when their parent row is in the export; an activity row naming a task is included only when that task is exported, and the workspace-level activity rows that name no task, such as an ownership handover, are always included, so the export carries the whole audit trail of the workspace without a narrowed export gaining another project activity; notifications are the own rows of the caller, from any workspace, that the notifications list rule returns, so a dismissed row and a row about an item the caller cannot read, such as one in a workspace where the caller is suspended, are left out; user_settings is the own row of the caller only; workspace_members honours its own read rule. The users block holds only the accounts referenced by exported rows (authors, assignees, owners, actors and members), each reduced to id, name, avatar, verified, approved, created and updated; email rides only the own row of the caller, and password and tokenKey are never emitted.\n\n**Attachments.** tasks, documents, decisions and milestones export an attachments array of the stored filenames on every row, present and empty when a row holds no files. Bounded: the export carries filenames only, with no file bytes, download URL or file token, so it is not a self-contained backup and an importer fetches and re-uploads the bytes separately; and it is a point-in-time read with no incremental or paging cursor.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. 400: The workspace is missing or blank, or projects or collections is neither null nor a list of strings. 404: The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -9074,7 +9074,7 @@
     },
     "/api/tracker/inspire": {
       "get": {
-        "description": "Auth required: an anonymous GET is 401. The server calls the upstream service and relays {quote, author, source}. The upstream URL comes from INSPIRE_UPSTREAM_URL when that variable is set and falls back to https://zenquotes.io/api/random otherwise, so a test can aim the route at a local stub with no outbound call.\n\n**Failure.** Every way the upstream can fail answers 502: a non-200 response, a 200 whose body does not parse, a 200 whose JSON is the wrong shape, a socket closed with no reply, and a refused connection; a DNS, TLS or timeout failure ends the send the same way as the last two. Only the send is wrapped, so a defect below it still surfaces as a defect instead of as a false 502. The swallowed error is logged server-side with the upstream URL and query string, so a credential-bearing override would be persisted to the superuser-readable log.\n\nBounded: the source label in the response is the constant zenquotes.io even when the override points elsewhere. Demonstrates outbound HTTP from pb_hooks.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required: an anonymous GET is 401. The server calls the upstream service and relays {quote, author, source}. The upstream URL comes from INSPIRE_UPSTREAM_URL when that variable is set and falls back to https://zenquotes.io/api/random otherwise, so a test can aim the route at a local stub with no outbound call.\n\n**Failure.** Every way the upstream can fail answers 502: a non-200 response, a 200 whose body does not parse, a 200 whose JSON is the wrong shape, a socket closed with no reply, and a refused connection; a DNS, TLS or timeout failure ends the send the same way as the last two. Only the send is wrapped, so a defect below it still surfaces as a defect instead of as a false 502. The swallowed error is logged server-side with the upstream URL and query string, so a credential-bearing override would be persisted to the superuser-readable log.\n\nBounded: the source label in the response is the constant zenquotes.io even when the override points elsewhere. Demonstrates outbound HTTP from pb_hooks.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. 502: The outside quote service could not be reached or gave no usable quote; try again later. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -9131,6 +9131,24 @@
               }
             },
             "description": "Too many requests; wait out the rate-limit window."
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The outside quote service could not be reached or gave no usable quote; try again later."
           }
         },
         "security": [
@@ -9146,7 +9164,7 @@
     },
     "/api/tracker/invitations/mine": {
       "get": {
-        "description": "Lists the invitations addressed to the caller's email, each with its workspace, role and expiry. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Lists the invitations addressed to the caller's email, each with its workspace, role and expiry. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -9245,7 +9263,7 @@
     },
     "/api/tracker/invitations/{id}/accept": {
       "post": {
-        "description": "Accepts an invitation addressed to the caller and joins its workspace. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user and needs write scope here; a read-only key gets 403. 403: The caller has not confirmed their email address; a superuser and a read-only API key get 403 too. 404: The invitation does not exist, is not addressed to the caller, was already used, or its workspace is in the trash. 410: The invitation has expired. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Accepts an invitation addressed to the caller and joins its workspace. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user and needs write scope here; a read-only key gets 403. 403: The caller has not confirmed their email address; a superuser and a read-only API key get 403 too. 404: The invitation does not exist, is not addressed to the caller, was already used, or its workspace is in the trash. 410: The invitation has expired. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -9356,7 +9374,7 @@
     },
     "/api/tracker/invitations/{id}/decline": {
       "post": {
-        "description": "Declines an invitation addressed to the caller. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user and needs write scope here; a read-only key gets 403. 404: The invitation does not exist, is not addressed to the caller, was already used, or its workspace is in the trash. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Declines an invitation addressed to the caller. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user and needs write scope here; a read-only key gets 403. 404: The invitation does not exist, is not addressed to the caller, was already used, or its workspace is in the trash. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -9441,7 +9459,7 @@
     },
     "/api/tracker/me": {
       "get": {
-        "description": "Auth required; a superuser answers 403, because it holds no workspace. Returns {user, unread_notifications, workspaces} in one call (decision:me-route).\n\n**user** is {id, name} of the caller.\n\n**workspaces** lists every live workspace the caller owns or holds a membership row in; a trashed workspace is left out (see route:workspaces-trash). Each entry is {id, name, role, status, counts, capabilities}. role is owner for the workspace owner, else the role of the membership row (admin, member or viewer); status is active for the owner, else the status of the row (active or suspended).\n\n**counts** is {projects, open_items}. projects counts the live projects of the workspace and never the hidden shadow project (concept:shadow-project). open_items counts live tasks, neither in the trash nor in a trashed project, whose status is in neither the completed nor the canceled category, so a task in a custom done status is not open, whatever its name. A task with no status counts as open.\n\n**capabilities** is {write, manage, own}, the tiers of decision:role-tiers: write (create, edit and trash items, create and edit projects) for the owner, an admin or a member; manage (workspace settings and vocabulary, invitations, templates, project delete, purge) for the owner or an admin; own (change a role, transfer ownership, delete the workspace) for the owner alone. The flags say what the rules admit; every write is still decided by its collection rule.\n\n**Suspended.** A suspended membership is listed with its id, role and status, so a client can tell a closed workspace from a missing one, but name and counts read null and every capability is false, because a suspended member cannot read the workspace.\n\n**unread_notifications** counts the rows the notifications list shows with read false, each decided by that same list rule, so it always equals the read=false total of the inbox (collection:notifications).\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required; a superuser answers 403, because it holds no workspace. Returns {user, unread_notifications, workspaces} in one call (decision:me-route).\n\n**user** is {id, name} of the caller.\n\n**workspaces** lists every live workspace the caller owns or holds a membership row in; a trashed workspace is left out (see route:workspaces-trash). Each entry is {id, name, role, status, counts, capabilities}. role is owner for the workspace owner, else the role of the membership row (admin, member or viewer); status is active for the owner, else the status of the row (active or suspended).\n\n**counts** is {projects, open_items}. projects counts the live projects of the workspace and never the hidden shadow project (concept:shadow-project). open_items counts live tasks, neither in the trash nor in a trashed project, whose status is in neither the completed nor the canceled category, so a task in a custom done status is not open, whatever its name. A task with no status counts as open.\n\n**capabilities** is {write, manage, own}, the tiers of decision:role-tiers: write (create, edit and trash items, create and edit projects) for the owner, an admin or a member; manage (workspace settings and vocabulary, invitations, templates, project delete, purge) for the owner or an admin; own (change a role, transfer ownership, delete the workspace) for the owner alone. The flags say what the rules admit; every write is still decided by its collection rule.\n\n**Suspended.** A suspended membership is listed with its id, role and status, so a client can tell a closed workspace from a missing one, but name and counts read null and every capability is false, because a suspended member cannot read the workspace.\n\n**unread_notifications** counts the rows the notifications list shows with read false, each decided by that same list rule, so it always equals the read=false total of the inbox (collection:notifications).\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -9564,7 +9582,7 @@
     },
     "/api/tracker/me/landing": {
       "get": {
-        "description": "The workspace the signed-in user should land on, and why. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "The workspace the signed-in user should land on, and why. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -9657,7 +9675,18 @@
     },
     "/api/tracker/notifications/read-all": {
       "post": {
-        "description": "Marks the caller's unread notifications as read, optionally only those of one workspace. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Marks the caller's unread notifications as read, optionally only those of one workspace. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "parameters": [
+          {
+            "description": "Marks only that workspace's notifications and those tied to no workspace; omitted marks every unread notification.",
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -9722,7 +9751,35 @@
     },
     "/api/tracker/project-items/counts": {
       "get": {
-        "description": "Counts the items the caller can see, grouped by project, status, priority, assignee, label or type. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Counts the items the caller can see, grouped by project, status, priority, assignee, label or type. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. 400: The group is missing or not one of the listed ones, or the filter is longer than 3500 characters or reaches past the items' own fields. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "parameters": [
+          {
+            "description": "What the items are counted by.",
+            "in": "query",
+            "name": "group",
+            "required": true,
+            "schema": {
+              "enum": [
+                "project",
+                "status",
+                "priority",
+                "assignee",
+                "label",
+                "type"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A filter over the items' own fields, at most 3500 characters, narrowing what is counted.",
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -9763,6 +9820,16 @@
               }
             },
             "description": "Success."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The group is missing or not one of the listed ones, or the filter is longer than 3500 characters or reaches past the items' own fields."
           },
           "401": {
             "content": {
@@ -9808,7 +9875,27 @@
     },
     "/api/tracker/search": {
       "get": {
-        "description": "Searches the tasks, decisions, documents, milestones and projects the caller can read by title and text. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Searches the tasks, decisions, documents, milestones and projects the caller can read by title and text. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. 400: The workspace parameter is present but blank. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "parameters": [
+          {
+            "description": "The text to find in titles and bodies, ignoring case; omitted or blank answers no results.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Narrows the search to one workspace id. Omitted searches every workspace the caller can read; present but blank is refused.",
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -9867,6 +9954,16 @@
             },
             "description": "Success."
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The workspace parameter is present but blank."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -9911,7 +10008,7 @@
     },
     "/api/tracker/summary": {
       "get": {
-        "description": "Auth required. Returns {user, total, byStatus, assignedToMe} for the tasks the caller owns through a project or is assigned, counted only in workspaces the caller owns or holds an active membership in. Server-side aggregation: one round trip instead of the caller fetching every task. The counts name only live work: a task in the trash, a task in a trashed project, or a task in a trashed workspace leaves every total and returns on restore, on the same terms the tasks list rule applies. A task in the shadow project counts only when it is assigned to the caller.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required. Returns {user, total, byStatus, assignedToMe} for the tasks the caller owns through a project or is assigned, counted only in workspaces the caller owns or holds an active membership in. Server-side aggregation: one round trip instead of the caller fetching every task. The counts name only live work: a task in the trash, a task in a trashed project, or a task in a trashed workspace leaves every total and returns on restore, on the same terms the tasks list rule applies. A task in the shadow project counts only when it is assigned to the caller.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -9992,7 +10089,80 @@
     },
     "/api/tracker/trash": {
       "get": {
-        "description": "Auth required; anonymous is 401. Lists the trashed items of one workspace. A missing workspace query parameter is 400. The caller must be the workspace owner or hold an ACTIVE workspace_members row for it, or the route answers 403; a missing or unknown workspace id is a 403 as well, so no existence leaks to a stranger. A TRASHED workspace is refused outright, the owner included, with the same 404 an unknown workspace gets; restoring the workspace brings its trash listing back.\n\n**Selection.** Rows come from tasks, decisions, documents and milestones, selected through the project_items view in one query. count is the true total of matching trashed rows and is never capped; the response serves one page (page, default 1; perPage, default 500, clamped to 1..500) as {workspace, count, page, perPage, items}. The order is newest-trashed-first by default; sort takes a comma list of project_items columns, each optionally prefixed with - or +, and id is always appended as the final tiebreak so pages are disjoint and complete. filter takes an expression over the flat columns of project_items and is ANDed onto the selection, never widening it, under the same trust check as GET /api/tracker/project-items/counts (at most 3500 characters; no @, no dotted path, no bound parameter, no // comment, balanced parentheses and quotes); anything else, and an unknown column in filter or sort, is refused 400.\n\n**Items.** Each item is {collection, record, purge_at, purge_days, has_priority}, where purge_at is the trashed time plus app_settings.trash_retention_days days (30 when unset), read exactly as the expiry sweep reads it. purge_days counts the calendar days from today until the day purge_at falls on, both read in the viewer's time zone (their user_settings.time_zone, else a time_zone query parameter sent with the request, else UTC); an unknown time_zone, or Local, answers 400 (decision:viewer-day-values). has_priority is false when the item holds no priority the workspace vocabulary still lists, a retired one included, exactly as the project_items column of that name reads. Each row expands trashed_by, and task rows also expand assignee, status, parent, milestone and dependencies. With group set to project, status, priority, assignee, label or type the route instead answers {workspace, total, items: [{key, count}]} over the same selection, bucketed as the counts route buckets; any other group is refused 400.\n\n**Drafts.** decisions, documents and milestones apply the same draft carve-out as their list rules: a trashed draft reaches only its author, the workspace owner and an ACTIVE admin. Tasks have no draft stage. See collection:project_items and route:workspaces-trash.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required; anonymous is 401. Lists the trashed items of one workspace. A missing workspace query parameter is 400. The caller must be the workspace owner or hold an ACTIVE workspace_members row for it, or the route answers 403; a missing or unknown workspace id is a 403 as well, so no existence leaks to a stranger. A TRASHED workspace is refused outright, the owner included, with the same 404 an unknown workspace gets; restoring the workspace brings its trash listing back.\n\n**Selection.** Rows come from tasks, decisions, documents and milestones, selected through the project_items view in one query. count is the true total of matching trashed rows and is never capped; the response serves one page (page, default 1; perPage, default 500, clamped to 1..500) as {workspace, count, page, perPage, items}. The order is newest-trashed-first by default; sort takes a comma list of project_items columns, each optionally prefixed with - or +, and id is always appended as the final tiebreak so pages are disjoint and complete. filter takes an expression over the flat columns of project_items and is ANDed onto the selection, never widening it, under the same trust check as GET /api/tracker/project-items/counts (at most 3500 characters; no @, no dotted path, no bound parameter, no // comment, balanced parentheses and quotes); anything else, and an unknown column in filter or sort, is refused 400.\n\n**Items.** Each item is {collection, record, purge_at, purge_days, has_priority}, where purge_at is the trashed time plus app_settings.trash_retention_days days (30 when unset), read exactly as the expiry sweep reads it. purge_days counts the calendar days from today until the day purge_at falls on, both read in the viewer's time zone (their user_settings.time_zone, else a time_zone query parameter sent with the request, else UTC); an unknown time_zone, or Local, answers 400 (decision:viewer-day-values). has_priority is false when the item holds no priority the workspace vocabulary still lists, a retired one included, exactly as the project_items column of that name reads. Each row expands trashed_by, and task rows also expand assignee, status, parent, milestone and dependencies. With group set to project, status, priority, assignee, label or type the route instead answers {workspace, total, items: [{key, count}]} over the same selection, bucketed as the counts route buckets; any other group is refused 400.\n\n**Drafts.** decisions, documents and milestones apply the same draft carve-out as their list rules: a trashed draft reaches only its author, the workspace owner and an ACTIVE admin. Tasks have no draft stage. See collection:project_items and route:workspaces-trash.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. 400: The workspace is missing or blank, or the filter, sort, group or time zone is refused: a filter longer than 3500 characters, a filter or sort that reaches past the items' own fields, a group outside the listed ones, or a time zone that is not an IANA name. 403: The workspace does not exist, or the caller is neither its owner nor an active member. 404: The workspace is in the trash; its owner gets 404 too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "parameters": [
+          {
+            "description": "The workspace id whose trash is listed.",
+            "in": "query",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A filter over the items' own fields, at most 3500 characters, narrowing the list.",
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "A comma list of the items' fields, each optionally prefixed - or +; most recently trashed first when omitted. Ignored with group.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Counts the trashed items per group instead of listing them.",
+            "in": "query",
+            "name": "group",
+            "required": false,
+            "schema": {
+              "enum": [
+                "project",
+                "status",
+                "priority",
+                "assignee",
+                "label",
+                "type"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "An IANA time zone name such as Europe/Paris, the day purge_days counts from; the caller's saved time zone wins over it.",
+            "in": "query",
+            "name": "time_zone",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The page to return, from 1; a missing or smaller value reads as 1.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Items per page, from 1 to 500; omitted is 500 and a value outside is brought to the nearer end.",
+            "in": "query",
+            "name": "perPage",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -10118,6 +10288,16 @@
             },
             "description": "Success."
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The workspace is missing or blank, or the filter, sort, group or time zone is refused: a filter longer than 3500 characters, a filter or sort that reaches past the items' own fields, a group outside the listed ones, or a time zone that is not an IANA name."
+          },
           "401": {
             "content": {
               "application/json": {
@@ -10136,7 +10316,17 @@
                 }
               }
             },
-            "description": "The caller is signed in but may not do this."
+            "description": "The workspace does not exist, or the caller is neither its owner nor an active member."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The workspace is in the trash; its owner gets 404 too."
           },
           "429": {
             "content": {
@@ -10162,7 +10352,7 @@
     },
     "/api/tracker/trash/purge": {
       "post": {
-        "description": "Permanently deletes everything that has been in the trash longer than the retention period now, instead of waiting for the daily run. Who may call: superusers only. A missing or invalid token gets 401; a user or an API key gets 403. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Permanently deletes everything that has been in the trash longer than the retention period now, instead of waiting for the daily run. Who may call: superusers only. A missing or invalid token gets 401; a user or an API key gets 403. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -10227,7 +10417,7 @@
     },
     "/api/tracker/users/{id}/settings": {
       "get": {
-        "description": "Auth required: an anonymous call is 401. {id} must be the id of the caller; any other id answers 404 on both verbs, the shape a denied record view returns, so the route reveals nothing about another account.\n\n**Read.** GET returns one flat object: display_name (users.name) with theme, font, font_size, default_view, default_project and time_zone from the user_settings row of the caller (collection:user_settings).\n\n**Save.** PATCH takes any subset of those keys and answers with the same object after the save. users.name and the settings row are written in one transaction, so a refused value in either half saves neither: a time_zone over 64 characters answers 400 naming time_zone and leaves the name unchanged. An empty body answers 400 No changes were supplied.; any other key, user and id included, answers 400 naming it. The checks of a user_settings save apply here too (decision:user-settings-write-checks): a default_project that is the shadow project of a workspace is refused with 400 (concept:shadow-project); a default_project or default_view that does not exist or that the caller cannot read answers 400 with code validation_missing_rel_records under its key; a time_zone that is not an IANA name such as Europe/Paris, or is Local, answers 400 naming time_zone, and an empty time_zone clears it. A display_name changed to an empty or whitespace-only value answers 400 naming display_name; any other change is stored trimmed. When the settings row is missing, the save creates it with theme and font set to system.\n\n**API keys.** A read key may only GET. A write key may save settings but not display_name, which answers 403 with code api_key_path, because a key never changes the account (decision:api-keys).\n\nOne user action that writes two records runs in one transaction inside its route (decision:backend-owns-business-rules).\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required: an anonymous call is 401. {id} must be the id of the caller; any other id answers 404 on both verbs, the shape a denied record view returns, so the route reveals nothing about another account.\n\n**Read.** GET returns one flat object: display_name (users.name) with theme, font, font_size, default_view, default_project and time_zone from the user_settings row of the caller (collection:user_settings).\n\n**Save.** PATCH takes any subset of those keys and answers with the same object after the save. users.name and the settings row are written in one transaction, so a refused value in either half saves neither: a time_zone over 64 characters answers 400 naming time_zone and leaves the name unchanged. An empty body answers 400 No changes were supplied.; any other key, user and id included, answers 400 naming it. The checks of a user_settings save apply here too (decision:user-settings-write-checks): a default_project that is the shadow project of a workspace is refused with 400 (concept:shadow-project); a default_project or default_view that does not exist or that the caller cannot read answers 400 with code validation_missing_rel_records under its key; a time_zone that is not an IANA name such as Europe/Paris, or is Local, answers 400 naming time_zone, and an empty time_zone clears it. A display_name changed to an empty or whitespace-only value answers 400 naming display_name; any other change is stored trimmed. When the settings row is missing, the save creates it with theme and font set to system.\n\n**API keys.** A read key may only GET. A write key may save settings but not display_name, which answers 403 with code api_key_path, because a key never changes the account (decision:api-keys).\n\nOne user action that writes two records runs in one transaction inside its route (decision:backend-owns-business-rules).\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. 404: The id in the path is not the caller; another account gets the same answer as an unknown id. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -10303,6 +10493,16 @@
             },
             "description": "The caller is signed in but may not do this."
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The id in the path is not the caller; another account gets the same answer as an unknown id."
+          },
           "429": {
             "content": {
               "application/json": {
@@ -10325,7 +10525,7 @@
         ]
       },
       "patch": {
-        "description": "Auth required: an anonymous call is 401. {id} must be the id of the caller; any other id answers 404 on both verbs, the shape a denied record view returns, so the route reveals nothing about another account.\n\n**Read.** GET returns one flat object: display_name (users.name) with theme, font, font_size, default_view, default_project and time_zone from the user_settings row of the caller (collection:user_settings).\n\n**Save.** PATCH takes any subset of those keys and answers with the same object after the save. users.name and the settings row are written in one transaction, so a refused value in either half saves neither: a time_zone over 64 characters answers 400 naming time_zone and leaves the name unchanged. An empty body answers 400 No changes were supplied.; any other key, user and id included, answers 400 naming it. The checks of a user_settings save apply here too (decision:user-settings-write-checks): a default_project that is the shadow project of a workspace is refused with 400 (concept:shadow-project); a default_project or default_view that does not exist or that the caller cannot read answers 400 with code validation_missing_rel_records under its key; a time_zone that is not an IANA name such as Europe/Paris, or is Local, answers 400 naming time_zone, and an empty time_zone clears it. A display_name changed to an empty or whitespace-only value answers 400 naming display_name; any other change is stored trimmed. When the settings row is missing, the save creates it with theme and font set to system.\n\n**API keys.** A read key may only GET. A write key may save settings but not display_name, which answers 403 with code api_key_path, because a key never changes the account (decision:api-keys).\n\nOne user action that writes two records runs in one transaction inside its route (decision:backend-owns-business-rules).\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: The body is empty, names a key not listed here, or holds a value the settings or the display name refuse; nothing is saved. 403: An API key tried to change the display name; a superuser and a read-only API key get 403 too. 404: The id in the path is not the caller; another account gets the same answer as an unknown id. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required: an anonymous call is 401. {id} must be the id of the caller; any other id answers 404 on both verbs, the shape a denied record view returns, so the route reveals nothing about another account.\n\n**Read.** GET returns one flat object: display_name (users.name) with theme, font, font_size, default_view, default_project and time_zone from the user_settings row of the caller (collection:user_settings).\n\n**Save.** PATCH takes any subset of those keys and answers with the same object after the save. users.name and the settings row are written in one transaction, so a refused value in either half saves neither: a time_zone over 64 characters answers 400 naming time_zone and leaves the name unchanged. An empty body answers 400 No changes were supplied.; any other key, user and id included, answers 400 naming it. The checks of a user_settings save apply here too (decision:user-settings-write-checks): a default_project that is the shadow project of a workspace is refused with 400 (concept:shadow-project); a default_project or default_view that does not exist or that the caller cannot read answers 400 with code validation_missing_rel_records under its key; a time_zone that is not an IANA name such as Europe/Paris, or is Local, answers 400 naming time_zone, and an empty time_zone clears it. A display_name changed to an empty or whitespace-only value answers 400 naming display_name; any other change is stored trimmed. When the settings row is missing, the save creates it with theme and font set to system.\n\n**API keys.** A read key may only GET. A write key may save settings but not display_name, which answers 403 with code api_key_path, because a key never changes the account (decision:api-keys).\n\nOne user action that writes two records runs in one transaction inside its route (decision:backend-owns-business-rules).\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: The body is empty, names a key not listed here, or holds a value the settings or the display name refuse; nothing is saved. 403: An API key tried to change the display name; a superuser and a read-only API key get 403 too. 404: The id in the path is not the caller; another account gets the same answer as an unknown id. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -10496,7 +10696,7 @@
     },
     "/api/tracker/workspaces/trash": {
       "get": {
-        "description": "Auth required; anonymous is 401. workspaces.listRule and viewRule exclude a trashed workspace for everyone, so this route is how the people who may restore one find it: it lists each trashed workspace the caller owns and each trashed workspace where the caller holds an ACTIVE admin membership, the same set that may restore one under the workspaces updateRule. A plain member, a viewer, a suspended admin, a non-member and a superuser all get the identical empty {count: 0, items: []}, so the route confirms no existence to any of them.\n\nResults are ordered newest-trashed-first and capped at 500; when more exist, only the first 500 are returned and the boolean truncated field is true (false otherwise). Restore is an ordinary PATCH clearing trashed through the collections API under the workspaces updateRule; once restored, the workspace and everything inside it are visible again to its members at once. See collection:workspaces and route:tracker-trash.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required; anonymous is 401. workspaces.listRule and viewRule exclude a trashed workspace for everyone, so this route is how the people who may restore one find it: it lists each trashed workspace the caller owns and each trashed workspace where the caller holds an ACTIVE admin membership, the same set that may restore one under the workspaces updateRule. A plain member, a viewer, a suspended admin, a non-member and a superuser all get the identical empty {count: 0, items: []}, so the route confirms no existence to any of them.\n\nResults are ordered newest-trashed-first and capped at 500; when more exist, only the first 500 are returned and the boolean truncated field is true (false otherwise). Restore is an ordinary PATCH clearing trashed through the collections API under the workspaces updateRule; once restored, the workspace and everything inside it are visible again to its members at once. See collection:workspaces and route:tracker-trash.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "responses": {
           "200": {
             "content": {
@@ -10571,7 +10771,7 @@
     },
     "/api/tracker/workspaces/{id}/deletion-impact": {
       "get": {
-        "description": "Auth required; anonymous is 401. Only the workspace OWNER gets an answer: an active admin, a member, a viewer, a non-member, a superuser and an unknown id all get the identical 404, so the route confirms no existence. It answers for a trashed workspace too, so the owner can read what a second DELETE would purge.\n\nReturns {items, trashed_items, projects, members, saved_views}, counted in one read. items counts the tasks, documents, decisions and milestones of the workspace that are not themselves in the trash, including those inside a trashed project and drafts by anyone; trashed_items counts those in the trash; projects counts every project of the workspace, trashed ones included, except the hidden shadow project (concept:shadow-project); members counts every workspace_members row other than the owner's own, whatever its role or status; saved_views counts every saved view of the workspace, the personal views of other members included. The counts therefore include rows that the owner's own lists hide. See collection:workspaces and route:workspaces-trash.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required; anonymous is 401. Only the workspace OWNER gets an answer: an active admin, a member, a viewer, a non-member, a superuser and an unknown id all get the identical 404, so the route confirms no existence. It answers for a trashed workspace too, so the owner can read what a second DELETE would purge.\n\nReturns {items, trashed_items, projects, members, saved_views}, counted in one read. items counts the tasks, documents, decisions and milestones of the workspace that are not themselves in the trash, including those inside a trashed project and drafts by anyone; trashed_items counts those in the trash; projects counts every project of the workspace, trashed ones included, except the hidden shadow project (concept:shadow-project); members counts every workspace_members row other than the owner's own, whatever its role or status; saved_views counts every saved view of the workspace, the personal views of other members included. The counts therefore include rows that the owner's own lists hide. See collection:workspaces and route:workspaces-trash.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user, so it may call this too. 404: The workspace does not exist or the caller is not its owner; an admin and a superuser get 404 too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -10638,6 +10838,16 @@
             },
             "description": "The caller is signed in but may not do this."
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The workspace does not exist or the caller is not its owner; an admin and a superuser get 404 too."
+          },
           "429": {
             "content": {
               "application/json": {
@@ -10662,7 +10872,7 @@
     },
     "/api/tracker/workspaces/{id}/resolve-member-email": {
       "post": {
-        "description": "Invites an email address to the workspace with a role, or sends a pending invitation to it again, answering the same whether or not the address has an account. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: The email is missing or blank, the role is not admin, member or viewer, a caller who is not the owner asked for an admin or a viewer, or the body carries expected_updated_at. 404: The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin. 409: The address recently declined an invitation to this workspace; invite it again later. 429: The daily invitation limit of the inviter is reached, or the same pending invitation was sent again less than a minute ago; wait before inviting again. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Invites an email address to the workspace with a role, or sends a pending invitation to it again, answering the same whether or not the address has an account. Who may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: The email is missing or blank, the role is not admin, member or viewer, a caller who is not the owner asked for an admin or a viewer, or the body carries expected_updated_at. 404: The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin. 409: The address recently declined an invitation to this workspace; invite it again later. 429: The daily invitation limit of the inviter is reached, or the same pending invitation was sent again less than a minute ago; wait before inviting again. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -10801,7 +11011,7 @@
     },
     "/api/tracker/workspaces/{id}/switch": {
       "get": {
-        "description": "Whether the signed-in user may switch to the named workspace and, if not, why and whether an invitation to it waits. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Whether the signed-in user may switch to the named workspace and, if not, why and whether an invitation to it waits. Who may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -10911,7 +11121,7 @@
     },
     "/api/tracker/workspaces/{id}/transfer-ownership": {
       "post": {
-        "description": "Auth required. The workspace owner hands the workspace to an existing ACTIVE member by posting {user: <a users record id>}. This route is the only path: the workspaces updateRule refuses any submitted owner field, so an owner PATCH is denied 404 before anything else runs.\n\n**Atomicity.** The owner check, both roster reads and every write run inside ONE transaction, so two simultaneous transfers by the same owner cannot both be accepted: the loser re-reads the committed owner and is refused with the ordinary 404, leaving its own target row unwritten. A superuser has no ownership of its own to be judged against, so it must name the person it believes owns the workspace now in a current_owner field alongside user, and that name is compared against the owner the transaction finds. Of any number of simultaneous superuser transfers of one workspace, exactly one can name the owner found; the rest, and any wrong name, are refused with 400 this workspace is owned by someone other than the person named as its current owner; check who owns it and try again. A superuser that sends no current_owner is refused with 400 current_owner is required: name the person who owns this workspace now, before anything is read, so a real and an unknown workspace id answer identically. A current_owner sent by anyone who is not a superuser is ignored. An operator may read the current owner first and send it as current_owner.\n\n**Effects.** The workspace owner becomes the target. The outgoing owner gets a workspace_members row at role admin and status active whatever that row held before, so a suspended outgoing owner is reinstated, and the row is CREATED when none existed. The incoming owner KEEPS whatever roster role it held and its row is not written, because ownership lives on the owner field and the roster row records the standing a person holds beneath ownership. From then on that row can be raised to admin but not lowered or removed (see collection:workspace_members). So after a handover and a hand-back both people hold an admin row. In the same transaction the route writes one task_activity row anchored to the workspace (field owner, from the outgoing owner, to the incoming one; actor is the caller, or operator holds the superuser email with actor empty) and one ownership_transferred notification to each of the two parties. A refused transfer records nothing.\n\n**Refusals.** An unknown workspace id and every caller who is neither the owner nor a superuser (a plain member, an ACTIVE admin and a non-member alike) get the identical 404 workspace not found, whether or not the body names the caller, so the route leaks no existence. Then: a missing or blank user is 400 user is required; naming the current owner is 400 the new owner is already the owner; a target with no membership row (a pending invitee included) or a suspended one is 400 the new owner must be an active member of this workspace, and so is a superuser naming its own id, which belongs to _superusers and can hold no membership; an ACTIVE VIEWER target is 400 a viewer cannot be made the owner of this workspace, because the read-only tier is not eligible to hold a workspace. A trashed workspace answers the owner and a superuser with 400 this workspace is in the trash; restore it before transferring ownership, and that cause outranks a wrong current_owner and a self-naming target; restoring the workspace makes the same handover succeed.\n\n**Account deletion.** The sole owner of a workspace that has other members is refused self-delete; once the workspace is handed over the account deletes cleanly. A trashed workspace still counts as owned, so trashing it is not a way around that refusal. See collection:workspaces, collection:task_activity and collection:notifications.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: The user is missing, already the owner, not an active member, or a viewer; the workspace is in the trash; or a superuser named no current owner or the wrong one. 404: The workspace does not exist or the caller is neither its owner nor a superuser. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required. The workspace owner hands the workspace to an existing ACTIVE member by posting {user: <a users record id>}. This route is the only path: the workspaces updateRule refuses any submitted owner field, so an owner PATCH is denied 404 before anything else runs.\n\n**Atomicity.** The owner check, both roster reads and every write run inside ONE transaction, so two simultaneous transfers by the same owner cannot both be accepted: the loser re-reads the committed owner and is refused with the ordinary 404, leaving its own target row unwritten. A superuser has no ownership of its own to be judged against, so it must name the person it believes owns the workspace now in a current_owner field alongside user, and that name is compared against the owner the transaction finds. Of any number of simultaneous superuser transfers of one workspace, exactly one can name the owner found; the rest, and any wrong name, are refused with 400 this workspace is owned by someone other than the person named as its current owner; check who owns it and try again. A superuser that sends no current_owner is refused with 400 current_owner is required: name the person who owns this workspace now, before anything is read, so a real and an unknown workspace id answer identically. A current_owner sent by anyone who is not a superuser is ignored. An operator may read the current owner first and send it as current_owner.\n\n**Effects.** The workspace owner becomes the target. The outgoing owner gets a workspace_members row at role admin and status active whatever that row held before, so a suspended outgoing owner is reinstated, and the row is CREATED when none existed. The incoming owner KEEPS whatever roster role it held and its row is not written, because ownership lives on the owner field and the roster row records the standing a person holds beneath ownership. From then on that row can be raised to admin but not lowered or removed (see collection:workspace_members). So after a handover and a hand-back both people hold an admin row. In the same transaction the route writes one task_activity row anchored to the workspace (field owner, from the outgoing owner, to the incoming one; actor is the caller, or operator holds the superuser email with actor empty) and one ownership_transferred notification to each of the two parties. A refused transfer records nothing.\n\n**Refusals.** An unknown workspace id and every caller who is neither the owner nor a superuser (a plain member, an ACTIVE admin and a non-member alike) get the identical 404 workspace not found, whether or not the body names the caller, so the route leaks no existence. Then: a missing or blank user is 400 user is required; naming the current owner is 400 the new owner is already the owner; a target with no membership row (a pending invitee included) or a suspended one is 400 the new owner must be an active member of this workspace, and so is a superuser naming its own id, which belongs to _superusers and can hold no membership; an ACTIVE VIEWER target is 400 a viewer cannot be made the owner of this workspace, because the read-only tier is not eligible to hold a workspace. A trashed workspace answers the owner and a superuser with 400 this workspace is in the trash; restore it before transferring ownership, and that cause outranks a wrong current_owner and a self-naming target; restoring the workspace makes the same handover succeed.\n\n**Account deletion.** The sole owner of a workspace that has other members is refused self-delete; once the workspace is handed over the account deletes cleanly. A trashed workspace still counts as owned, so trashing it is not a way around that refusal. See collection:workspaces, collection:task_activity and collection:notifications.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: The user is missing, already the owner, not an active member, or a viewer; the workspace is in the trash; or a superuser named no current owner or the wrong one. 404: The workspace does not exist or the caller is neither its owner nor a superuser. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",
@@ -11029,7 +11239,7 @@
     },
     "/api/tracker/workspaces/{id}/vocab": {
       "post": {
-        "description": "Auth required; anonymous is 401. Only the workspace owner or an ACTIVE admin may call it; a plain member, a viewer, a suspended admin and a non-member each get the same 404 as an unknown id, and so does everyone, the owner included, once the workspace is trashed.\n\nThe body may carry the workspace fields name, priorities and default_project together with the statuses and labels arrays; every other key is ignored, so owner and trashed are never written here. Each workspace field is held to exactly the rules a PATCH of the workspaces collection applies: a whitespace-only name, an emptied, repeated or reserved (none) priority entry, and a default_project outside this workspace are each refused with a 400 error; priority names are trimmed, a name-only entry keeps the id of the stored entry with that name, and a new entry gets a fresh id. statuses and labels are full-array replacements: array order becomes status position, an entry with an id renames that row, an entry without one is added, and a row left out is deleted, except that omitting a status a task still uses or a core label is refused with a 400 error. Status and label names are trimmed. A call with no workspace fields changes only the vocabulary.\n\nEverything the call carries is written in ONE transaction, so any refusal leaves the workspace record, its statuses and its labels exactly as they were. Success answers 200 with the saved workspace record, re-read after the commit, whose expand carries statuses_via_workspace ordered by position and labels_via_workspace ordered by creation: the same shape a collection read with expand=statuses_via_workspace,labels_via_workspace returns.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: A workspace field, status or label is refused, or the call would delete a status a task still uses or a core label; nothing is saved. 404: The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "description": "Auth required; anonymous is 401. Only the workspace owner or an ACTIVE admin may call it; a plain member, a viewer, a suspended admin and a non-member each get the same 404 as an unknown id, and so does everyone, the owner included, once the workspace is trashed.\n\nThe body may carry the workspace fields name, priorities and default_project together with the statuses and labels arrays; every other key is ignored, so owner and trashed are never written here. Each workspace field is held to exactly the rules a PATCH of the workspaces collection applies: a whitespace-only name, an emptied, repeated or reserved (none) priority entry, and a default_project outside this workspace are each refused with a 400 error; priority names are trimmed, a name-only entry keeps the id of the stored entry with that name, and a new entry gets a fresh id. statuses and labels are full-array replacements: array order becomes status position, an entry with an id renames that row, an entry without one is added, and a row left out is deleted, except that omitting a status a task still uses or a core label is refused with a 400 error. Status and label names are trimmed. A call with no workspace fields changes only the vocabulary.\n\nEverything the call carries is written in ONE transaction, so any refusal leaves the workspace record, its statuses and its labels exactly as they were. Success answers 200 with the saved workspace record, re-read after the commit, whose expand carries statuses_via_workspace ordered by position and labels_via_workspace ordered by creation: the same shape a collection read with expand=statuses_via_workspace,labels_via_workspace returns.\n\nWho may call: anyone signed in, a user or a superuser. A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, or 404 where a refusal would reveal something hidden from them. An API key acts as its user and needs write scope here; a read-only key gets 403. 400: A workspace field, status or label is refused, or the call would delete a status a task still uses or a core label; nothing is saved. 404: The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Unless an answer documents another body, every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
         "parameters": [
           {
             "description": "Record id.",

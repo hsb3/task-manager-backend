@@ -1,7 +1,9 @@
 #!/usr/bin/env bun
 /**
  * tm mcp (clients/tm): a real MCP client over stdio lists the six tools with their hints, create/show
- * round-trip, a read key's write is an isError result naming api_key_scope (decision:api-keys), and
+ * round-trip, search rows carry kind, tm_list pages, fields take typed values, a refusal names
+ * inputs not flags, a read key's write is an isError result naming api_key_scope
+ * (decision:api-keys), and
  * an agent holding only an API key lists, creates, edits, comments and searches.
  *
  * Fully self-contained clean-room server; runs `tm mcp` as a subprocess. Port 8194 + PB_PORT_OFFSET.
@@ -269,6 +271,87 @@ try {
     tup(false, "milestone", "zephyr m1"),
   );
 
+  console.log("\n── search rows carry kind; tm_list pages with page and limit ──");
+  o = await call(w, "tm_search", { query: "zephyr" });
+  check(
+    "tm_search row for the task carries kind task and collection tasks",
+    tup(
+      o.json?.results?.find((x: any) => x.id === ID)?.kind ?? null,
+      o.json?.results?.find((x: any) => x.id === ID)?.collection ?? null,
+    ),
+    tup("task", "tasks"),
+  );
+  for (const t of ["one", "two", "three"]) {
+    o = await call(w, "tm_create", { title: `zephyr page ${t}`, project: PROJECT });
+    check(`tm_create paging fixture ${t}`, o.isError, false);
+  }
+  const ids = (c: Called): string[] => (Array.isArray(c.json) ? c.json.map((x: any) => x.id) : []);
+  const scope = { project: PROJECT, kind: "task" };
+  const all = ids(await call(w, "tm_list", scope));
+  const p1 = ids(await call(w, "tm_list", { ...scope, limit: 2, page: 1 }));
+  const p2 = ids(await call(w, "tm_list", { ...scope, limit: 2, page: 2 }));
+  check(
+    "tm_list limit 2 pages 1 and 2 are disjoint and together the first four items",
+    tup(
+      p1.length,
+      p2.length,
+      p1.some((id) => p2.includes(id)),
+      [...p1, ...p2],
+    ),
+    tup(2, 2, false, all.slice(0, 4)),
+  );
+  check(
+    "tm_list declares page as an integer of at least 1",
+    tup(
+      (tools.tm_list?.inputSchema?.properties as any)?.page?.type,
+      (tools.tm_list?.inputSchema?.properties as any)?.page?.minimum,
+    ),
+    tup("integer", 1),
+  );
+  o = await call(w, "tm_list", { page: 0 });
+  check(
+    "tm_list with page 0 → isError naming page",
+    tup(o.isError, o.text.includes("page")),
+    tup(true, true),
+  );
+
+  console.log("\n── fields take strings, numbers and yes/no values ──");
+  check(
+    "tm_create's fields accept string, number and boolean values",
+    (tools.tm_create?.inputSchema?.properties as any)?.fields?.additionalProperties?.type,
+    ["string", "number", "boolean"],
+  );
+  o = await call(w, "tm_create", {
+    title: "zephyr drafted",
+    kind: "decision",
+    project: PROJECT,
+    fields: { draft: true },
+  });
+  check(
+    "tm_create a decision with draft true → draft is true",
+    tup(o.isError, o.json?.draft),
+    tup(false, true),
+  );
+  o = await call(w, "tm_edit", { id: ID, fields: { ordinal: 7 } });
+  check("tm_edit with ordinal 7 → ordinal is 7", tup(o.isError, o.json?.ordinal), tup(false, 7));
+  o = await call(w, "tm_edit", { id: ID, fields: { ordinal: "8" } });
+  check(
+    'tm_edit with ordinal "8" (text) → ordinal is the number 8',
+    tup(o.isError, o.json?.ordinal),
+    tup(false, 8),
+  );
+  o = await call(w, "tm_create", {
+    title: "zephyr maybe",
+    kind: "decision",
+    project: PROJECT,
+    fields: { draft: "yes" },
+  });
+  check(
+    'tm_create with draft "yes" → isError naming draft and true or false',
+    tup(o.isError, o.text.includes("draft takes true or false")),
+    tup(true, true),
+  );
+
   console.log("\n── refusals are tool results with isError, never protocol errors ──");
   const rd = await connect(R);
   clients.push(rd);
@@ -288,9 +371,9 @@ try {
   );
   o = await call(w, "tm_edit", { id: ID });
   check(
-    "tm_edit with nothing to change → isError",
-    tup(o.isError, o.text.length > 0),
-    tup(true, true),
+    "tm_edit with nothing to change → isError naming the inputs, no flags",
+    tup(o.isError, o.text.includes("a title or a field"), o.text.includes("--")),
+    tup(true, true, false),
   );
   o = await call(w, "tm_show", {});
   check(
@@ -300,9 +383,9 @@ try {
   );
   o = await call(w, "tm_create", { title: "zephyr nowhere" });
   check(
-    "tm_create without project or workspace → isError",
-    tup(o.isError, o.text.includes("project")),
-    tup(true, true),
+    "tm_create without project or workspace → isError naming the inputs, no flags",
+    tup(o.isError, o.text.includes("a project or a workspace"), o.text.includes("--")),
+    tup(true, true, false),
   );
   o = await call(w, "tm_list", { kind: "sprint" });
   check(

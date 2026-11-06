@@ -8,7 +8,7 @@ import * as verbs from "./src/verbs.ts";
 const HELP = `usage: tm <verb> [options]
 
   login [--url URL]                 paste an API key; saves it for the next runs
-  list [--project ID] [--workspace ID] [--kind KIND] [--limit N]
+  list [--project ID] [--workspace ID] [--kind KIND] [--limit N] [--page N]
   show <id>
   search <text>
   create <title> (--project ID | --workspace ID) [--kind KIND] [--set field=value]...
@@ -17,6 +17,7 @@ const HELP = `usage: tm <verb> [options]
   mcp                               serve the verbs as tools to an AI agent over stdio
 
   KIND is task (default), document, decision or milestone.
+  --limit is the page size (default 50); --page picks the page (default 1).
   --json prints the server's answer as JSON; errors go to stderr and exit 1.
   TM_URL and TM_API_KEY override what login saved.`;
 
@@ -28,27 +29,36 @@ const OPTIONS = {
   workspace: { type: "string" },
   kind: { type: "string" },
   limit: { type: "string" },
+  page: { type: "string" },
   title: { type: "string" },
   set: { type: "string", multiple: true, default: [] as string[] },
 } as const;
 
-function fields_of(sets: string[]): Record<string, string> {
+/** `--set` pairs, typed by the kind's schema. */
+function fields_of(kind: verbs.Kind | undefined, sets: string[]): verbs.Fields {
   const out: Record<string, string> = {};
   for (const s of sets) {
     const i = s.indexOf("=");
     if (i < 1) throw new UsageError(`--set wants field=value, got "${s}"`);
     out[s.slice(0, i)] = s.slice(i + 1);
   }
-  return out;
+  return verbs.typed_fields(kind, out);
 }
 
-function need(positionals: string[], n: number, what: string): void {
-  if (positionals.length < n) throw new UsageError(`missing ${what}`);
-}
+/** Each verb's positionals: how many it needs, and how the usage error names them. */
+const NEEDS: Record<string, [number, string]> = {
+  mcp: [0, ""],
+  list: [0, ""],
+  show: [1, "<id>"],
+  search: [1, "<text>"],
+  create: [1, "<title>"],
+  edit: [1, "<id>"],
+  comment: [2, "<id> <text>"],
+};
 
-function limit_of(raw: string | undefined): number | undefined {
+function whole_of(flag: string, raw: string | undefined): number | undefined {
   if (raw === undefined) return undefined;
-  if (!/^[1-9][0-9]*$/.test(raw)) throw new UsageError("--limit wants a whole number above 0");
+  if (!/^[1-9][0-9]*$/.test(raw)) throw new UsageError(`${flag} wants a whole number above 0`);
   return Number(raw);
 }
 
@@ -58,15 +68,17 @@ const pad = (s: unknown, n: number) =>
     .slice(0, n);
 
 /** A short table for people; --json gets the raw answer. */
-function print_human(verb: string, data: any): void {
+function print_human(verb: string, data: unknown): void {
   if (verb === "list") {
-    for (const i of data) console.log(`${i.id}  ${pad(i.kind, 9)} ${pad(i.key, 8)} ${i.title}`);
-    if (!data.length) console.log("no items");
+    const rows = data as verbs.ListRow[];
+    for (const i of rows) console.log(`${i.id}  ${pad(i.kind, 9)} ${pad(i.key, 8)} ${i.title}`);
+    if (!rows.length) console.log("no items");
   } else if (verb === "search") {
-    for (const r of data.results) console.log(`${r.id}  ${pad(r.collection, 10)} ${r.title}`);
-    if (!data.results.length) console.log("no matches");
+    const found = data as verbs.Found;
+    for (const r of found.results) console.log(`${r.id}  ${pad(r.kind, 9)} ${r.title}`);
+    if (!found.results.length) console.log("no matches");
   } else {
-    for (const [k, v] of Object.entries(data)) {
+    for (const [k, v] of Object.entries(data as object)) {
       if (v === "" || v === null || (Array.isArray(v) && !v.length)) continue;
       console.log(`${pad(k, 18)} ${typeof v === "object" ? JSON.stringify(v) : v}`);
     }
@@ -76,8 +88,8 @@ function print_human(verb: string, data: any): void {
 /** One line from stdin: the whole input when piped; keystrokes without echo at a terminal. */
 async function read_secret(prompt: string): Promise<string> {
   if (!process.stdin.isTTY) return (await Bun.stdin.text()).split("\n")[0].trim();
+  process.stdin.setRawMode(true); // before the prompt: a paste that races it must not echo
   process.stderr.write(prompt);
-  process.stdin.setRawMode(true);
   let line = "";
   try {
     for await (const chunk of process.stdin) {
@@ -130,12 +142,22 @@ async function main(argv: string[]): Promise<number> {
     console.log(v.json ? JSON.stringify({ saved: file }) : `saved to ${file}`);
     return 0;
   }
-  const cfg = load_config();
+  if (!Object.hasOwn(NEEDS, verb)) throw new UsageError(`unknown verb "${verb}"`);
+  const [n, what] = NEEDS[verb];
+  if (rest.length < n) throw new UsageError(`missing ${what}`);
+  const kind = v.kind === undefined ? undefined : verbs.item_kind(v.kind);
+  const limit = whole_of("--limit", v.limit);
+  const page = whole_of("--page", v.page);
+  const fields = fields_of(verb === "create" ? (kind ?? "task") : kind, v.set);
+  if (verb === "create" && !v.project && !v.workspace)
+    throw new UsageError("create needs a project or a workspace");
+  if (verb === "edit" && v.title === undefined && !Object.keys(fields).length)
+    throw new UsageError("edit needs a title or a field to set");
+  const cfg = load_config(); // after the command line is checked: a usage error needs no login
   if (verb === "mcp") {
     await (await import("./src/mcp.ts")).serve(cfg); // loaded here only: the other verbs need no SDK
     return 0;
   }
-  const kind = v.kind === undefined ? undefined : verbs.item_kind(v.kind);
   let data: unknown;
   switch (verb) {
     case "list":
@@ -143,37 +165,31 @@ async function main(argv: string[]): Promise<number> {
         project: v.project,
         workspace: v.workspace,
         kind,
-        limit: limit_of(v.limit),
+        limit,
+        page,
       });
       break;
     case "show":
-      need(rest, 1, "<id>");
       data = await verbs.show(cfg, rest[0]);
       break;
     case "search":
-      need(rest, 1, "<text>");
       data = await verbs.search(cfg, rest.join(" "));
       break;
     case "create":
-      need(rest, 1, "<title>");
       data = await verbs.create(cfg, {
         kind,
         title: rest.join(" "),
         project: v.project,
         workspace: v.workspace,
-        fields: fields_of(v.set),
+        fields,
       });
       break;
     case "edit":
-      need(rest, 1, "<id>");
-      data = await verbs.edit(cfg, rest[0], { title: v.title, fields: fields_of(v.set) });
+      data = await verbs.edit(cfg, rest[0], { title: v.title, fields });
       break;
     case "comment":
-      need(rest, 2, "<id> <text>");
       data = await verbs.comment(cfg, rest[0], rest.slice(1).join(" "));
       break;
-    default:
-      throw new UsageError(`unknown verb "${verb}"`);
   }
   if (v.json) console.log(JSON.stringify(data, null, 2));
   else print_human(verb, data);
