@@ -84,6 +84,254 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785187800_seed_app_docs.js", "collection:app_docs", "A data migration seeds it, so the docs travel with the app a"]',
+    "card 9fwr: the record says the server seeds the corpus, not which migration does",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:app_docs", "The namespace, when present, must be one of collection, conc"]',
+    "card 9fwr: namespaces are named as slug prefixes with their colon, so hook appears only as a slug prefix",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:app_docs", "The self-documenting collection: one record per collection, "]',
+    "card 9fwr: namespaces are named as slug prefixes with their colon, so hook appears only as a slug prefix",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:comments", "**Field guards.** edited is hook-set and tamper-proof: force"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:comments", "A second universal-tier guard there re-counts the targets on"]',
+    "card 9fwr: the universal-tier wording becomes the observable guarantee, every write path",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:comments", "A universal-tier hook (pb_hooks/scope.pb.js) therefore re-as"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:comments", "Bounded: a superuser bypasses collection rules, so a re-scop"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:comments", "reactions may be toggled by any caller allowed to react, but"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:cycles", "**Shape.** A create that omits ends_on gets the DEFAULT TWO-"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:cycles", "A cycle is a calendar-day object: a hook normalizes starts_o"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:cycles", "A daily cron runs it at 06:00 UTC unless CYCLE_ROLLOVER_CRON"]',
+    "card 9fwr: the scheduled run is described as a daily server run, not as a cron job",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:cycles", "Two guards then run on create and on update, on the universa"]',
+    "card 9fwr: the universal-tier wording becomes the observable guarantee, every write path",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:decisions", "The project must belong to the same workspace as the decisio"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:documents", "The project must belong to the same workspace as the documen"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:invitation_events", "A ledger of invitation sends and declines that only the invi"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:invitation_events", "The daily expiry sweep in pb_hooks/invitation_expiry.pb.js d"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:invitation_events", "pb_hooks/invitations.pb.js writes the mint and decline rows,"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:labels", "They are undeletable: a delete hook refuses a core label wit"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:milestones", "**Scope.** Every milestone belongs to exactly one project in"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:notifications", "**Digest.** A daily cron (g2-notification-digest, pb_hooks/n"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:notifications", "**Producers.** The pb_hooks/notify.pb.js fan-out writes assi"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:project_items", "**Realtime.** Like every view collection this one emits no r"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:project_stats", "A VIEW collection backed by SQL: projects LEFT JOIN tasks LE"]',
+    "card 9fwr: the view is described as backed by a query, without naming the query language",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:projects", "A creator may choose it, otherwise it is suggested from the "]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:projects", "Collection rules and that hook both stop applying to a super"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:projects", "RETURNING; a PATCH that changes it is refused with 400."]',
+    "card 9fwr: the counter is described by its guarantee, assigned atomically, not by the statement behind it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:projects", "The workspace of a project is immutable for ordinary callers"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:projects", "item_seq is the server-owned counter behind the ONE shared n"]',
+    "card 9fwr: the counter is described by its guarantee, assigned atomically, not by the statement behind it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:saved_views", "**Stale-write refusal.** pb_hooks/precondition.pb.js guards "]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:saved_views", "The delete guard registers ahead of every other delete hook,"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:statuses", "A hook checks that the status belongs to the workspace of th"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:statuses", "Deleting a status still referenced by a task is refused by a"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:statuses", "The seeding hook runs after any workspace create and skips a"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:statuses", "tasks.completedAt is set and cleared by a hook as the status"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:task_activity", "**Task rows.** pb_hooks/activity.pb.js writes exactly one ro"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:task_subscribers", "**How rows appear.** AUTO: pb_hooks/notify.pb.js subscribes "]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:tasks", "**Status.** status is optional: a hook fills the workspace d"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:tasks", "A hook (pb_hooks/cycles.pb.js, universal create and update t"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:tasks", "RETURNING, and a partial unique index on workspace and key b"]',
+    "card 9fwr: the counter is described by its guarantee, assigned atomically, not by the statement behind it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:tasks", "completedAt is set by a hook when the status crosses into th"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:tasks", "pb_hooks/keys.pb.js assigns it at create from projects.item_"]',
+    "card 9fwr: the counter is described by its guarantee, assigned atomically, not by the statement behind it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:templates", "**templateData shape.** A hook (pb_hooks/scope.pb.js, create"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:templates", "A template bound to a project must live in the workspace of "]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:user_settings", "**Provisioning.** A hook creates the row when the user is cr"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:users", "A partial unique index on email_key enforces it, and the cre"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:users", "GitHub OAuth account linking matches on the same key (pb_hoo"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:workspace_invitations", "A daily cron sweep deletes rows past it, and the accept rout"]',
+    "card 9fwr: the scheduled run is described as a daily server run, not as a cron job",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:workspace_members", "Status moves only from active to suspended and from suspende"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:workspaces", "**Provisioning.** Every workspace, however it is created, ge"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:workspaces", "A daily cron purges workspaces trashed longer than app_setti"]',
+    "card 9fwr: the scheduled run is described as a daily server run, not as a cron job",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "collection:workspaces", "A name made only of whitespace is refused with a 400 error b"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:tracker-export", "Auth required ($apis.requireAuth): an anonymous POST is 401."]',
+    "card 9fwr: the auth sentence drops the name of the server function behind it; the auth behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:tracker-inspire", "**Failure.** Every way the upstream can fail answers 502: a "]',
+    "card 9fwr: the upstream call is described as the server calling the upstream service, without the runtime API",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:tracker-inspire", "Auth required ($apis.requireAuth): an anonymous GET is 401."]',
+    "card 9fwr: the auth sentence drops the name of the server function behind it; the auth behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:tracker-inspire", "The backend calls the upstream through $http.send (the JSVM "]',
+    "card 9fwr: the upstream call is described as the server calling the upstream service, without the runtime API",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:tracker-me", "Auth required ($apis.requireAuth); a superuser answers 403, "]',
+    "card 9fwr: the auth sentence drops the name of the server function behind it; the auth behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:tracker-trash", "Auth required ($apis.requireAuth); anonymous is 401."]',
+    "card 9fwr: the auth sentence drops the name of the server function behind it; the auth behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:workspaces-deletion-impact", "Auth required ($apis.requireAuth); anonymous is 401."]',
+    "card 9fwr: the auth sentence drops the name of the server function behind it; the auth behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:workspaces-transfer-ownership", "This route is the only path: the workspaces updateRule refus"]',
+    "card 9fwr: a hook becomes the server, a check or a guard; the behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:workspaces-transfer-ownership", "scripts/transfer_workspace_ownership.ts reads the current ow"]',
+    "card 9fwr: the record states the behaviour without naming the server file that implements it",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:workspaces-trash", "Auth required ($apis.requireAuth); anonymous is 401."]',
+    "card 9fwr: the auth sentence drops the name of the server function behind it; the auth behaviour is unchanged",
+  ],
+  [
+    '["1785187800_seed_app_docs.js", "route:workspaces-vocab", "Auth required ($apis.requireAuth); anonymous is 401."]',
+    "card 9fwr: the auth sentence drops the name of the server function behind it; the auth behaviour is unchanged",
+  ],
+  [
     '["1785187500_seed_app_docs.js", "decision:api-keys", "- **A key can read the metadata of the keys of its owner.** "]',
     "card sq82: a key request naming api_keys is now refused (decision:api-key-reads-refused); the accepted limit is marked superseded",
   ],

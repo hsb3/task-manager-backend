@@ -47,7 +47,7 @@ type Replay = { cols: any[]; docs: Map<string, { title: string; body: string }>;
  * settings' "/api/" rate-limit rule. Throws Error if ./pocketbase is absent, `migrate up`
  * fails or the rule is missing. Copies pb_migrations/ into the temp dir first —
  * never points the tool at the tracked repo directory. */
-function fetch_replay(): Replay {
+export function fetch_replay(): Replay {
   if (!fs.existsSync(PB)) {
     throw new Error(
       `no ./pocketbase at ${PB} — run \`make pocketbase\`. ` +
@@ -539,7 +539,7 @@ function _error_resp(desc: string): any {
 }
 
 /** One operation per non-internal registry key; returns [paths, internal count]. */
-function route_paths(rate: RateRule): [any, number] {
+function route_paths(rate: RateRule, docs: Replay["docs"]): [any, number] {
   const paths: any = {};
   let internal = 0;
   for (const key of Object.keys(ROUTES).sort(by_code_point)) {
@@ -554,15 +554,19 @@ function route_paths(rate: RateRule): [any, number] {
     if (!(spec.auth in AUTH)) throw new Error(`route ${key} has unknown auth ${spec.auth}`);
     const api = p.startsWith("/api/");
     const keys = spec.auth === "superuser" ? "" : KEY_TEXT[key_access(method, p)];
-    const description = [
-      spec.summary,
-      AUTH[spec.auth],
+    const refusals = Object.entries((spec.responses ?? {}) as Record<string, string>);
+    const lead = spec.docs ? docs.get(spec.docs)?.body : spec.summary;
+    if (!lead) throw new Error(`route ${key} names ${spec.docs}, which has no app_docs record`);
+    const rest = [
+      AUTH[spec.denies ? "users" : spec.auth],
       keys,
+      ...refusals.map(([s, text]) => `${s}: ${text}`),
       api ? rate_limit_text(rate) : "",
       ERROR_SHAPE,
     ]
       .filter(Boolean)
       .join(" ");
+    const description = lead + (spec.docs ? "\n\n" : " ") + rest;
 
     const status = String(spec.response.status);
     const ok: any = {
@@ -581,6 +585,7 @@ function route_paths(rate: RateRule): [any, number] {
       responses["403"] = _error_resp("An API key was sent; API keys are refused here.");
     }
     if (api) responses["429"] = _error_resp("Too many requests; wait out the rate-limit window.");
+    for (const [s, text] of refusals) responses[s] = _error_resp(text);
 
     const op: any = {
       tags: [p.startsWith("/api/tracker/") ? "tracker" : "system"],
@@ -589,6 +594,11 @@ function route_paths(rate: RateRule): [any, number] {
       responses,
     };
     if (spec.auth !== "none") op.security = SECURITY;
+    if (spec.request)
+      op.requestBody = {
+        required: !!(spec.request.required?.length || spec.request.minProperties),
+        content: { "application/json": { schema: spec.request } },
+      };
     const params = [...p.matchAll(/\{([^}]+)\}/gu)].map((m) => ({
       name: m[1],
       in: "path",
@@ -607,10 +617,9 @@ function route_paths(rate: RateRule): [any, number] {
 // ----------------------------------------------------------------------------
 
 const INFO_DESCRIPTION =
-  "OpenAPI description of this app's PocketBase REST API, generated from the " +
-  "pb_migrations/ schema and the route registry (pb_hooks/lib/routes.js) by " +
-  "scripts/gen_openapi.ts. Routes the server calls on itself are left out on purpose. " +
-  "Per-record access is " +
+  "OpenAPI description of this app's PocketBase REST API, generated from the app's own " +
+  "collection definitions, their documentation records and its table of custom routes. " +
+  "Routes the server calls on itself are left out on purpose. Per-record access is " +
   "governed by each collection's API rules at runtime (not encoded here), " +
   "and relation `expand` is dynamic — the expanded shape depends on the " +
   "`expand` query parameter and the caller's read access.";
@@ -662,7 +671,7 @@ function build_spec({ cols, docs, rate }: Replay): any {
 
   Object.assign(paths, auth_paths());
   Object.assign(paths, health_path());
-  const [routes] = route_paths(rate);
+  const [routes] = route_paths(rate, docs);
   for (const [p, ops] of Object.entries(routes)) paths[p] = { ...paths[p], ...(ops as any) };
   tags.push({ name: "users-auth", description: "users auth endpoints." });
   tags.push({ name: "system", description: "System endpoints." });
@@ -738,7 +747,7 @@ function main(): number {
 
   fs.writeFileSync(OUTPUT, content, "utf-8");
   const n = replay.cols.filter((c) => !c.name.startsWith("_") && !c.system).length;
-  const [routes, internal] = route_paths(replay.rate);
+  const [routes, internal] = route_paths(replay.rate, replay.docs);
   const r = Object.values(routes).reduce(
     (sum: number, ops: any) => sum + Object.keys(ops).length,
     0,

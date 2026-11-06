@@ -3,6 +3,7 @@
 
 // auth: "any" = any signed-in auth record (user, API key or superuser) · "users" = a signed-in user (an API key acts as its user) · "superuser" = superusers only · "none" = no sign-in.
 // internal: true = reachable only by the server itself (loopback); left out of openapi.json on purpose.
+// request = the body the handler reads · responses = the error statuses the handler itself returns · denies: ["superuser"] = refused in the handler with 403 · docs = the app_docs slug whose body leads the description.
 const ROUTES = {
   "GET /admin": {
     summary: "Redirects to the admin dashboard.",
@@ -13,6 +14,9 @@ const ROUTES = {
     summary:
       "Lists the accounts still waiting for approval or for email confirmation; for app administrators only.",
     auth: "any",
+    responses: {
+      404: "A caller who is not an app administrator gets 404, the same status a route that does not exist answers.",
+    },
     response: {
       status: 200,
       schema: {
@@ -50,6 +54,9 @@ const ROUTES = {
     summary:
       "Approves a pending account so it can sign in; for app administrators only.",
     auth: "any",
+    responses: {
+      404: "A caller who is not an app administrator gets 404, the same status a route that does not exist answers; an administrator gets 404 for an unknown account.",
+    },
     response: {
       status: 200,
       schema: {
@@ -84,6 +91,30 @@ const ROUTES = {
     summary:
       "Exports one workspace as JSON, holding only what the caller may read in it.",
     auth: "any",
+    docs: "route:tracker-export",
+    request: {
+      type: "object",
+      properties: {
+        workspace: { type: "string", description: "The workspace id." },
+        projects: {
+          type: ["array", "null"],
+          items: { type: "string" },
+          description:
+            "Project ids that narrow the export; null or empty exports every readable project.",
+        },
+        collections: {
+          type: ["array", "null"],
+          items: { type: "string" },
+          description:
+            "Collection names that narrow the export; null or empty exports the default set.",
+        },
+      },
+      required: ["workspace"],
+    },
+    responses: {
+      400: "The workspace is missing or blank, or projects or collections is neither null nor a list of strings.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member.",
+    },
     response: {
       status: 200,
       schema: {
@@ -120,6 +151,7 @@ const ROUTES = {
     summary:
       "Returns a random quote and its author from an outside quote service.",
     auth: "any",
+    docs: "route:tracker-inspire",
     response: {
       status: 200,
       schema: {
@@ -175,6 +207,11 @@ const ROUTES = {
     summary:
       "Accepts an invitation addressed to the caller and joins its workspace.",
     auth: "users",
+    responses: {
+      403: "The caller has not confirmed their email address; a superuser and a read-only API key get 403 too.",
+      404: "The invitation does not exist, is not addressed to the caller, was already used, or its workspace is in the trash.",
+      410: "The invitation has expired.",
+    },
     response: {
       status: 200,
       schema: {
@@ -195,6 +232,9 @@ const ROUTES = {
   "POST /api/tracker/invitations/{id}/decline": {
     summary: "Declines an invitation addressed to the caller.",
     auth: "users",
+    responses: {
+      404: "The invitation does not exist, is not addressed to the caller, was already used, or its workspace is in the trash.",
+    },
     response: {
       status: 200,
       schema: {
@@ -207,6 +247,8 @@ const ROUTES = {
   "GET /api/tracker/me": {
     summary: "The caller, their workspaces and what they may do in each.",
     auth: "any",
+    denies: ["superuser"],
+    docs: "route:tracker-me",
     response: {
       status: 200,
       schema: {
@@ -300,6 +342,7 @@ const ROUTES = {
     summary:
       "Counts the items the caller can see, grouped by project, status, priority, assignee, label or type.",
     auth: "any",
+    denies: ["superuser"],
     response: {
       status: 200,
       schema: {
@@ -357,6 +400,7 @@ const ROUTES = {
     summary:
       "Counts the caller's tasks in total, by status and assigned to them.",
     auth: "any",
+    docs: "route:tracker-summary",
     response: {
       status: 200,
       schema: {
@@ -379,6 +423,7 @@ const ROUTES = {
     summary:
       "Lists the trashed items of one workspace a page at a time, or counts them in groups.",
     auth: "any",
+    docs: "route:tracker-trash",
     response: {
       status: 200,
       schema: {
@@ -472,6 +517,7 @@ const ROUTES = {
   "GET /api/tracker/users/{id}/settings": {
     summary: "The caller's display name and personal settings.",
     auth: "users",
+    docs: "route:tracker-user-settings",
     response: {
       status: 200,
       schema: {
@@ -480,7 +526,7 @@ const ROUTES = {
           display_name: { type: "string" },
           theme: { type: "string" },
           font: { type: "string" },
-          font_size: { type: "integer" },
+          font_size: { type: "integer", description: "0 when unset." },
           default_view: { type: "string" },
           default_project: { type: "string" },
           time_zone: { type: "string" },
@@ -501,6 +547,42 @@ const ROUTES = {
     summary:
       "Saves the caller's display name and personal settings together and returns them.",
     auth: "users",
+    docs: "route:tracker-user-settings",
+    request: {
+      type: "object",
+      properties: {
+        display_name: { type: "string" },
+        theme: { type: "string", enum: ["light", "dark", "system"] },
+        font: { type: "string", enum: ["system", "sans", "mono"] },
+        font_size: {
+          type: "integer",
+          minimum: 0,
+          maximum: 24,
+          description: "From 12 to 24, or 0 to clear it.",
+        },
+        default_view: {
+          type: "string",
+          description: "A saved view id the caller can read; empty clears it.",
+        },
+        default_project: {
+          type: "string",
+          description:
+            "A project id the caller can read, never a hidden shadow project; empty clears it.",
+        },
+        time_zone: {
+          type: "string",
+          description:
+            "An IANA time zone name such as Europe/Paris; empty clears it.",
+        },
+      },
+      additionalProperties: false,
+      minProperties: 1,
+    },
+    responses: {
+      400: "The body is empty, names a key not listed here, or holds a value the settings or the display name refuse; nothing is saved.",
+      403: "An API key tried to change the display name; a superuser and a read-only API key get 403 too.",
+      404: "The id in the path is not the caller; another account gets the same answer as an unknown id.",
+    },
     response: {
       status: 200,
       schema: {
@@ -509,7 +591,7 @@ const ROUTES = {
           display_name: { type: "string" },
           theme: { type: "string" },
           font: { type: "string" },
-          font_size: { type: "integer" },
+          font_size: { type: "integer", description: "0 when unset." },
           default_view: { type: "string" },
           default_project: { type: "string" },
           time_zone: { type: "string" },
@@ -529,6 +611,7 @@ const ROUTES = {
   "GET /api/tracker/workspaces/trash": {
     summary: "The trashed workspaces the caller owns or administers.",
     auth: "any",
+    docs: "route:workspaces-trash",
     response: {
       status: 200,
       schema: {
@@ -549,6 +632,7 @@ const ROUTES = {
     summary:
       "What deleting a workspace would take with it, counted for its owner.",
     auth: "any",
+    docs: "route:workspaces-deletion-impact",
     response: {
       status: 200,
       schema: {
@@ -574,6 +658,30 @@ const ROUTES = {
     summary:
       "Invites an email address to the workspace with a role, answering the same whether or not the address has an account.",
     auth: "any",
+    request: {
+      type: "object",
+      properties: {
+        email: {
+          type: "string",
+          description:
+            "Any non-blank text; the server stores it trimmed and in lower case without checking its shape.",
+        },
+        role: {
+          type: "string",
+          enum: ["admin", "member", "viewer"],
+          default: "member",
+          description:
+            "Only the owner may invite an admin or a viewer; an active admin invites members.",
+        },
+      },
+      required: ["email"],
+    },
+    responses: {
+      400: "The email is missing or blank, the role is not admin, member or viewer, a caller who is not the owner asked for an admin or a viewer, or the body carries expected_updated_at.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin.",
+      409: "The address recently declined an invitation to this workspace; invite it again later.",
+      429: "The daily invitation limit of the inviter is reached, or the rate-limit window is exhausted; wait before inviting again.",
+    },
     response: {
       status: 200,
       schema: {
@@ -612,8 +720,29 @@ const ROUTES = {
     },
   },
   "POST /api/tracker/workspaces/{id}/transfer-ownership": {
-    summary: "Hands a workspace to one of its active members.",
+    summary: "Hands a workspace to another active member who is not a viewer.",
     auth: "any",
+    docs: "route:workspaces-transfer-ownership",
+    request: {
+      type: "object",
+      properties: {
+        user: {
+          type: "string",
+          description:
+            "The id of the new owner, an active member who is not a viewer.",
+        },
+        current_owner: {
+          type: "string",
+          description:
+            "Required of a superuser: the id of the person who owns the workspace now. Ignored for anyone else.",
+        },
+      },
+      required: ["user"],
+    },
+    responses: {
+      400: "The user is missing, already the owner, not an active member, or a viewer; the workspace is in the trash; or a superuser named no current owner or the wrong one.",
+      404: "The workspace does not exist or the caller is neither its owner nor a superuser.",
+    },
     response: {
       status: 200,
       schema: {
@@ -627,6 +756,63 @@ const ROUTES = {
     summary:
       "Saves a workspace together with its statuses and labels and returns the saved workspace with both lists.",
     auth: "any",
+    docs: "route:workspaces-vocab",
+    request: {
+      type: "object",
+      description:
+        "Every part is optional; any other top-level key, owner and trashed included, is ignored.",
+      properties: {
+        name: { type: "string" },
+        priorities: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { id: { type: "string" }, name: { type: "string" } },
+            required: ["name"],
+          },
+        },
+        default_project: {
+          type: "string",
+          description: "A project id in this workspace.",
+        },
+        statuses: {
+          type: "array",
+          description:
+            "The full list in position order: an entry with an id renames that status, one without adds a status, and a status left out is deleted.",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              terminal: {
+                type: "boolean",
+                description: "True for a status that ends the work.",
+              },
+              off_pipeline: {
+                type: "boolean",
+                description:
+                  "Only false is accepted; true is refused with 400.",
+              },
+            },
+            required: ["name"],
+          },
+        },
+        labels: {
+          type: "array",
+          description:
+            "The full list: an entry with an id renames that label, one without adds a label, and a label left out is deleted.",
+          items: {
+            type: "object",
+            properties: { id: { type: "string" }, name: { type: "string" } },
+            required: ["name"],
+          },
+        },
+      },
+    },
+    responses: {
+      400: "A workspace field, status or label is refused, or the call would delete a status a task still uses or a core label; nothing is saved.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin.",
+    },
     response: {
       status: 200,
       schema: {
