@@ -85,6 +85,8 @@
 2	2	test_constants_checker
 4	2	test_invitation_limits
 1	2	test_owner_defaults
+4	2	test_item_list_filters
+2	2	test_item_write_refusals
 3	2	test_pb_migrate
 2	2	test_pb_refusal_statuses
 4	2	test_rescope_guard_checker

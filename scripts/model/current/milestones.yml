@@ -47,9 +47,13 @@ capabilities:
   create:
     verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status
+      ?= "active") || project.workspace.owner = @request.auth.id || (project.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && project.workspace.workspace_members_via_workspace.role ?!= "viewer" && project.workspace.workspace_members_via_workspace.status
       ?= "active")) && (workspace = "" || workspace.trashed = "") && (project = "" || project.workspace.trashed
       = "")'
     actors:
+    - workspace-owner
+    - active-workspace-writer
     - workspace-owner
     - active-workspace-writer
     authRequired: guard

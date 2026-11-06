@@ -398,6 +398,19 @@ try {
   );
   check("counts.pb.js: GET /api/tracker/project-items/counts is registered", status, 200);
 
+  // item_list.pb.js: the project_items list names a field whose operator it cannot answer.
+  let listed: any;
+  [status, listed] = await api(
+    "GET",
+    `/api/collections/project_items/records?filter=${encodeURIComponent('status ~ "x"')}`,
+    alice,
+  );
+  check(
+    "item_list.pb.js: an unsupported filter operator is refused naming the field",
+    tup(status, listed?.data?.status?.code ?? null),
+    tup(400, "operator_not_supported"),
+  );
+
   // cycles.pb.js: its rollover route is registered.
   [status] = await api("POST", "/api/tracker/cycles/rollover", su);
   check("cycles.pb.js: POST /api/tracker/cycles/rollover is registered", status, 200);
@@ -456,6 +469,7 @@ try {
     "counts.pb.js",
     "cycles.pb.js",
     "invitations.pb.js",
+    "item_list.pb.js",
     "keys.pb.js",
     "main.pb.js",
     "membership_status.pb.js",
