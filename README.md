@@ -44,7 +44,7 @@ starter label and status sets automatically.
 ## Building against it
 
 [`openapi.json`](openapi.json) is the API contract, generated from the
-migrations and gated against drift on every commit — it is never hand-edited.
+migrations and the route registry (`pb_hooks/lib/routes.js`) and gated against drift on every commit — it is never hand-edited.
 [`docs/generated/decisions.md`](docs/generated/decisions.md) records the product and schema rulings
 behind it, generated the same way.
 

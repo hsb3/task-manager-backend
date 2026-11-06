@@ -663,6 +663,8 @@ run_suite "test_fixture_project_resolve_checker" bun tests/test_fixture_project_
 run_suite "test_app_docs_down_up_checker" bun tests/test_app_docs_down_up_checker.ts
 run_suite "test_historical_migration_guard" bun tests/test_historical_migration_guard.ts
 run_suite "test_keep_in_sync_checker" bun tests/test_keep_in_sync_checker.ts
+run_suite "test_route_registry_checker" bun tests/test_route_registry_checker.ts
+run_suite "test_openapi_routes" bun tests/test_openapi_routes.ts
 run_suite "test_py_helpers" bun tests/test_py_helpers.ts
 run_suite "test_argparse" bun tests/test_argparse.ts
 run_suite "test_ts_source" bun tests/test_ts_source.ts

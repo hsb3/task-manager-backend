@@ -123,9 +123,8 @@ onRecordDeleteExecute((e) => {
 
 // GET /api/tracker/invitations/mine — a client filter cannot name the hidden email_key, and the
 // invitee cannot read the workspace record yet, so the match and workspace_name come from here.
-routerAdd(
-  "GET",
-  "/api/tracker/invitations/mine",
+require(`${__hooks}/lib/routes.js`).add(
+  "GET /api/tracker/invitations/mine",
   (e) => {
     const key = e.auth.getString("email_key");
     const invLib = require(`${__hooks}/lib/invitations.js`);
@@ -162,14 +161,12 @@ routerAdd(
     }
     return e.json(200, { items: items });
   },
-  $apis.requireAuth("users"),
 );
 
 // POST /api/tracker/invitations/{id}/accept — refusal order: not the caller's / trashed (404, so
 // no existence oracle), unverified (403), expired (410); then one transaction.
-routerAdd(
-  "POST",
-  "/api/tracker/invitations/{id}/accept",
+require(`${__hooks}/lib/routes.js`).add(
+  "POST /api/tracker/invitations/{id}/accept",
   (e) => {
     const uid = e.auth.id;
     const key = e.auth.getString("email_key");
@@ -266,13 +263,11 @@ routerAdd(
     if (!out) throw new NotFoundError("Invitation not found.");
     return e.json(200, out);
   },
-  $apis.requireAuth("users"),
 );
 
 // POST /api/tracker/invitations/{id}/decline — same 404s as accept; an expired row may still be declined.
-routerAdd(
-  "POST",
-  "/api/tracker/invitations/{id}/decline",
+require(`${__hooks}/lib/routes.js`).add(
+  "POST /api/tracker/invitations/{id}/decline",
   (e) => {
     const key = e.auth.getString("email_key");
     let inv;
@@ -318,7 +313,6 @@ routerAdd(
     if (!declined) throw new NotFoundError("Invitation not found.");
     return e.json(200, { declined: true });
   },
-  $apis.requireAuth("users"),
 );
 
 // Every collection read of an invitation carries the backend-computed expiry (decision:backend-owns-business-rules); the collection rules stay the only authorization.

@@ -183,10 +183,10 @@ async function invite(
 // catch. Returns (values, condition) so a failure can print the source it read.
 function route_allowed_roles(): [string[], string | null] {
   const src = read_text(path.join(REPO_ROOT, "pb_hooks", "routes.pb.js"));
-  const at = src.indexOf(`"${ROUTE_PATH}"`);
+  const at = src.indexOf(`"POST ${ROUTE_PATH}"`);
   if (at === -1) throw new Error("ValueError: substring not found");
   let handler = src.slice(at);
-  const nxt = handler.indexOf("\nrouterAdd(");
+  const nxt = handler.indexOf("\nrequire(");
   if (nxt !== -1) handler = handler.slice(0, nxt);
   const m = /if \(([^()]*role !== [^()]*)\)\s*throw new BadRequestError/.exec(handler);
   if (!m) return [[], null];

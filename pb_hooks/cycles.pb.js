@@ -315,9 +315,8 @@ onBootstrap((e) => {
 // A daily cron cannot be waited on in the battery, so this route runs the SAME inlined
 // sweep on demand and returns {rolled: <count>}. Custom routes bypass collection rules,
 // so requireSuperuserAuth is the whole gate.
-routerAdd(
-  "POST",
-  "/api/tracker/cycles/rollover",
+require(`${__hooks}/lib/routes.js`).add(
+  "POST /api/tracker/cycles/rollover",
   (e) => {
     // ── INLINED SWEEP (route copy, uses e.app) — KEEP IN SYNC with the cron copy ──
     var rolled = 0;
@@ -445,5 +444,4 @@ routerAdd(
     // ── END INLINED SWEEP (route copy) ──
     return e.json(200, { rolled: rolled });
   },
-  $apis.requireSuperuserAuth(),
 );

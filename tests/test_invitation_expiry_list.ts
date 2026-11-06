@@ -94,13 +94,13 @@ const invitationsSrc = fs.readFileSync(path.join(HOOKS_SRC, "invitations.pb.js")
 const usesLib = (start: RegExp): boolean => {
   const at = invitationsSrc.search(start);
   if (at === -1) return false;
-  const next = invitationsSrc.slice(at + 1).search(/\n(routerAdd|on[A-Z]\w*)\(/);
+  const next = invitationsSrc.slice(at + 1).search(/\n(require|on[A-Z]\w*)\(/);
   const body = invitationsSrc.slice(at, next === -1 ? undefined : at + 1 + next);
   return body.includes(`/${LIB}\`)`);
 };
 check(
   "the invitee's /mine read uses it",
-  usesLib(/routerAdd\(\s*"GET",\s*"\/api\/tracker\/invitations\/mine"/),
+  usesLib(/\.add\(\s*"GET \/api\/tracker\/invitations\/mine"/),
   true,
 );
 check("the collection read (onRecordEnrich) uses it", usesLib(/\nonRecordEnrich\(/), true);

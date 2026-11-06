@@ -955,79 +955,70 @@ onRecordAfterCreateSuccess((e) => {
 // ── Custom route: per-user summary, computed server-side ────────────────────
 // One round-trip instead of the client fetching every task and counting.
 // $apis.requireAuth() middleware -> e.auth is the logged-in user record.
-routerAdd(
-  "GET",
-  "/api/tracker/summary",
-  (e) => {
-    const uid = e.auth.id;
-    // KEEP IN SYNC: the membership and trash clauses of tasks.listRule; the personal scope (my projects or assigned to me) narrows them, never replaces them
-    const tasks = e.app.findRecordsByFilter(
-      "tasks",
-      // project.shadow = false keeps this personal: the workspace container is owned by the
-      // workspace owner, so without it their total absorbs every member's workspace-level item.
-      '((project.owner = {:uid} && project.shadow = false) || assignee = {:uid}) && (workspace.owner = {:uid} || (workspace.workspace_members_via_workspace.user ?= {:uid} && workspace.workspace_members_via_workspace.status ?= "active")) && trashed = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed = ""',
-      "",
-      0,
-      0,
-      { uid },
-    );
-    // Statuses are now config-driven (G1 #74: a `statuses` RELATION), so accumulate
-    // dynamically — byStatus is keyed by status RELATION ID (config-driven, no change
-    // needed here); a hard-coded {todo,doing,done} would produce NaN on any custom status.
-    const byStatus = {};
-    let assignedToMe = 0;
-    for (const t of tasks) {
-      const s = t.get("status");
-      byStatus[s] = (byStatus[s] || 0) + 1;
-      if (t.get("assignee") === uid) assignedToMe += 1;
-    }
-    return e.json(200, {
-      user: e.auth.get("name"),
-      total: tasks.length,
-      byStatus,
-      assignedToMe,
-    });
-  },
-  $apis.requireAuth(),
-);
+require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/summary", (e) => {
+  const uid = e.auth.id;
+  // KEEP IN SYNC: the membership and trash clauses of tasks.listRule; the personal scope (my projects or assigned to me) narrows them, never replaces them
+  const tasks = e.app.findRecordsByFilter(
+    "tasks",
+    // project.shadow = false keeps this personal: the workspace container is owned by the
+    // workspace owner, so without it their total absorbs every member's workspace-level item.
+    '((project.owner = {:uid} && project.shadow = false) || assignee = {:uid}) && (workspace.owner = {:uid} || (workspace.workspace_members_via_workspace.user ?= {:uid} && workspace.workspace_members_via_workspace.status ?= "active")) && trashed = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed = ""',
+    "",
+    0,
+    0,
+    { uid },
+  );
+  // Statuses are now config-driven (G1 #74: a `statuses` RELATION), so accumulate
+  // dynamically — byStatus is keyed by status RELATION ID (config-driven, no change
+  // needed here); a hard-coded {todo,doing,done} would produce NaN on any custom status.
+  const byStatus = {};
+  let assignedToMe = 0;
+  for (const t of tasks) {
+    const s = t.get("status");
+    byStatus[s] = (byStatus[s] || 0) + 1;
+    if (t.get("assignee") === uid) assignedToMe += 1;
+  }
+  return e.json(200, {
+    user: e.auth.get("name"),
+    total: tasks.length,
+    byStatus,
+    assignedToMe,
+  });
+});
 
 // ── Friendly alias for the dashboard ────────────────────────────────────────
 // The admin UI's /_/ path is compiled into the binary and can't be renamed;
 // a redirect gives it a memorable address.
-routerAdd("GET", "/admin", (e) => e.redirect(302, "/_/"));
+require(`${__hooks}/lib/routes.js`).add("GET /admin", (e) =>
+  e.redirect(302, "/_/"),
+);
 
 // ── Custom route calling an EXTERNAL API ────────────────────────────────────
 // $http.send is the JSVM's outbound HTTP client (fetch() does not exist here).
 // Auth-required so the backend isn't an open relay to someone else's API.
-routerAdd(
-  "GET",
-  "/api/tracker/inspire",
-  (e) => {
-    let res;
-    try {
-      res = $http.send({
-        // Overridable so the blocking battery can aim this route at a local stub instead.
-        url:
-          $os.getenv("INSPIRE_UPSTREAM_URL") ||
-          "https://zenquotes.io/api/random",
-        method: "GET",
-        timeout: 10, // seconds
-      });
-    } catch (err) {
-      // DNS/TLS/socket/timeout throws out of $http.send; uncaught, PB answers 400 and an
-      // outage reads to the client as a bad request. Only the send is wrapped, so a bug
-      // below still surfaces as a bug.
-      e.app.logger().error("inspire upstream call failed", "err", String(err));
-      return e.json(502, { error: "upstream unreachable" });
-    }
-    if (res.statusCode !== 200) {
-      return e.json(502, { error: "upstream returned " + res.statusCode });
-    }
-    const q = (res.json || [])[0];
-    if (!q || typeof q.q !== "string") {
-      return e.json(502, { error: "upstream returned an unusable body" });
-    }
-    return e.json(200, { quote: q.q, author: q.a, source: "zenquotes.io" });
-  },
-  $apis.requireAuth(),
-);
+require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/inspire", (e) => {
+  let res;
+  try {
+    res = $http.send({
+      // Overridable so the blocking battery can aim this route at a local stub instead.
+      url:
+        $os.getenv("INSPIRE_UPSTREAM_URL") || "https://zenquotes.io/api/random",
+      method: "GET",
+      timeout: 10, // seconds
+    });
+  } catch (err) {
+    // DNS/TLS/socket/timeout throws out of $http.send; uncaught, PB answers 400 and an
+    // outage reads to the client as a bad request. Only the send is wrapped, so a bug
+    // below still surfaces as a bug.
+    e.app.logger().error("inspire upstream call failed", "err", String(err));
+    return e.json(502, { error: "upstream unreachable" });
+  }
+  if (res.statusCode !== 200) {
+    return e.json(502, { error: "upstream returned " + res.statusCode });
+  }
+  const q = (res.json || [])[0];
+  if (!q || typeof q.q !== "string") {
+    return e.json(502, { error: "upstream returned an unusable body" });
+  }
+  return e.json(200, { quote: q.q, author: q.a, source: "zenquotes.io" });
+});

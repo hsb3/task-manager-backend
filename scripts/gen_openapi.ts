@@ -3,14 +3,17 @@
  * Generate openapi.json — an OpenAPI 3.1 spec for this app's PocketBase API.
  *
  * PocketBase ships no OpenAPI export, so this derives the spec deterministically by
- * replaying pb_migrations/ into a throwaway data.db and reading `_collections`; the
- * spec is what a client generates typed bindings from. Access is governed by
- * per-collection API rules at runtime, not encoded here.
+ * replaying pb_migrations/ into a throwaway data.db (collections from `_collections`, their
+ * prose from `app_docs`, the /api/ rate limit from the settings) and reading the custom-route
+ * registry (pb_hooks/lib/routes.js; `internal: true` routes are left out). The spec is what a
+ * client generates typed bindings from. Per-record access is governed by per-collection API
+ * rules at runtime, not encoded here.
  *
  * Usage: bun scripts/gen_openapi.ts [--check]
  */
 
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { parse_args } from "./_argparse.ts";
@@ -21,6 +24,9 @@ const REPO = path.dirname(path.dirname(path.resolve(import.meta.path)));
 const PB = pb_bin_path(REPO);
 const MIGRATIONS = path.join(REPO, "pb_migrations");
 const OUTPUT = path.join(REPO, "openapi.json");
+const ROUTES: Record<string, any> = createRequire(import.meta.url)(
+  path.join(REPO, "pb_hooks/lib/routes.js"),
+).ROUTES;
 
 const OPENAPI_VERSION = "3.1.0";
 
@@ -33,11 +39,15 @@ const EMAIL_NOTE = "Only returned when the record's emailVisibility flag is true
 // Schema extraction (migration replay)
 // ----------------------------------------------------------------------------
 
+type RateRule = { maxRequests: number; duration: number };
+type Replay = { cols: any[]; docs: Map<string, { title: string; body: string }>; rate: RateRule };
+
 /** Replay migrations into a temp dir and return `_collections` rows (parsed
- * fields/options plus CRUD rules under `_rules`). Throws Error if ./pocketbase
- * is absent or `migrate up` fails. Copies pb_migrations/ into the temp dir first —
+ * fields/options plus CRUD rules under `_rules`), the `app_docs` rows by slug and the
+ * settings' "/api/" rate-limit rule. Throws Error if ./pocketbase is absent, `migrate up`
+ * fails or the rule is missing. Copies pb_migrations/ into the temp dir first —
  * never points the tool at the tracked repo directory. */
-function fetch_collections(): any[] {
+function fetch_replay(): Replay {
   if (!fs.existsSync(PB)) {
     throw new Error(
       `no ./pocketbase at ${PB} — run \`make pocketbase\`. ` +
@@ -47,6 +57,8 @@ function fetch_collections(): any[] {
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "pbopenapi_"));
   let rows: any[][];
+  let doc_rows: any[][];
+  let settings: any;
   try {
     const mig = path.join(tmp, "pb_migrations");
     fs.cpSync(MIGRATIONS, mig, { recursive: true, dereference: true });
@@ -65,6 +77,11 @@ function fetch_collections(): any[] {
             "FROM _collections ORDER BY name",
         )
         .values() as any[][];
+      doc_rows = con.query("SELECT slug, title, body FROM app_docs").values() as any[][];
+      const prm = con
+        .query("SELECT CAST(value AS TEXT) FROM _params WHERE id = 'settings'")
+        .values();
+      settings = JSON.parse((prm[0]?.[0] as string) || "{}");
     } finally {
       con.close();
     }
@@ -72,7 +89,12 @@ function fetch_collections(): any[] {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 
-  return rows.map(
+  const rate = (settings?.rateLimits?.rules ?? []).find((r: any) => r.label === "/api/");
+  if (!rate || !(rate.maxRequests > 0) || !(rate.duration > 0)) {
+    throw new Error('the settings carry no "/api/" rate-limit rule with maxRequests and duration');
+  }
+  const docs = new Map(doc_rows.map(([slug, title, body]) => [slug, { title, body }]));
+  const cols = rows.map(
     ([cid, name, typ, system, fields, options, create_rule, update_rule, delete_rule]) => ({
       id: cid,
       name,
@@ -83,6 +105,7 @@ function fetch_collections(): any[] {
       _rules: { create: create_rule, update: update_rule, delete: delete_rule },
     }),
   );
+  return { cols, docs, rate: { maxRequests: rate.maxRequests, duration: rate.duration } };
 }
 
 // ----------------------------------------------------------------------------
@@ -167,8 +190,8 @@ function field_schema(f: any, id_to_name: Map<string, string>): any {
   return schema;
 }
 
-/** Build the Record component schema for one collection. */
-function record_schema(col: any, id_to_name: Map<string, string>): any {
+/** Build the Record component schema for one collection; `body` is its app_docs body. */
+function record_schema(col: any, id_to_name: Map<string, string>, body: string): any {
   const props: any = {};
   const required: string[] = [];
   for (const f of col.fields) {
@@ -179,7 +202,7 @@ function record_schema(col: any, id_to_name: Map<string, string>): any {
 
   const schema: any = {
     type: "object",
-    description: `A \`${col.name}\` record (${col.type} collection).`,
+    description: body,
     properties: props,
   };
   if (required.length) schema.required = required.sort(by_code_point);
@@ -257,8 +280,9 @@ function _json_resp(desc: string, ref: string): any {
   };
 }
 
-/** CRUD paths for one collection. View collections get read-only paths. */
-function collection_paths(col: any, su_write: boolean): any {
+/** CRUD paths for one collection. View collections get read-only paths. `title` is the
+ * collection's app_docs title, put in front of every operation description. */
+function collection_paths(col: any, su_write: boolean, title: string): any {
   const name = col.name;
   const is_view = col.type === "view";
   const rec_ref = `#/components/schemas/${record_schema_name(name)}`;
@@ -276,7 +300,7 @@ function collection_paths(col: any, su_write: boolean): any {
     get: {
       tags: [tag],
       summary: `List/search ${name} records.`,
-      description: "Access governed by the collection's list API rule.",
+      description: `${title}. Access governed by the collection's list API rule.`,
       security: SECURITY,
       parameters: LIST_QUERY_PARAMS.map((p) => _param(...p)),
       responses: { "200": _json_resp("Paginated list.", list_ref) },
@@ -286,7 +310,7 @@ function collection_paths(col: any, su_write: boolean): any {
     get: {
       tags: [tag],
       summary: `Fetch one ${name} record.`,
-      description: "Access governed by the collection's view API rule.",
+      description: `${title}. Access governed by the collection's view API rule.`,
       security: SECURITY,
       parameters: [_id_param(), ...SINGLE_QUERY_PARAMS.map((p) => _param(...p))],
       responses: { "200": _json_resp("The record.", rec_ref) },
@@ -298,7 +322,7 @@ function collection_paths(col: any, su_write: boolean): any {
   paths[base].post = {
     tags: [tag],
     summary: `Create a ${name} record.`,
-    description: "Access governed by the collection's create API rule." + su_note,
+    description: `${title}. Access governed by the collection's create API rule.` + su_note,
     security: SECURITY,
     requestBody: _json_body(rec_ref),
     responses: { "200": _json_resp("The created record.", rec_ref) },
@@ -306,7 +330,7 @@ function collection_paths(col: any, su_write: boolean): any {
   paths[one].patch = {
     tags: [tag],
     summary: `Update a ${name} record.`,
-    description: "Access governed by the collection's update API rule." + su_note,
+    description: `${title}. Access governed by the collection's update API rule.` + su_note,
     security: SECURITY,
     parameters: [_id_param()],
     requestBody: _json_body(rec_ref),
@@ -315,7 +339,7 @@ function collection_paths(col: any, su_write: boolean): any {
   paths[one].delete = {
     tags: [tag],
     summary: `Delete a ${name} record.`,
-    description: "Access governed by the collection's delete API rule." + su_note,
+    description: `${title}. Access governed by the collection's delete API rule.` + su_note,
     security: SECURITY,
     parameters: [_id_param()],
     responses: { "204": { description: "Deleted (no content)." } },
@@ -339,6 +363,7 @@ function auth_paths(): any {
     const op: any = {
       tags: [tag],
       summary,
+      description: `${summary} ${ERROR_SHAPE}`,
       requestBody: {
         required: true,
         content: {
@@ -436,6 +461,7 @@ function health_path(): any {
       get: {
         tags: ["system"],
         summary: "API health check.",
+        description: "Answers 200 while the server is up.",
         responses: {
           "200": {
             description: "Health status.",
@@ -459,18 +485,138 @@ function health_path(): any {
 }
 
 // ----------------------------------------------------------------------------
+// Custom routes (the registry)
+// ----------------------------------------------------------------------------
+
+// Wording below is measured in a clean room (anon / user / API key / superuser per auth kind).
+const AUTH: Record<string, string> = {
+  any:
+    "Who may call: anyone signed in, a user or a superuser. " +
+    "A missing or invalid token gets 401; a signed-in caller who may not do this gets 403, " +
+    "or 404 where a refusal would reveal something hidden from them.",
+  users:
+    "Who may call: a signed-in user. A missing or invalid token gets 401; " +
+    "a superuser gets 403, as does a caller who may not do this.",
+  superuser:
+    "Who may call: superusers only. A missing or invalid token gets 401; " +
+    "a user or an API key gets 403.",
+  none: "Who may call: anyone; no sign-in is needed.",
+};
+
+const ERROR_SHAPE =
+  'Every error body is {"status": <code>, "message": "<reason>", "data": {}}; ' +
+  "a validation error lists the offending fields under data.";
+
+function rate_limit_text(rate: RateRule): string {
+  return (
+    `Rate limit: the /api/tracker/ routes and /api/health together allow ${rate.maxRequests} requests per ` +
+    `${rate.duration} seconds per client address (collection endpoints are counted separately); ` +
+    "past that the answer is 429 with no retry header, so wait out the window. " +
+    "Superusers are not limited."
+  );
+}
+
+// KEEP IN SYNC: pb_hooks/api_keys.pb.js key path allowlist (`/api/tracker/admin/`) and key read list (`/api/tracker/export`).
+/** What an API key gets on this route: "refused", "read" (any key) or "write" (write scope only). */
+function key_access(method: string, p: string): "refused" | "read" | "write" {
+  if (!p.startsWith("/api/tracker/") || p.startsWith("/api/tracker/admin/")) return "refused";
+  return method === "GET" || method === "HEAD" || (method === "POST" && p === "/api/tracker/export")
+    ? "read"
+    : "write";
+}
+
+const KEY_TEXT = {
+  refused: "API keys are refused here with 403.",
+  read: "An API key acts as its user, so it may call this too.",
+  write: "An API key acts as its user and needs write scope here; a read-only key gets 403.",
+};
+
+function _error_resp(desc: string): any {
+  return {
+    description: desc,
+    content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+  };
+}
+
+/** One operation per non-internal registry key; returns [paths, internal count]. */
+function route_paths(rate: RateRule): [any, number] {
+  const paths: any = {};
+  let internal = 0;
+  for (const key of Object.keys(ROUTES).sort(by_code_point)) {
+    const spec = ROUTES[key];
+    if (spec.internal === true) {
+      internal += 1;
+      continue;
+    }
+    const sp = key.indexOf(" ");
+    const method = key.slice(0, sp);
+    const p = key.slice(sp + 1);
+    if (!(spec.auth in AUTH)) throw new Error(`route ${key} has unknown auth ${spec.auth}`);
+    const api = p.startsWith("/api/");
+    const keys = spec.auth === "superuser" ? "" : KEY_TEXT[key_access(method, p)];
+    const description = [
+      spec.summary,
+      AUTH[spec.auth],
+      keys,
+      api ? rate_limit_text(rate) : "",
+      ERROR_SHAPE,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const status = String(spec.response.status);
+    const ok: any = {
+      description: status === "302" ? "Redirects to the dashboard." : "Success.",
+    };
+    if (spec.response.schema !== null) {
+      ok.content = { "application/json": { schema: spec.response.schema } };
+    }
+    const responses: any = { [status]: ok };
+    if (spec.auth !== "none") {
+      responses["401"] = _error_resp("The token is missing or invalid.");
+    }
+    if (spec.auth !== "none") {
+      responses["403"] = _error_resp("The caller is signed in but may not do this.");
+    } else if (keys === KEY_TEXT.refused) {
+      responses["403"] = _error_resp("An API key was sent; API keys are refused here.");
+    }
+    if (api) responses["429"] = _error_resp("Too many requests; wait out the rate-limit window.");
+
+    const op: any = {
+      tags: [p.startsWith("/api/tracker/") ? "tracker" : "system"],
+      summary: spec.summary,
+      description,
+      responses,
+    };
+    if (spec.auth !== "none") op.security = SECURITY;
+    const params = [...p.matchAll(/\{([^}]+)\}/gu)].map((m) => ({
+      name: m[1],
+      in: "path",
+      required: true,
+      description: m[1] === "id" ? "Record id." : `The ${m[1]} path segment.`,
+      schema: { type: "string" },
+    }));
+    if (params.length) op.parameters = params;
+    (paths[p] ??= {})[method.toLowerCase()] = op;
+  }
+  return [paths, internal];
+}
+
+// ----------------------------------------------------------------------------
 // Assembly
 // ----------------------------------------------------------------------------
 
 const INFO_DESCRIPTION =
   "OpenAPI description of this app's PocketBase REST API, generated from the " +
-  "pb_migrations/ schema by scripts/gen_openapi.ts. Per-record access is " +
+  "pb_migrations/ schema and the route registry (pb_hooks/lib/routes.js) by " +
+  "scripts/gen_openapi.ts. Routes the server calls on itself are left out on purpose. " +
+  "Per-record access is " +
   "governed by each collection's API rules at runtime (not encoded here), " +
   "and relation `expand` is dynamic — the expanded shape depends on the " +
   "`expand` query parameter and the caller's read access.";
 
-/** Assemble the full OpenAPI document from the collection rows. */
-function build_spec(cols: any[]): any {
+/** Assemble the full OpenAPI document from the replayed DB and the route registry. */
+function build_spec({ cols, docs, rate }: Replay): any {
   const id_to_name = new Map<string, string>(cols.map((c) => [c.id, c.name]));
   const app_cols = cols.filter((c) => !c.name.startsWith("_") && !c.system);
   app_cols.sort((a, b) => by_code_point(a.name, b.name));
@@ -483,10 +629,13 @@ function build_spec(cols: any[]): any {
   const tags: { name: string; description: string }[] = [];
 
   for (const col of app_cols) {
-    schemas[record_schema_name(col.name)] = record_schema(col, id_to_name);
+    const doc = docs.get(`collection:${col.name}`);
+    if (!doc)
+      throw new Error(`collection ${col.name} has no \`collection:${col.name}\` app_docs record`);
+    schemas[record_schema_name(col.name)] = record_schema(col, id_to_name, doc.body);
     schemas[list_schema_name(col.name)] = list_result_schema(col);
-    Object.assign(paths, collection_paths(col, su_write_names.has(col.name)));
-    tags.push({ name: col.name, description: `\`${col.name}\` collection endpoints.` });
+    Object.assign(paths, collection_paths(col, su_write_names.has(col.name), doc.title));
+    tags.push({ name: col.name, description: doc.title });
   }
 
   // AuthResponse schema references the users Record schema.
@@ -500,10 +649,27 @@ function build_spec(cols: any[]): any {
     required: ["token", "record"],
   };
 
+  schemas.Error = {
+    type: "object",
+    description: "The body of every error answer.",
+    properties: {
+      status: { type: "integer" },
+      message: { type: "string" },
+      data: { type: "object", description: "Offending fields of a validation error; else empty." },
+    },
+    required: ["status", "message", "data"],
+  };
+
   Object.assign(paths, auth_paths());
   Object.assign(paths, health_path());
+  const [routes] = route_paths(rate);
+  for (const [p, ops] of Object.entries(routes)) paths[p] = { ...paths[p], ...(ops as any) };
   tags.push({ name: "users-auth", description: "users auth endpoints." });
   tags.push({ name: "system", description: "System endpoints." });
+  tags.push({
+    name: "tracker",
+    description: "Task-tracker actions that span collections or need the server to do the work.",
+  });
 
   return {
     openapi: OPENAPI_VERSION,
@@ -541,8 +707,8 @@ function _su_write(col: any): boolean {
 // ----------------------------------------------------------------------------
 
 /** Deterministic JSON text (sorted keys, no timestamps, trailing NL). */
-function render(cols: any[]): string {
-  const spec = build_spec(cols);
+function render(replay: Replay): string {
+  const spec = build_spec(replay);
   return json_dumps(spec, { indent: 2, sort_keys: true, ensure_ascii: false }) + "\n";
 }
 
@@ -555,24 +721,32 @@ function main(): number {
   const check_mode = parse_args(usage, help, [["--check", "store_true", "check"]], { check: false })
     .check as boolean;
 
-  let cols: any[];
+  let replay: Replay;
+  let content: string;
   try {
-    cols = fetch_collections();
+    replay = fetch_replay();
+    content = render(replay);
   } catch (exc) {
     if (!(exc instanceof Error)) throw exc;
     console.log(`❌ gen_openapi: ${exc.message}`);
     return 1;
   }
 
-  const content = render(cols);
-
   if (check_mode) {
     return _check(content);
   }
 
   fs.writeFileSync(OUTPUT, content, "utf-8");
-  const n = cols.filter((c) => !c.name.startsWith("_") && !c.system).length;
-  console.log(`✅ gen_openapi: wrote ${path.relative(REPO, OUTPUT)} (${n} collections).`);
+  const n = replay.cols.filter((c) => !c.name.startsWith("_") && !c.system).length;
+  const [routes, internal] = route_paths(replay.rate);
+  const r = Object.values(routes).reduce(
+    (sum: number, ops: any) => sum + Object.keys(ops).length,
+    0,
+  );
+  console.log(
+    `✅ gen_openapi: wrote ${path.relative(REPO, OUTPUT)} (${n} collections, ${r} routes, ` +
+      `${internal} internal route${internal === 1 ? "" : "s"} left out).`,
+  );
   return 0;
 }
 
@@ -596,7 +770,7 @@ function _check(content: string): number {
 
   console.log(
     "❌ gen_openapi --check: openapi.json is out of date with the " +
-      "pb_migrations schema.\n" +
+      "pb_migrations schema or the route registry.\n" +
       "   Run `bun scripts/gen_openapi.ts` to regenerate it.",
   );
   return 1;

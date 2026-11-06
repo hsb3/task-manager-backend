@@ -72,6 +72,7 @@ routerUse(
           target.name !== "api_keys" &&
           (target.name !== "users" || method === "GET" || method === "HEAD");
       } else {
+        // KEEP IN SYNC: scripts/gen_openapi.ts renders this allowlist (`/api/tracker/admin/`) and the read list (`/api/tracker/export`) into every route's description.
         allowed =
           route.startsWith("/api/files/") ||
           route === "/api/realtime" ||

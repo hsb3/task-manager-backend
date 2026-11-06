@@ -126,41 +126,44 @@ onRecordCreateRequest((e) => {
 
 // Answers 204 before sending, so the signup that called it never waits on SMTP. Outside /api/,
 // so no rate limit rule applies to it and a client forging the server address cannot spend it.
-routerAdd("POST", "/internal/signup-verification/{id}", (e) => {
-  const secret = e.app.store().get("signupMailSecret");
-  if (
-    !secret ||
-    !$security.equal(e.request.header.get("X-Signup-Mail"), secret)
-  ) {
-    throw new NotFoundError();
-  }
-  // Close: the caller would otherwise reuse this connection while the send still holds it.
-  e.response.header().set("Connection", "close");
-  e.response.writeHeader(204);
-  e.flush();
-
-  // A batch signup commits only after its hook returns, so wait for the row.
-  const id = e.request.pathValue("id");
-  let user = null;
-  for (let i = 0; i < 50 && !user; i++) {
-    try {
-      user = e.app.findRecordById("users", id);
-    } catch (_) {
-      sleep(100);
+require(`${__hooks}/lib/routes.js`).add(
+  "POST /internal/signup-verification/{id}",
+  (e) => {
+    const secret = e.app.store().get("signupMailSecret");
+    if (
+      !secret ||
+      !$security.equal(e.request.header.get("X-Signup-Mail"), secret)
+    ) {
+      throw new NotFoundError();
     }
-  }
-  if (!user || user.verified()) return;
-  try {
-    $mails.sendRecordVerification(e.app, user);
-  } catch (err) {
-    e.app
-      .logger()
-      .error(
-        "signup verification email failed",
-        "user",
-        user.id,
-        "err",
-        String(err).split(user.getString("email")).join("[address]"),
-      );
-  }
-});
+    // Close: the caller would otherwise reuse this connection while the send still holds it.
+    e.response.header().set("Connection", "close");
+    e.response.writeHeader(204);
+    e.flush();
+
+    // A batch signup commits only after its hook returns, so wait for the row.
+    const id = e.request.pathValue("id");
+    let user = null;
+    for (let i = 0; i < 50 && !user; i++) {
+      try {
+        user = e.app.findRecordById("users", id);
+      } catch (_) {
+        sleep(100);
+      }
+    }
+    if (!user || user.verified()) return;
+    try {
+      $mails.sendRecordVerification(e.app, user);
+    } catch (err) {
+      e.app
+        .logger()
+        .error(
+          "signup verification email failed",
+          "user",
+          user.id,
+          "err",
+          String(err).split(user.getString("email")).join("[address]"),
+        );
+    }
+  },
+);
