@@ -510,6 +510,7 @@ try {
     email: string,
     subject: string,
     name = "OAuth Person",
+    createData: Record<string, any> | undefined = undefined,
   ): Promise<[number, any]> => {
     PROVIDER_USER = { sub: subject, email: email, email_verified: true, name };
     return api(link_room.base_url, "POST", "/api/collections/users/auth-with-oauth2", {
@@ -517,7 +518,25 @@ try {
       code: "fake-code",
       codeVerifier: "",
       redirectURL: link_room.base_url + "/api/oauth2-redirect",
+      createData,
     });
+  };
+
+  const password_login = async (email: string, password: string): Promise<number> =>
+    (
+      await api(link_room.base_url, "POST", "/api/collections/users/auth-with-password", {
+        identity: email,
+        password,
+      })
+    )[0];
+
+  const db_run = (sql: string): void => {
+    const c = sqlite_connect(path.join(link_room.data_dir, "data.db"), { timeout: 15 });
+    try {
+      c.run(sql);
+    } finally {
+      c.close();
+    }
   };
 
   const users_on_key = (key: string): any[] => {
@@ -688,7 +707,7 @@ try {
     [body.status, body.message, typeof body.data],
     [500, "The sign-in could not be completed.", "object"],
   );
-  let logged = false;
+  let logged: any = null;
   for (let i = 0; i < 20 && !logged; i++) {
     const [, l] = await api(
       link_room.base_url,
@@ -697,12 +716,18 @@ try {
       null,
       su_token,
     );
-    logged = (l.items ?? []).some((x: any) =>
-      String(x.message).includes("oauth verified save failed"),
-    );
+    logged = (l.items ?? []).find((x: any) => String(x.message).includes("oauth sign-in failed"));
     if (!logged) await new Promise((r) => setTimeout(r, 500));
   }
-  check("…and the failure is logged", logged, true);
+  check("…and the failure is logged", Boolean(logged), true);
+  check(
+    "…naming the database's own cause",
+    String(logged?.data?.cause ?? "").includes("probe db failure"),
+    true,
+  );
+  [s] = await oauth_login(dbfail_mail, "fake-subject-dbfail");
+  check("…a retry once the database recovers → 403 (approval gate)", s, 403);
+  check("…and the account is saved verified", verified_on_key("dbfail.signup@example.com"), [1]);
 
   // A refusal from the verified save keeps its own status and message, even though e.next() also refused.
   [s, body] = await oauth_login("Refuse.Signup@Example.com", "fake-subject-refuse");
@@ -710,6 +735,169 @@ try {
     "first OAuth sign-in, verified save refused with a status → its own 400",
     [s, body.message],
     [400, "Probe refusal."],
+  );
+
+  // Pre-registration takeover: a stranger signs up at someone's address with a password they know,
+  // then the owner signs in through the provider.
+  for (const [planted, presented, key, label] of [
+    [
+      "victim.exact@example.com",
+      "victim.exact@example.com",
+      "victim.exact@example.com",
+      "the exact",
+    ],
+    ["Vic.Tim+pre@gmail.com", "victim@gmail.com", "victim@gmail.com", "a folded gmail"],
+    [
+      "Mixed.Case+Plant@GoogleMail.com",
+      "MixedCase@GOOGLEMAIL.com",
+      "mixedcase@googlemail.com",
+      "a mixed-case googlemail",
+    ],
+  ]) {
+    [s] = await api(link_room.base_url, "POST", "/api/collections/users/records", {
+      email: planted,
+      password: "attacker123456",
+      passwordConfirm: "attacker123456",
+    });
+    check(`(fixture) unverified signup at ${planted} with a known password`, s, 200);
+    const [pre_id] = users_on_key(key);
+    db_run(
+      `INSERT INTO _externalAuths (collectionRef, recordRef, provider, providerId) VALUES ('_pb_users_auth_', '${pre_id}', 'github', 'attacker-${pre_id}')`,
+    );
+    const subject = `fake-subject-victim-${pre_id}`;
+    [s] = await oauth_login(presented, subject);
+    check(`OAuth sign-in at ${label} address of that account → 403 (approval gate)`, s, 403);
+    check("…the account is saved verified", verified_on_key(key), [1]);
+    check(
+      "…and the provider just used is its only link",
+      external_auths().filter((r: any) => r[0] === pre_id),
+      [tup(pre_id, "oidc", subject)],
+    );
+    [s] = await api(
+      link_room.base_url,
+      "PATCH",
+      `/api/collections/users/records/${pre_id}`,
+      { approved: true, verified: true },
+      su_token,
+    );
+    check("(fixture) a superuser approves it", s, 200);
+    check(
+      "…the signup's password no longer signs in",
+      await password_login(planted, "attacker123456"),
+      400,
+    );
+    [s, body] = await oauth_login(presented, subject);
+    check("…while the provider sign-in reaches that account", [s, body.record?.id], [200, pre_id]);
+  }
+
+  // A provider link that fails at the database during a first sign-in leaves no account behind.
+  db_run(
+    "CREATE TRIGGER zz_probe_link BEFORE INSERT ON _externalAuths WHEN NEW.providerId = 'fake-subject-orphan' BEGIN SELECT RAISE(ABORT, 'probe link failure'); END",
+  );
+  try {
+    [s, body] = await oauth_login("Orphan.Signup@Example.com", "fake-subject-orphan");
+  } finally {
+    db_run("DROP TRIGGER IF EXISTS zz_probe_link");
+  }
+  check(
+    "first OAuth sign-in whose provider link fails at the database → 500",
+    [s, body.message],
+    [500, "The sign-in could not be completed."],
+  );
+  check("…and leaves no account behind", users_on_key("orphan.signup@example.com"), []);
+
+  const user_row = (id: string): any[] => {
+    const c = sqlite_connect(path.join(link_room.data_dir, "data.db"), { timeout: 15 });
+    try {
+      return c.query("SELECT verified, password FROM users WHERE id = ?").values(id)[0] as any[];
+    } finally {
+      c.close();
+    }
+  };
+  const links_of = (id: string): any[] => external_auths().filter((r: any) => r[0] === id);
+  const su_user = async (email: string, verified: boolean): Promise<string> => {
+    const [st, rec] = await api(
+      link_room.base_url,
+      "POST",
+      "/api/collections/users/records",
+      {
+        email,
+        password: "precede123456",
+        passwordConfirm: "precede123456",
+        verified,
+        approved: true,
+      },
+      su_token,
+    );
+    check(`(fixture) account at ${email}`, st, 200);
+    return rec.id;
+  };
+
+  // D1: an existing provider link outranks the fold — a linked subject whose address now folds onto another account stays on its own.
+  const d1_a = await su_user("d1.alpha@example.com", true);
+  const d1_b = await su_user("D1.Beta@gmail.com", true);
+  [s, body] = await oauth_login("d1.alpha@example.com", "fake-subject-d1");
+  check("(fixture) the provider account links to A", [s, body.record?.id], [200, d1_a]);
+  [s, body] = await oauth_login("d1beta+moved@gmail.com", "fake-subject-d1");
+  check(
+    "a linked provider account whose address folds onto B signs into A",
+    [s, body.record?.id],
+    [200, d1_a],
+  );
+  check("…B gains no link", links_of(d1_b), []);
+
+  // D2: the signed-in account outranks the fold — adding a provider whose address folds onto another account links to the caller.
+  const d2_l = await su_user("d2.signed@example.com", true);
+  const d2_m = await su_user("D2.Target@gmail.com", false);
+  const d2_m_before = user_row(d2_m);
+  const [, l_auth] = await api(
+    link_room.base_url,
+    "POST",
+    "/api/collections/users/auth-with-password",
+    {
+      identity: "d2.signed@example.com",
+      password: "precede123456",
+    },
+  );
+  PROVIDER_USER = {
+    sub: "fake-subject-d2",
+    email: "d2target@gmail.com",
+    email_verified: true,
+    name: "D2",
+  };
+  [s, body] = await api(
+    link_room.base_url,
+    "POST",
+    "/api/collections/users/auth-with-oauth2",
+    {
+      provider: "oidc",
+      code: "fake-code",
+      codeVerifier: "",
+      redirectURL: link_room.base_url + "/api/oauth2-redirect",
+    },
+    l_auth.token,
+  );
+  check(
+    "signed-in L adds a provider whose address folds onto unverified M → L",
+    [s, body.record?.id],
+    [200, d2_l],
+  );
+  check("…the link is L's", links_of(d2_l), [tup(d2_l, "oidc", "fake-subject-d2")]);
+  check(
+    "…M is untouched (still unverified, same password, no link)",
+    [user_row(d2_m), links_of(d2_m)],
+    [d2_m_before, []],
+  );
+
+  // The provider proved only its own address, so an account createData points elsewhere stays unverified.
+  [s] = await oauth_login("prover@example.com", "fake-subject-createdata", "OAuth Person", {
+    email: "unproven.createdata@example.com",
+  });
+  check("OAuth signup whose createData names another address → 403", s, 403);
+  check(
+    "…that account is not saved verified",
+    verified_on_key("unproven.createdata@example.com"),
+    [0],
   );
 } finally {
   await link_room.stop();
