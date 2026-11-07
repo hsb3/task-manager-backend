@@ -53,32 +53,9 @@ onBootstrap((e) => {
   }
 });
 
-// ── Request hook: enforce verified + auto-link on OAuth login (Ruling 4) ─────
-// Fires after the OAuth2 token exchange and BEFORE PocketBase links the external
-// account to a users record. We use it to make two guarantees, both keyed on the
-// fact that e.oAuth2User.email is documented as the VERIFIED email — a provider (GitHub, Google)
-// fills it only when it has confirmed the user owns that address, and leaves it EMPTY
-// otherwise. That single invariant is what makes both behaviours below safe.
-//
-//   (a) FIRST-TIME SIGNUP → verified=true. Our users authRule requires
-//       verified=true, so a brand-new OAuth account created with verified=false
-//       would be immediately bricked (403 on its own token). Because the provider has
-//       already verified the email, we can safely mark the new record verified so
-//       the account works on first login instead of being locked out.
-//
-//   (b) ACCOUNT LINKING = auto-link by verified email. If the verified email folds
-//       (PBTT-529) onto an EXISTING users record, we point the auth at THAT record rather
-//       than letting a second, duplicate account be created. This is safe ONLY
-//       because the email is provider-verified: an attacker cannot claim someone
-//       else's address without the provider confirming ownership, and if ownership
-//       can't be confirmed the email is empty and we do nothing.
-//
-// DEFENSIVE + IDEMPOTENT BY DESIGN. PocketBase's own engine may already do some
-// of this in a given version; this hook is written so that if the core already
-// linked or already verified, we cause no harm (re-setting verified=true when it
-// is already true is a no-op; re-pointing at the same record changes nothing).
-// If the provider could not verify the email we bail out and let the core engine
-// decide — we never invent a link or a verification on unverified input.
+// Request hook: an existing provider link or the signed-in account decides the account; only when core matched
+// nothing does a provider-verified email that folds onto an existing account reach THAT account. Core's own
+// transaction verifies and links, first resetting an unverified account's password and other links (decision:oauth-providers-from-env).
 onRecordAuthWithOAuth2Request((e) => {
   // decision:user-settings-write-checks: a provider name the person never typed is stored trimmed, a blank one empty, never refused.
   if (e.oAuth2User && typeof e.oAuth2User.name === "string")
@@ -124,40 +101,38 @@ onRecordAuthWithOAuth2Request((e) => {
     }
   }
 
-  if (existing) {
-    // (b) LINK: an account with this verified email already exists. Assigning
-    // e.record BEFORE e.next() makes the core linking attach the provider identity
-    // to this record instead of minting a duplicate. Setting e.record to the same
-    // record the engine already chose is harmless (idempotent).
-    e.record = existing;
-    // (a) also applies to the linked record: guarantee it satisfies the authRule.
-    e.record.set("verified", true);
-  }
+  // Core's own match (a provider link, the signed-in account, the exact email) stands; the fold only fills its gap.
+  if (existing && !e.record) e.record = existing;
+  // Core verifies only on an exact email match (v0.40.4 apis/record_auth_with_oauth2.go:326,374); a fold match is the same mailbox.
+  e.oAuth2User.email =
+    e.record && e.record.getString("email_key") === key
+      ? e.record.email()
+      : canonical;
 
-  // (a) FIRST-TIME SIGNUP: the record does not exist before e.next(), and the create form drops
-  // `verified` from createData (a system field), so the brand-new record is verified AFTER the
-  // core saved it — including when the auth response itself was refused (the approval gate 403),
-  // since the account persists and must not be locked out on its first approved login.
-  let err = null;
   try {
-    e.next();
+    return e.next();
   } catch (x) {
-    err = x;
-  }
-  if (!existing && e.record && !e.record.getBool("verified")) {
-    e.record.set("verified", true);
-    try {
-      e.app.save(e.record);
-    } catch (x) {
-      // KEEP IN SYNC: membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
-      const v = x.value || x;
-      if (!(v && (v.status || typeof v.marshalJSON === "function"))) {
-        // The save failure wins over whatever e.next() threw, because that error would hide it.
-        e.app.logger().error("oauth verified save failed", "error", String(x));
-        throw new InternalServerError("The sign-in could not be completed.");
-      }
-      throw x;
+    const w = x.value || x;
+    // Core wraps any non-API failure of its sign-in transaction as this 400 (v0.40.4 apis/record_auth_with_oauth2.go:156).
+    const v =
+      w &&
+      w.message === "Failed to authenticate." &&
+      typeof w.rawData === "function"
+        ? w.rawData()
+        : null;
+    // KEEP IN SYNC: membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
+    if (v && !(v.status || typeof v.marshalJSON === "function")) {
+      e.app
+        .logger()
+        .error(
+          "oauth sign-in failed",
+          "error",
+          String(x),
+          "cause",
+          typeof v.error === "function" ? v.error() : String(v),
+        );
+      throw new InternalServerError("The sign-in could not be completed.");
     }
+    throw x;
   }
-  if (err) throw err;
 }, "users");

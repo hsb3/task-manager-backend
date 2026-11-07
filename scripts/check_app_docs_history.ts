@@ -83,6 +83,14 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785189100_seed_app_docs.js", "collection:users", "Provider sign-in account linking (GitHub or Google, decision"]',
+    "decision:oauth-providers-from-env: an existing provider link or the signed-in account outranks the email fold; the record now says so",
+  ],
+  [
+    '["1785189100_seed_app_docs.js", "decision:oauth-providers-from-env", "A sign-in whose verified email folds onto an existing accoun"]',
+    "decision:oauth-providers-from-env: an existing provider link or the signed-in account outranks the email fold; the record now says so",
+  ],
+  [
     '["1785187800_seed_app_docs.js", "collection:app_docs", "A data migration seeds it, so the docs travel with the app a"]',
     "card 9fwr: the record says the server seeds the corpus, not which migration does",
   ],
