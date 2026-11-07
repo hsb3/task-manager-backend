@@ -146,7 +146,18 @@ onRecordAuthWithOAuth2Request((e) => {
   }
   if (!existing && e.record && !e.record.getBool("verified")) {
     e.record.set("verified", true);
-    e.app.save(e.record);
+    try {
+      e.app.save(e.record);
+    } catch (x) {
+      // KEEP IN SYNC: membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
+      const v = x.value || x;
+      if (!(v && (v.status || typeof v.marshalJSON === "function"))) {
+        // The save failure wins over whatever e.next() threw, because that error would hide it.
+        e.app.logger().error("oauth verified save failed", "error", String(x));
+        throw new InternalServerError("The sign-in could not be completed.");
+      }
+      throw x;
+    }
   }
   if (err) throw err;
 }, "users");
