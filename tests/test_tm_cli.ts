@@ -482,6 +482,53 @@ try {
     tup(o.code, o.stderr.includes("tm login")),
     tup(1, true),
   );
+  o = await tm(["list", "--json"], { TM_URL: BASE_URL, TM_API_KEY: "x" });
+  check(
+    "env key without tmk_ → exit 1, names TM_API_KEY, never echoes it",
+    tup(o.code, o.stdout, o.stderr.includes("TM_API_KEY"), o.stderr.includes("tmk_")),
+    tup(1, "", true, true),
+  );
+  o = await tm(["list", "--json"], { TM_URL: BASE_URL, TM_API_KEY: "sekretvalue" });
+  check("the bad key's value is not echoed", o.stderr.includes("sekretvalue"), false);
+  fs.writeFileSync(cfg, JSON.stringify({ url: BASE_URL, key: "sekretfile" }));
+  o = await tm(["list", "--json"], {});
+  check(
+    "saved key without tmk_ → exit 1, names the config file, no echo",
+    tup(o.code, o.stderr.includes(cfg), o.stderr.includes("sekretfile")),
+    tup(1, true, false),
+  );
+  o = await tm(["login", "--url", BASE_URL], {}, "sekretpaste\n");
+  check(
+    "login refuses a key without tmk_ → exit 1, no echo",
+    tup(o.code, o.stderr.includes("tmk_"), (o.stdout + o.stderr).includes("sekretpaste")),
+    tup(1, true, false),
+  );
+  // repair: a bad saved key is replaced by login; a bad env key never blocks login
+  fs.writeFileSync(cfg, JSON.stringify({ url: BASE_URL, key: "sekretfile" }));
+  o = await tm(["login"], {}, `${WRITE_KEY}\n`);
+  check(
+    "login replaces a bad saved key (url kept) → exit 0, file holds the good key",
+    tup(o.code, JSON.parse(fs.readFileSync(cfg, "utf8"))),
+    tup(0, { url: BASE_URL, key: WRITE_KEY }),
+  );
+  o = await tm(["login"], { TM_API_KEY: "x" }, `${WRITE_KEY}\n`);
+  check("a bad env key does not block login → exit 0", o.code, 0);
+  o = await tm(["list", "--json"], { TM_API_KEY: ` Bearer  ${WRITE_KEY} ` });
+  check("env key with Bearer and spaces is normalised and accepted", o.code, 0);
+  o = await tm(["list", "--json"], { TM_API_KEY: `  ${WRITE_KEY}` });
+  check("env key with leading spaces is accepted", o.code, 0);
+  o = await tm(["list", "--json"], { TM_API_KEY: "eyJhbGciOiJIUzI1NiJ9.e30.sig" });
+  check("a JWT-looking value is refused → exit 1", o.code, 1);
+  o = await tm(["login"], {}, "eyJhbGciOiJIUzI1NiJ9.e30.sig\n");
+  check("login refuses a JWT-looking paste → exit 1", o.code, 1);
+  fs.writeFileSync(cfg, `{"url":"${BASE_URL}","key":ZQXsecret}`);
+  o = await tm(["list", "--json"], {});
+  check(
+    "corrupt config → exit 1, names the file, never quotes the parser",
+    tup(o.code, o.stderr.includes(cfg), o.stderr.includes("ZQXsecret")),
+    tup(1, true, false),
+  );
+  fs.rmSync(cfg);
   o = await tm(["frobnicate"], W);
   check("unknown verb → exit 2 (usage)", o.code, 2);
   o = await tm(["--help"]);

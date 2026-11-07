@@ -20,29 +20,48 @@ export function save_config(cfg: Config): string {
   return file;
 }
 
+/** Same reading the server gives the header (trim, optional "Bearer "); tm takes API keys only, so a JWT is refused. */
+export function check_key(raw: string, from: string): string {
+  const key = raw.trim().replace(/^bearer\s+/i, "");
+  if (!key.startsWith("tmk_"))
+    throw new ConfigError(
+      `the API key from ${from} does not start with tmk_: check it was copied whole` +
+        (from === "TM_API_KEY" ? "" : "; run `tm login` to replace it"),
+    );
+  return key;
+}
+
+function read_saved(file: string): Partial<Config> {
+  if (!fs.existsSync(file)) return {};
+  let parsed: any;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    // the parser's detail can quote the key
+    throw new ConfigError(`${file} is not valid JSON; run \`tm login\` again`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new ConfigError(`${file} is not a saved login; run \`tm login\` again`);
+  return parsed;
+}
+
+/** The server URL of the saved login, whatever state its key is in. */
+export function saved_url(): string {
+  return String(read_saved(config_path()).url ?? "");
+}
+
 /** Env wins over the file: TM_URL and TM_API_KEY, each on its own. */
 export function load_config(): Config {
   const file = config_path();
-  let saved: Partial<Config> = {};
-  if (fs.existsSync(file)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-        throw new Error("not an object");
-      saved = parsed;
-    } catch (e: any) {
-      throw new ConfigError(
-        `${file} is not readable as a saved login (${e?.message ?? e}); run \`tm login\` again`,
-      );
-    }
-  }
+  const saved = read_saved(file);
   const url = process.env.TM_URL || saved.url || "";
-  const key = process.env.TM_API_KEY || saved.key || "";
-  if (typeof url !== "string" || typeof key !== "string" || !url || !key) {
+  const raw = process.env.TM_API_KEY || saved.key || "";
+  if (typeof url !== "string" || typeof raw !== "string" || !url || !raw) {
     throw new ConfigError(
       "no server or key configured: run `tm login` or set TM_URL and TM_API_KEY",
     );
   }
+  const key = check_key(raw, process.env.TM_API_KEY ? "TM_API_KEY" : file);
   try {
     new URL(url);
   } catch {
