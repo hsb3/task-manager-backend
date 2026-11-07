@@ -51,6 +51,31 @@ pocketbase plugin's field notes; what follows is what this repo's hooks add.
   silently registers nothing on 0.40.4: clean boot, no `failed to execute` line, the refusal
   never fires, and a logger call as the handler's first statement never reaches `/api/logs` —
   the handler is never entered. Use the bare `onRecordCreateRequest(fn, ...)` form.
+- pb_hooks FILE load order is not stable per boot (3tvy: an untagged guard ran before another
+  file's `noContent` chain-ender on only about half of fresh boots), so "my file loads first" is
+  a per-boot race; prove any cross-file order across repeated boots. A hook file that throws at
+  load does NOT fail the boot: PB prints `failed to execute <file>` and serves with that file's
+  hooks absent. `roomkit.serve()` refuses a room whose log carries that line, the only cover for
+  boot-only files; `tests/test_hook_files_loaded.ts` also probes each file that registers a
+  request, route or realtime handler.
+- A `DynamicModel` template infers Go types: `new DynamicModel({ ordinal: 0 })` scans as an int,
+  so a fractional row value throws inside the hook after its UPDATE committed and the client
+  gets 400 for a committed create (2bg7, `pb_hooks/ordinal.pb.js`). Write the template
+  fractional (`{ ordinal: 0.5 }`) for any number that may hold a fraction, and use the array
+  form `q.all(rows)` when zero rows is a legitimate answer.
+- Each operation's rule stands alone: a peer correctly 404'd on GET got 200 plus the full body
+  from a blind PATCH by id, and could DELETE, because update/delete carried a weaker predicate.
+  A privacy predicate goes on list, view, update AND delete; probe the writes by id as the
+  excluded role (`check_view_within_list.ts` compares view against list only).
+- `hidden: true` on a VIEW collection's field silently reads back false on 0.40.4 (PATCH and
+  migration alike; a base-collection field sticks), so a view column stays serialised,
+  filterable, sortable and `?fields=`-selectable for anyone who sees the row: keep a
+  confidential value out of the view rather than hiding it.
+- `$app.canAccessRecord(record, requestInfo, rule)` re-queries the PERSISTED row by id: an
+  unsaved record fails every rule, and a saved one mutated in memory answers for the DB value.
+  A route that creates under its collection's live rule mirrors the rule in JS behind a
+  differential gate (direct create vs route across the matrix, holding at least one permit and
+  one refusal): `tests/test_invite_mirror.ts`.
 - `e.app = txApp` inside a `*Request` hook ESCAPES the request in the pooled JSVM: other
   in-flight requests see the transactional app before the `finally` restores it, so a
   "transactional cascade" produced 204s with no cascade, 400s with a full cascade, and
@@ -66,3 +91,24 @@ correct port band), seeds fixtures by name, probes the FULL role matrix
 check, and self-gates (process.exit non-zero on any failure). The battery flags ❌
 glyphs as belt-and-braces. Prove claims against the running server — docs and app_docs
 state only what a test or live call demonstrated.
+
+- **Local first** (owner ruling 2026-07-26): every verifiable criterion gets a local room or
+  dev-server gate; a prod gate exists only for a claim about prod itself (deploy wiring, live
+  delivery, live data).
+- **A proof counts only once it has failed.** Break the behaviour, show the assertion RED with
+  its message, restore, show it GREEN, and quote both. Assert the settled thing (a readout, a
+  URL, a confirmed response) first and poll derived state against it; a scan gated on a
+  readiness signal waits for the data it checks; never pin a revert-probe's baseline to the
+  current tip; pin a known bug with an explicit assertion on the wrong behaviour, never an
+  expected-failure marker (it goes green for ANY error); prove persistence from a fresh read,
+  never an in-memory echo; a concurrency claim needs a barrier-released probe, not a sequential
+  suite.
+- **A clean-room copy refuses symlinks itself.** Node's `cpSync({dereference: true})` still
+  copies a symlink INSIDE the tree as a symlink, so a write into the copy lands in the real tree;
+  only `tests/roomkit.ts` `hooks_dir` and the battery's migrations copy refuse symlinks.
+- **A conflicted generated file shows NO conflict markers** (`merge=binary` in the generated
+  `.gitattributes`) and looks clean: resolve it by rerunning its generator, never `git add`, and
+  rebase just before the final gate run so the gate proves the rebased tree.
+- **Scratch dirs are unique.** `PB_PORT_OFFSET` separates ports, not directories: make scratch
+  with `mktemp -d` (or a PID-unique path), never a fixed name under a shared temp root, and
+  delete only what you created — a fixed name once let one agent `rm -rf` another's live rooms.

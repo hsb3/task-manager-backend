@@ -17,4 +17,4 @@ the repo; it knows nothing about local apps.
 **How to apply:** before handing a lane an offset, run
 `lsof -nP -iTCP -sTCP:LISTEN | grep 127.0.0.1:1` and avoid any band whose defaults (8090-8199
 plus the offset) hit a listener; 4300 is burned while Docker runs. Related:
-[[scratch-dirs-must-be-unique]], [[pkill-by-script-name-kills-other-lanes]].
+the scratch-dir rule in `.agents/rules/pocketbase.md`, [[battery-hang-surviving-room]].

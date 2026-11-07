@@ -5,12 +5,11 @@ so a checkout carries both.
 
 | Source | Native entry points |
 | --- | --- |
-| `context/` | `.claude/instructions` |
 | `memory/` | `.claude/memory` |
 | `rules/` | `.claude/rules` |
 | `agents/claude/` | `.claude/agents` |
 
-Root `AGENTS.md` directs agents to the applicable context, memory and rules.
+Root `AGENTS.md` points at the rules; project memory is indexed in `memory/MEMORY.md`.
 
 Native settings and hook registrations stay in `.claude/` (`settings.json`, `hooks/`),
 which remains a real directory. Personal operations and runtime state stay in their
