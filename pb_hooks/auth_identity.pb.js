@@ -137,3 +137,46 @@ onRecordUpdate((e) => {
   // ── END INLINED CANONICALIZE (update copy) ──
   return e.next();
 }, "users");
+
+// ── Password signup is verify-first: no password exists before the mailbox owner sets one (decision:password-signup-verify-first) ──
+
+onRecordCreateRequest((e) => {
+  const info = e.requestInfo();
+  // A provider signup's createData may carry a password and override the email, so it never keeps one.
+  if (info.context === "oauth2") {
+    e.record.setRandomPassword();
+    return e.next();
+  }
+  // A superuser create keeps what it submitted (seed/import).
+  if (!e.hasSuperuserAuth()) {
+    const body = info.body || {};
+    if (body.password !== undefined || body.passwordConfirm !== undefined) {
+      const msg =
+        "Signup takes no password: the signup mail links to setting one.";
+      throw new BadRequestError(msg, {
+        password: new ValidationError("validation_signup_password", msg),
+      });
+    }
+    e.record.setRandomPassword();
+  }
+  return e.next();
+}, "users");
+
+// Core keeps the password on verify while password login is on; drop one set before the mailbox owner acted, as core does when it is off.
+onRecordConfirmVerificationRequest((e) => {
+  if (!e.record.verified()) e.record.setRandomPassword();
+  return e.next();
+}, "users");
+
+// A superuser marking an account verified drops a password set before it, unless the same request sets one.
+onRecordUpdateRequest((e) => {
+  const body = e.requestInfo().body || {};
+  if (
+    e.record.verified() &&
+    !e.record.original().verified() &&
+    body.password === undefined
+  ) {
+    e.record.setRandomPassword();
+  }
+  return e.next();
+}, "users");

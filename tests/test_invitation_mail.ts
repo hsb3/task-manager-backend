@@ -446,8 +446,6 @@ try {
   console.log("\n── (e) the mailed invitation is accepted by a new account ──");
   [s, r] = await api("POST", "/api/collections/users/records", null, {
     email: ADDR_A,
-    password: "signup123456",
-    passwordConfirm: "signup123456",
     name: "Alpha Invitee",
   });
   check("anonymous signup for the invited address → 200", s, 200);
@@ -460,9 +458,12 @@ try {
   [s] = await login_a();
   console.log(`  ·  sign-in before verification and approval → status ${s}`);
   check("sign-in before verification and approval → NOT 200", s !== 200, true);
+  // A signup carries no password (decision:password-signup-verify-first); the superuser sets one with the approval.
   [s] = await api("PATCH", `/api/collections/users/records/${user_a}`, su, {
     verified: true,
     approved: true,
+    password: "signup123456",
+    passwordConfirm: "signup123456",
   });
   check("superuser marks the account verified and approved → 200", s, 200);
   [s, r] = await login_a();

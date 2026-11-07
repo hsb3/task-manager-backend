@@ -737,7 +737,8 @@ try {
     [400, "Probe refusal."],
   );
 
-  // Pre-registration takeover: a stranger signs up at someone's address with a password they know,
+  // Pre-registration takeover: an unverified account at someone's address holds a password a stranger
+  // knows (a signup can no longer set one, decision:password-signup-verify-first, so a superuser builds it),
   // then the owner signs in through the provider.
   for (const [planted, presented, key, label] of [
     [
@@ -754,12 +755,19 @@ try {
       "a mixed-case googlemail",
     ],
   ]) {
-    [s] = await api(link_room.base_url, "POST", "/api/collections/users/records", {
-      email: planted,
-      password: "attacker123456",
-      passwordConfirm: "attacker123456",
-    });
-    check(`(fixture) unverified signup at ${planted} with a known password`, s, 200);
+    [s] = await api(
+      link_room.base_url,
+      "POST",
+      "/api/collections/users/records",
+      {
+        email: planted,
+        password: "attacker123456",
+        passwordConfirm: "attacker123456",
+        verified: false,
+      },
+      su_token,
+    );
+    check(`(fixture) unverified account at ${planted} with a known password`, s, 200);
     const [pre_id] = users_on_key(key);
     db_run(
       `INSERT INTO _externalAuths (collectionRef, recordRef, provider, providerId) VALUES ('_pb_users_auth_', '${pre_id}', 'github', 'attacker-${pre_id}')`,
@@ -898,6 +906,24 @@ try {
     "…that account is not saved verified",
     verified_on_key("unproven.createdata@example.com"),
     [0],
+  );
+
+  // COVERS: hook:auth_identity.pb.js#onRecordCreateRequest:users
+  // createData may carry a password and an email the provider never proved (decision:password-signup-verify-first).
+  [s] = await oauth_login("prover2@example.com", "fake-subject-createdata-pw", "OAuth Person", {
+    email: "planted.createdata@example.com",
+    password: "attacker123456",
+    passwordConfirm: "attacker123456",
+  });
+  check("OAuth signup whose createData carries a password → 403", s, 403);
+  // Flipped in the database, past every hook, so only the signup decides which password the account holds.
+  db_run(
+    "UPDATE users SET verified = 1, approved = 1 WHERE email = 'planted.createdata@example.com'",
+  );
+  check(
+    "…once verified and approved, that password does not sign in",
+    await password_login("planted.createdata@example.com", "attacker123456"),
+    400,
   );
 } finally {
   await link_room.stop();

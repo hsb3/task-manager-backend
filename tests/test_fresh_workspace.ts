@@ -146,15 +146,16 @@ try {
   let signup: any;
   [s, signup] = await api("POST", "/api/collections/users/records", null, {
     email: USER_EMAIL,
-    password: USER_PASSWORD,
-    passwordConfirm: USER_PASSWORD,
     name: "Fresh User",
   });
   check("anonymous signup → 200", s, 200);
   const user_id = signup.id ?? null;
+  // A signup carries no password (decision:password-signup-verify-first); the superuser sets one with the approval.
   [s] = await api("PATCH", `/api/collections/users/records/${user_id}`, su, {
     verified: true,
     approved: true,
+    password: USER_PASSWORD,
+    passwordConfirm: USER_PASSWORD,
   });
   check("superuser approves the account → 200", s, 200);
   let auth: any;

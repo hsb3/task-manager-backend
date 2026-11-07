@@ -83,6 +83,14 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785189200_seed_app_docs.js", "collection:users", "**Verification email.** A signup through POST /api/collectio"]',
+    "decision:password-signup-verify-first (fr92): the signup mail now sets the password and its resend is request-password-reset; the record now says so",
+  ],
+  [
+    '["1785189200_seed_app_docs.js", "collection:users", "A failed send keeps the account and is logged; POST /api/col"]',
+    "decision:password-signup-verify-first (fr92): the signup mail now sets the password and its resend is request-password-reset; the record now says so",
+  ],
+  [
     '["1785189100_seed_app_docs.js", "collection:users", "Provider sign-in account linking (GitHub or Google, decision"]',
     "decision:oauth-providers-from-env: an existing provider link or the signed-in account outranks the email fold; the record now says so",
   ],

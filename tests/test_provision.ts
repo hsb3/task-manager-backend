@@ -143,8 +143,6 @@ try {
   const signup_email = `prov-signup-${randomBytes(4).toString("hex")}@example.com`;
   [s, r] = await api("POST", "/api/collections/users/records", null, {
     email: signup_email,
-    password: "test123456",
-    passwordConfirm: "test123456",
     name: "Signup Provision",
   });
   check("anonymous signup create", s, 200);
@@ -296,9 +294,12 @@ try {
     "\n── (2) PROJECT CRUD: owner may create/rename/delete their workspace's projects ──",
   );
   // Approve the signup user and log in as the OWNER.
+  // A signup carries no password (decision:password-signup-verify-first); the superuser sets one with the approval.
   await api("PATCH", `/api/collections/users/records/${signup_uid}`, su, {
     verified: true,
     approved: true,
+    password: "test123456",
+    passwordConfirm: "test123456",
   });
   const [owner_tok, owner_id] = await login(signup_email);
   let owner_ws: any;

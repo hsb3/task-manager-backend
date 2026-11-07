@@ -201,8 +201,6 @@ try {
     "/api/collections/users/records",
     {
       email: signup_email,
-      password: "signup123456",
-      passwordConfirm: "signup123456",
       name: "Signup E2E",
     },
   );
@@ -227,7 +225,8 @@ try {
     room.base_url,
     "PATCH",
     `/api/collections/users/records/${py_str(user_id)}`,
-    { verified: true, approved: true },
+    // A signup carries no password (decision:password-signup-verify-first); the superuser sets one here.
+    { verified: true, approved: true, password: "signup123456", passwordConfirm: "signup123456" },
     su_token,
   );
   check("superuser PATCH verified+approved", patch_status, 200);
@@ -300,7 +299,10 @@ try {
       room.base_url,
       "POST",
       "/api/collections/users/records",
-      { email, password: "signup123456", passwordConfirm: "signup123456", name },
+      // Only a superuser create may carry a password (decision:password-signup-verify-first).
+      token
+        ? { email, password: "signup123456", passwordConfirm: "signup123456", name }
+        : { email, name },
       token,
     );
 
@@ -596,7 +598,8 @@ try {
     room.base_url,
     "PATCH",
     `/api/collections/users/records/${py_str(peer_id)}`,
-    { verified: true, approved: true },
+    // Marking an account verified drops an earlier password unless the same request sets one (decision:password-signup-verify-first).
+    { verified: true, approved: true, password: "signup123456", passwordConfirm: "signup123456" },
     su_token,
   );
   check("(fixture) peer verified+approved", s, 200);
