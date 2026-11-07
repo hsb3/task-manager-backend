@@ -8,7 +8,7 @@
  * site that got this wrong left only a comment behind, and `migrate collections` re-emits the
  * block on every regeneration, so the convention needs a gate that can fail.
  *
- * The key set is DERIVED, never hand-typed (.agents/memory/feedback-invariants-belong-in-the-gate.md):
+ * The key set is DERIVED, never hand-typed (docs/design-patterns.md, "Invariants belong in the gate"):
  * a key is hook-owned when a pb_hooks/ file that registers onBootstrap WRITES it, either as the
  * head of a `settings.<key>` assignment or as a top-level key of an `unmarshal({...}, model)`
  * object. A read of the same key does not make that file an owner. A fifth family wired into a new boot hook is therefore gated the day it lands, with no

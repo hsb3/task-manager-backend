@@ -49,8 +49,8 @@ const CHAIN_TOPIC = "probe:delete_chain";
 // realtime.pb.js's four delete arms end their hidden-workspace leg with `return e.next()`;
 // a bare `return` silences the broadcast exactly as the guard does AND stops the hook chain,
 // so only a handler downstream of them can tell the two apart. `priority` is what puts this
-// one downstream: pb_hooks FILE load order is not stable per boot (project memory
-// pb-hook-order-across-files), so "my file loads last" would be a per-boot race.
+// one downstream: pb_hooks FILE load order is not stable per boot (.agents/rules/pocketbase.md),
+// so "my file loads last" would be a per-boot race.
 const CHAIN_PROBE_HOOK = `/// <reference path="../pb_data/types.d.ts" />
 // tests/test_activity.ts's delete-chain probe — written into this room's hooks copy only.
 $app.onRecordAfterDeleteSuccess().bind({
