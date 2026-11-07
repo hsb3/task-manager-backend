@@ -423,6 +423,22 @@ try {
   check("tm mcp exits 0 within 5s of end of input", exited, 0);
   if (exited !== 0) lone.kill();
 
+  console.log("\n── a key without tmk_ stops the server before it starts ──");
+  const bad = Bun.spawn([process.execPath, TM, "mcp"], {
+    cwd: S,
+    env: { PATH: process.env.PATH ?? "", HOME: S, TM_URL: BASE_URL, TM_API_KEY: "x" },
+    stdin: "pipe",
+    stdout: "ignore",
+    stderr: "pipe",
+  });
+  const bad_exit = await Promise.race([bad.exited, Bun.sleep(5_000).then(() => "still running")]);
+  if (bad_exit !== 1) bad.kill(); // a server that started is the failure; free its stderr read
+  check(
+    "tm mcp with a mistyped key exits 1 naming TM_API_KEY",
+    tup(bad_exit, (await new Response(bad.stderr).text()).includes("TM_API_KEY")),
+    tup(1, true),
+  );
+
   console.log("\n── stage check: only PocketBase running, only an API key in the env ──");
   // The transport passes the parent's HOME through, so point it at an empty place: no saved
   // login can leak in, and the key and URL in the environment are all there is.

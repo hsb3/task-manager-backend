@@ -2,7 +2,15 @@
 // tm — the task tracker from the command line. Exit 0 ok · 1 the server refused · 2 usage.
 
 import { parseArgs } from "node:util";
-import { ApiError, ConfigError, load_config, save_config, UsageError } from "./src/api.ts";
+import {
+  ApiError,
+  check_key,
+  ConfigError,
+  load_config,
+  saved_url,
+  save_config,
+  UsageError,
+} from "./src/api.ts";
 import * as verbs from "./src/verbs.ts";
 
 const HELP = `usage: tm <verb> [options]
@@ -110,11 +118,12 @@ async function read_secret(prompt: string): Promise<string> {
 }
 
 async function login(url: string | undefined): Promise<string> {
-  const key = await read_secret("Paste your API key: ");
-  if (!key) throw new UsageError("no key was pasted");
+  const pasted = await read_secret("Paste your API key: ");
+  if (!pasted) throw new UsageError("no key was pasted");
+  const key = check_key(pasted, "the paste");
   const previous = (() => {
     try {
-      return load_config().url;
+      return saved_url();
     } catch {
       return "";
     }

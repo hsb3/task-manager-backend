@@ -443,6 +443,18 @@ const idp = Bun.serve({
 const idp_url = `http://127.0.0.1:${idp.port}`;
 
 const link_room = new Room(8099 + PORT_OFFSET, null, true);
+// The battery points every suite at one shared hooks dir; the scratch hook below needs a private copy.
+link_room.hooks_dir = path.join(link_room.tmp, "pb_hooks_private");
+fs.cpSync(path.join(REPO_ROOT, "pb_hooks"), link_room.hooks_dir, { recursive: true });
+// Scratch hook: the verified save of a "refuse." account is refused with a status, as a rule hook of the app could.
+fs.writeFileSync(
+  path.join(link_room.hooks_dir, "zz_probe_refuse.pb.js"),
+  `onRecordUpdate((e) => {
+  if (e.record.email().startsWith("refuse.") && e.record.getBool("verified")) throw new BadRequestError("Probe refusal.");
+  e.next();
+}, "users");
+`,
+);
 try {
   await link_room.start();
   let s: number;
@@ -483,6 +495,16 @@ try {
     su_token,
   );
   check("fake OpenID provider configured", s, 200);
+
+  // The sign-ins here outrun the auth rate limit; this room's limiter is not under test.
+  [s] = await api(
+    link_room.base_url,
+    "PATCH",
+    "/api/settings",
+    { rateLimits: { enabled: false } },
+    su_token,
+  );
+  check("rate limits off (linking room)", s, 200);
 
   const oauth_login = (
     email: string,
@@ -645,6 +667,50 @@ try {
       con.close();
     }
   }
+
+  // A database failure saving the verified flag answers 500 with the shared body, never PB's generic 400.
+  // Mixed case: the stored email is folded, so core's own verified save is skipped and the hook's is the one that runs.
+  const dbfail_mail = "DbFail.Signup@Example.com";
+  const con = sqlite_connect(path.join(link_room.data_dir, "data.db"), { timeout: 15 });
+  let body: any;
+  try {
+    con.run(
+      "CREATE TRIGGER zz_probe_update BEFORE UPDATE OF verified ON users WHEN NEW.verified = 1 BEGIN SELECT RAISE(ABORT, 'probe db failure'); END",
+    );
+    [s, body] = await oauth_login(dbfail_mail, "fake-subject-dbfail");
+  } finally {
+    con.run("DROP TRIGGER IF EXISTS zz_probe_update");
+    con.close();
+  }
+  check("first OAuth sign-in, verified-flag save fails at the database → 500", s, 500);
+  check(
+    "…the shared error body with a behaviour message",
+    [body.status, body.message, typeof body.data],
+    [500, "The sign-in could not be completed.", "object"],
+  );
+  let logged = false;
+  for (let i = 0; i < 20 && !logged; i++) {
+    const [, l] = await api(
+      link_room.base_url,
+      "GET",
+      "/api/logs?perPage=200&filter=level%20%3E%3D%208",
+      null,
+      su_token,
+    );
+    logged = (l.items ?? []).some((x: any) =>
+      String(x.message).includes("oauth verified save failed"),
+    );
+    if (!logged) await new Promise((r) => setTimeout(r, 500));
+  }
+  check("…and the failure is logged", logged, true);
+
+  // A refusal from the verified save keeps its own status and message, even though e.next() also refused.
+  [s, body] = await oauth_login("Refuse.Signup@Example.com", "fake-subject-refuse");
+  check(
+    "first OAuth sign-in, verified save refused with a status → its own 400",
+    [s, body.message],
+    [400, "Probe refusal."],
+  );
 } finally {
   await link_room.stop();
   link_room.cleanup_tmp();
