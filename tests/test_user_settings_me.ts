@@ -328,16 +328,12 @@ try {
   }
   [s, r] = await api("POST", "/api/collections/users/records", null, {
     email: "blank@example.com",
-    password: "test123456",
-    passwordConfirm: "test123456",
     name: "  ",
   });
   check("signup with name='  ' → 400 naming name", [s, Boolean(r?.data?.name)], [400, true]);
   check("users.name unchanged by the blank refusals", await userName(alice_id), nameBefore);
   [s, r] = await api("POST", "/api/collections/users/records", null, {
     email: "noname@example.com",
-    password: "test123456",
-    passwordConfirm: "test123456",
     name: "",
   });
   check("signup with name='' → 200 (an account may have no name)", [s, r?.name], [200, ""]);

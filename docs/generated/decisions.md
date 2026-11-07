@@ -504,6 +504,21 @@ This supersedes decision:github-oauth-verified-email-linking, which covered GitH
 - **An unverified account.** When the account a sign-in reaches is still unverified, as when someone else signed up at that address first, PocketBase's own pre-registration guard runs before it is verified: its password is reset to a random value and its links to other provider accounts are removed, so whoever created it keeps no way in. The reset, the verified flag and the new link are saved together or not at all, and a database failure answers 500 and leaves nothing half done, so the next sign-in starts clean. An account a sign-in creates is saved verified only when its email is the address the provider verified.
 - **Accepted risk.** Google reports an address as verified for any domain whose mailbox it confirmed, Gmail or not, and that verdict outlives a custom domain changing hands, so a provider account on a lapsed domain could link to an existing password account holding the same address. GitHub carries the same class of risk; neither is mitigated here.
 
+## password-signup-verify-first
+
+- **Slug:** `decision:password-signup-verify-first`
+- **Title:** A password signup takes no password: the signup mail links to choosing one, and choosing it verifies the account.
+- **Ref:** `users`
+
+Supersedes decision:verified-login and the verification-mail parts of decision:signup-mail-off-request. Owner verdict 2026-11-06 (kata zhdh), after a probe showed that a stranger could sign up at someone else's address with a password they knew, and that the password still signed in once the real owner confirmed the verification mail and an administrator approved the account (kata fr92).
+
+- **No password at signup.** A public `POST /api/collections/users/records` takes the email and the display fields only. A body that carries `password` or `passwordConfirm` answers 400 with the error on `password` (code `validation_signup_password`) instead of dropping it, because a client whose password was silently dropped would believe it can sign in. The server gives the account a random password nobody knows, so no password exists on it before the mailbox owner acts. A superuser create keeps what it submits (seeding, import). A provider signup always gets a random password, whatever its createData carries, because createData can name a password and an address the provider never proved; the provider still decides whether the account is verified (decision:oauth-providers-from-env).
+- **The signup mail sets the password.** The mail sent on signup (decision:signup-mail-off-request) is a welcome mail whose link opens the PocketBase set-password page (`/_/#/auth/confirm-password-reset/{TOKEN}`). `POST /api/collections/users/confirm-password-reset` sets the password and marks the account verified, because only the mailbox owner holds the token, and the token works once. The link works for the PocketBase password reset lifetime, 30 minutes, and the mail states the lifetime configured on the collection; `POST /api/collections/users/request-password-reset` sends a fresh one, and while the account is unverified that mail reads as finishing signup rather than as a reset.
+- **Every way of verifying drops an earlier password.** confirm-password-reset verifies by setting the password the mailbox owner chooses. `POST /api/collections/users/confirm-verification` and a superuser setting `verified` through the records API also verify, and both replace a password the account held before it was verified with a random one, unless that superuser request sets a password itself; PocketBase does the same on confirm-verification when password sign-in is off, and one-time-password and provider sign-in already do so. This closes the hole for accounts that signed up with a password before this change: once verified, their owner chooses a password through request-password-reset, the forgot-password flow.
+- **Unchanged.** The `users` auth rule still requires `verified` and `approved` (decision:signup-approval). An approved account that never verifies, which now means one whose owner never chose a password, is still deleted by the daily `unconfirmed-signup-purge` after 30 days, and signup keeps its rate limit (decision:rate-limits-batch-and-superuser-mfa).
+
+Prior art: Linear and Slack sign up email-first, where a link or code proves the mailbox before any credential exists. `tests/test_signup_verification.ts` proves it.
+
 ## project-items-membership-denormalised
 
 - **Slug:** `decision:project-items-membership-denormalised`
@@ -703,6 +718,8 @@ Accepted limits:
 
 See collection:users and decision:verified-login. `tests/test_signup_verification.ts` proves it.
 
+**Superseded in part:** the mail this route sends is the welcome mail that sets the password (decision:password-signup-verify-first), not a verification mail, so its resend is POST /api/collections/users/request-password-reset rather than request-verification. The loopback call, its secret, its bound and its failure handling are unchanged.
+
 ## soft-delete-trash
 
 - **Slug:** `decision:soft-delete-trash`
@@ -793,6 +810,8 @@ The signup hook in `pb_hooks/main.pb.js` creates the row with `theme` and `font`
 - **Ref:** `users`
 
 Anyone can sign up, so the `users` auth rule requires `verified`, alongside `approved` (decision:signup-approval): an unverified account cannot sign in. The verification email carries a token valid for 24 hours, and `POST /api/collections/users/confirm-verification` sets the flag. An approved account that never verifies is deleted: the daily `unconfirmed-signup-purge` cron in `pb_hooks/signup_purge.pb.js` removes approved, unverified accounts created more than 30 days ago, except the sole owner of a workspace with other members, which is skipped and logged (decision:account-delete-sole-owner), while an unapproved account is never swept. Superusers are not subject to the `users` auth rule.
+
+**Superseded:** decision:password-signup-verify-first replaces this record: a password signup verifies by choosing its password from the link in the signup mail, which works for 30 minutes, and confirm-verification still verifies but drops any password the account held before. The auth rule and the purge are unchanged.
 
 ## viewer-day-values
 

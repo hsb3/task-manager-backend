@@ -68,8 +68,6 @@ const throwaway = `appr-${token_hex(4)}@example.com`;
 console.log("\n── (a) SIGNUP with no `approved` in the body starts unapproved ──");
 [s, r] = await api("POST", "/api/collections/users/records", null, {
   email: throwaway,
-  password: "test123456",
-  passwordConfirm: "test123456",
   name: "Approval Throwaway",
 });
 check("anonymous signup", s, 200);
@@ -81,16 +79,12 @@ console.log("\n── (b)/(c) createRule blocks ANY `approved` key in the signup
 // isset is true for both approved:true and approved:false — presence alone blocks.
 [s] = await api("POST", "/api/collections/users/records", null, {
   email: `appr-${token_hex(4)}@example.com`,
-  password: "test123456",
-  passwordConfirm: "test123456",
   name: "Sneaky True",
   approved: true,
 });
 check("signup with approved:true", s, 400);
 [s] = await api("POST", "/api/collections/users/records", null, {
   email: `appr-${token_hex(4)}@example.com`,
-  password: "test123456",
-  passwordConfirm: "test123456",
   name: "Sneaky False",
   approved: false,
 });
@@ -98,8 +92,13 @@ check("signup with approved:false", s, 400);
 
 // COVERS: rule:users.auth
 console.log("\n── (d) LOGIN still 403s with verified=true but approved=false ──");
-[s] = await api("PATCH", `/api/collections/users/records/${tmp_id}`, su, { verified: true });
-check("superuser flips verified only", s, 200);
+// A signup carries no password (decision:password-signup-verify-first); the superuser sets one with the flag.
+[s] = await api("PATCH", `/api/collections/users/records/${tmp_id}`, su, {
+  verified: true,
+  password: "test123456",
+  passwordConfirm: "test123456",
+});
+check("superuser flips verified only (and sets the password)", s, 200);
 [s] = await api("POST", "/api/collections/users/auth-with-password", null, {
   identity: throwaway,
   password: "test123456",

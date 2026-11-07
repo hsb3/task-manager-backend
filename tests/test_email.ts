@@ -179,21 +179,30 @@ console.log("\n── SIGNUP a throwaway user (starts unverified) ──");
 const throwaway = `tw-${randomBytes(4).toString("hex")}@example.com`;
 [s, r] = await api("POST", "/api/collections/users/records", null, {
   email: throwaway,
-  password: "test123456",
-  passwordConfirm: "test123456",
   name: "Throwaway",
 });
 check("signup", s, 200);
 check("new account verified flag", r.verified, false);
 const tw_id = r.id;
-// The signup sends its own verification mail before answering, so it is already captured here.
-const signup_eml = await newest_eml_after(baseline);
+// The signup sends its own set-password mail before answering, so it is already captured here.
+const signup_content = decode_eml(await newest_eml_after(baseline));
 check(
-  "signup sent the branded verification mail",
-  extract_subject(decode_eml(signup_eml)),
-  "Confirm your Task Tracker account",
+  "signup sent the branded welcome mail",
+  extract_subject(signup_content),
+  "Finish creating your Task Tracker account",
+);
+check(
+  "its link points at PocketBase's own set-password page",
+  signup_content.includes(`${APP_URL}/_/#/auth/confirm-password-reset/`),
+  true,
 );
 baseline = count_eml();
+// A signup carries no password (decision:password-signup-verify-first); the superuser plants one so login is judged by the authRule alone.
+[s] = await api("PATCH", `/api/collections/users/records/${tw_id}`, su, {
+  password: "test123456",
+  passwordConfirm: "test123456",
+});
+check("superuser sets a password on the unverified account", s, 200);
 
 console.log("\n── AUTH before verify (authRule: verified = true) ──");
 [s] = await api("POST", "/api/collections/users/auth-with-password", null, {
@@ -245,12 +254,12 @@ check("confirm-verification", s, 204);
 [s] = await api("PATCH", `/api/collections/users/records/${tw_id}`, su, { approved: true });
 check("superuser approves throwaway (#30 gate)", s, 200);
 
-console.log("\n── AUTH after verify + approval (403-before / 200-after) ──");
+console.log("\n── AUTH after verify + approval: a password set before verifying is gone ──");
 [s, r] = await api("POST", "/api/collections/users/auth-with-password", null, {
   identity: throwaway,
   password: "test123456",
 });
-check("verified login", s, 200);
+check("the pre-verification password no longer signs in", s, 400);
 
 console.log("\n── request-otp (200 + otpId; PocketBase sends the branded email) ──");
 [s, r] = await api("POST", "/api/collections/users/request-otp", null, { email: throwaway });
@@ -322,7 +331,7 @@ console.log("\n── old password now fails, new password succeeds ──");
   identity: throwaway,
   password: "test123456",
 });
-check("old password rejected after reset", s, 400);
+check("pre-verification password still rejected after reset", s, 400);
 [s] = await api("POST", "/api/collections/users/auth-with-password", null, {
   identity: throwaway,
   password: "newpass456789",

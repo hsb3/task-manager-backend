@@ -69,9 +69,10 @@ onBootstrap((e) => {
     );
 });
 
-// ── Request hook: a public signup sends its own verification email ───────────
+// ── Request hook: a public signup sends its own set-password email ───────────
 // Seeding/import (superuser) sends nothing. decision:signup-mail-off-request: the send runs in a
 // loopback request that answers at once, because a JSVM hook cannot send in the background.
+// decision:password-signup-verify-first: the mail is core's password reset, whose confirm verifies the account.
 onRecordCreateRequest((e) => {
   const send = !e.hasSuperuserAuth();
   e.next();
@@ -111,7 +112,7 @@ onRecordCreateRequest((e) => {
     failure = String(err);
   }
   if (failure) {
-    // The user is already committed; request-verification remains the retry path.
+    // The user is already committed; request-password-reset remains the retry path.
     e.app
       .logger()
       .error(
@@ -153,7 +154,7 @@ require(`${__hooks}/lib/routes.js`).add(
     }
     if (!user || user.verified()) return;
     try {
-      $mails.sendRecordVerification(e.app, user);
+      $mails.sendRecordPasswordReset(e.app, user);
     } catch (err) {
       e.app
         .logger()
@@ -167,3 +168,22 @@ require(`${__hooks}/lib/routes.js`).add(
     }
   },
 );
+
+// Unverified means its mailbox owner has chosen no password yet, so the reset mail reads as finishing signup (decision:password-signup-verify-first).
+onMailerRecordPasswordResetSend((e) => {
+  if (!e.record.verified()) {
+    const link = `${e.app.settings().meta.appURL}/_/#/auth/confirm-password-reset/${e.meta.token}`;
+    const minutes = Math.round(
+      e.record.collection().passwordResetToken.duration / 60,
+    );
+    e.message.subject = "Finish creating your Task Tracker account";
+    e.message.html =
+      "<p>Hello,</p>\n" +
+      "<p>Welcome to Task Tracker! Click the button below to choose your password. Choosing it confirms your email address and finishes creating your account.</p>\n" +
+      `<p>\n  <a class="btn" href="${link}" target="_blank" rel="noopener">Choose my password</a>\n</p>\n` +
+      `<p>The link works for ${minutes} minutes. If it has expired, request a password reset for this address to get a fresh one.</p>\n` +
+      "<p><i>If you didn't create a Task Tracker account, you can safely ignore this email.</i></p>\n" +
+      "<p>\n  Thanks,<br/>\n  The Task Tracker team\n</p>";
+  }
+  e.next();
+}, "users");

@@ -58,7 +58,8 @@ client IP is the leftmost `X-Forwarded-For` entry.
   realtime subscribe `POST /api/realtime`, for signed-in and anonymous callers alike.
 - **Some routes are tighter**, per the settings migration's rate-limit rules: sign-in
   (`auth-with-password`, users and superusers) allows 10 per window, and signup
-  (`POST /api/collections/users/records`) and `request-otp` allow 5. Sign in once and reuse the token.
+  (`POST /api/collections/users/records`, which takes no password: the signup mail links to
+  choosing one) and `request-otp` allow 5. Sign in once and reuse the token.
 - **A 429 carries no `Retry-After` or `X-RateLimit-*` header.** Its body is
   `{"data": {}, "message": "Too Many Requests.", "status": 429}`. Wait for the window to
   pass (up to 60 s) and retry. `seed.ts` does this itself.

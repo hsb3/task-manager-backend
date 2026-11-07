@@ -43,7 +43,8 @@ const SERVER_FIELD_NOTE: Record<string, string> = {
   email: "Sign-in email address of the account.",
   emailVisibility: "Whether other users can see the email of this account.",
   verified: "Whether the email address has been confirmed; set by the server.",
-  password: "Account password; write-only.",
+  password:
+    "Account password; write-only. A public signup may not send it: the signup mail links to choosing one.",
   tokenKey: "Server-kept token secret.",
 };
 
@@ -474,7 +475,7 @@ function auth_paths(): any {
     },
     [`${base}/confirm-password-reset`]: {
       post: post(
-        "Confirm a password reset with a token + new password.",
+        "Confirm a password reset with a token + new password; this also marks an unverified account verified, which is how a signup chooses its first password.",
         {
           token: { type: "string" },
           password: { type: "string" },

@@ -89,13 +89,17 @@ const throwaway = `tmp-${randomBytes(4).toString("hex")}@example.com`;
 console.log('\n── SIGNUP is open (createRule ""), but accounts start unverified ──');
 [s, r] = await api("POST", "/api/collections/users/records", null, {
   email: throwaway,
-  password: "test123456",
-  passwordConfirm: "test123456",
   name: "Throwaway",
 });
 check("anonymous signup", s, 200);
 check("new account verified flag", r.verified, false);
 const tmp_id = getitem(r, "id");
+// A signup carries no password (decision:password-signup-verify-first); the superuser sets one so login is judged by the authRule alone.
+[s] = await api("PATCH", `/api/collections/users/records/${tmp_id}`, su, {
+  password: "test123456",
+  passwordConfirm: "test123456",
+});
+check("superuser sets the throwaway's password", s, 200);
 
 // COVERS: rule:users.auth
 console.log("\n── LOGIN requires verified = true AND approved = true (authRule, #30) ──");
@@ -104,7 +108,12 @@ console.log("\n── LOGIN requires verified = true AND approved = true (authRu
   password: "test123456",
 });
 check("unverified login", s, 403);
-[s] = await api("PATCH", `/api/collections/users/records/${tmp_id}`, su, { verified: true });
+// Marking an account verified drops a password set before it unless the same request sets one (decision:password-signup-verify-first).
+[s] = await api("PATCH", `/api/collections/users/records/${tmp_id}`, su, {
+  verified: true,
+  password: "test123456",
+  passwordConfirm: "test123456",
+});
 check("superuser flips verified", s, 200);
 // verified alone isn't enough post-#30 — approved=true is also required (superuser-only).
 [s] = await api("PATCH", `/api/collections/users/records/${tmp_id}`, su, { approved: true });
