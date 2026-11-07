@@ -4,7 +4,7 @@
  * `workspace_members`, the permission matrix enforced across every
  * workspace-scoped collection, and its lifecycle hooks (unassign-on-leave,
  * account-delete guard, last-workspace auto-provision). Status-code idiom
- * per CLAUDE.md.
+ * per .agents/rules/pocketbase.md.
  *
  * Fixtures: owner=Alice, member=Bob (his seeded membership row is
  * role="member"/status="active" — both are required fields). admin=Carol,

@@ -8,7 +8,7 @@
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy (the cycle hooks
  * under test live there), scripts/seed.ts fixtures. Port 8117 + PB_PORT_OFFSET (suite
- * self-boot band per CLAUDE.md).
+ * self-boot band per .agents/rules/ports.md).
  */
 
 import fs from "node:fs";

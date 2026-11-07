@@ -390,7 +390,7 @@ decoration, so the gate asserts what is enforceable today and the harder goal st
 work. Read that command's own exit status: chaining anything after a gate reports the last
 command's status instead, which is how a red gate gets announced as green.
 
-**Here:** `make dod` runs only the gates the touched paths require; `AGENTS.md`'s gate law forbids reading a gate's result through a pipe.
+**Here:** the repo runs `make check` whole instead of a path-scoped subset: one entry point, every gate, so no scope list can be misremembered; `AGENTS.md`'s gate law forbids reading a gate's result through a pipe.
 
 ### A proof counts only after it has been seen fail
 

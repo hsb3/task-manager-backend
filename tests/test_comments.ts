@@ -10,7 +10,7 @@
  * foreign tenant's thread and the cascade delete it would arm (TASK-079).
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, scripts/seed.ts fixtures.
- * Port 8102 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md).
+ * Port 8102 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md).
  */
 
 import fs from "node:fs";

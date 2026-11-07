@@ -24,7 +24,7 @@
  *   §10 a refused create burns no number: the counter is claimed after the insert commits,
  *      and concurrent accepted creates still take distinct, contiguous numbers.
  *
- * Port: 8099 + PB_PORT_OFFSET (per CLAUDE.md's port bands).
+ * Port: 8099 + PB_PORT_OFFSET (per .agents/rules/ports.md).
  */
 
 import fs from "node:fs";

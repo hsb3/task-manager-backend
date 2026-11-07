@@ -13,7 +13,7 @@
  *      on the next save (mwf4)
  *
  * Mints its own users; scripts/seed.ts runs nowhere. Self-contained clean room.
- * Port 8123 + PB_PORT_OFFSET — the suite self-boot band (CLAUDE.md).
+ * Port 8123 + PB_PORT_OFFSET — the suite self-boot band (.agents/rules/ports.md).
  */
 
 import fs from "node:fs";

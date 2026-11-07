@@ -16,7 +16,7 @@
  * Absence, not correctness: each probe is the minimum that flips when the file is gone; the
  * behaviour itself is proven by that file's own suite.
  *
- * Port 8124 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md).
+ * Port 8124 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md).
  */
 
 import fs from "node:fs";

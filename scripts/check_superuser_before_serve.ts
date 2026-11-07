@@ -4,7 +4,7 @@
  *
  * A `pocketbase serve` against a --dir with no superuser yet is PocketBase's "first
  * run" — it launches the installer link in the machine's default browser (see
- * CLAUDE.md's clean-room law: upsert BEFORE serve). Textual line order is not a
+ * AGENTS.md's clean-room law: upsert BEFORE serve). Textual line order is not a
  * proxy for this — a helper function's body sits above its call site — so this
  * walks module (and locally-resolvable function/method) bodies in DOCUMENT-ORDER-OF-
  * EXECUTION, inlining a call to a same-module function/method at its call site,
@@ -296,7 +296,7 @@ options:
       errors.push(
         `${stem}: serve at line(s) ${violations.join(", ")} ` +
           `runs with no superuser upsert earlier in execution order — ` +
-          `move the upsert ahead of serve (see CLAUDE.md clean-room law)`,
+          `move the upsert ahead of serve (see AGENTS.md clean-room law)`,
       );
       rows.push([stem, "❌ SERVE-BEFORE-UPSERT"]);
     } else {

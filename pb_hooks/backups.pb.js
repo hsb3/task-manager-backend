@@ -9,7 +9,7 @@
 //
 // Why the hook and not a settings migration (which CAN persist backups.s3 — it is
 // normal settings, not the provider-stripped class): a migration is git, and the
-// S3 secret must never touch git (CLAUDE.md). The boot hook reads the secret from
+// S3 secret must never touch git (AGENTS.md). The boot hook reads the secret from
 // a Railway variable at every boot, so it also re-applies a ROTATED key on the next
 // deploy — a one-shot migration would bake the first-apply value.
 //

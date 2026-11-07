@@ -38,5 +38,5 @@ if verdict=$(printf '%s' "$input" | (cd "$root" && bun scripts/check_historical_
   exit 0
 fi
 
-echo "${verdict:-Blocked: $rel exists on $ref and scripts/check_historical_migrations.ts did not run — historical migrations are never edited (CLAUDE.md migration law).}" >&2
+echo "${verdict:-Blocked: $rel exists on $ref and scripts/check_historical_migrations.ts did not run — historical migrations are never edited (AGENTS.md migration law).}" >&2
 exit 2

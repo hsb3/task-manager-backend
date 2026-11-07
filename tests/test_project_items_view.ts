@@ -34,7 +34,7 @@
  * collection read-only.
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, scripts/seed.ts
- * fixtures. Port 8116 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md); 8100-8115
+ * fixtures. Port 8116 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md); 8100-8115
  * and 8121 are already claimed by other suites.
  */
 

@@ -7,7 +7,7 @@
  * behaves as before. Realtime and expand (which never name one) are pinned unchanged.
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, scripts/seed.ts
- * fixtures. Port 8165 + PB_PORT_OFFSET (suite self-boot band per CLAUDE.md).
+ * fixtures. Port 8165 + PB_PORT_OFFSET (suite self-boot band per .agents/rules/ports.md).
  */
 
 import fs from "node:fs";

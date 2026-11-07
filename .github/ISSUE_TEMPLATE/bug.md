@@ -25,6 +25,6 @@ after; the bad output no longer occurs).
 
 ## Dependencies & gates
 
-Which repo gates fire for this fix (see `CLAUDE.md` Commands + CI); anything this blocks on.
+Which repo gates fire for this fix (see `AGENTS.md` Commands + CI); anything this blocks on.
 
 -

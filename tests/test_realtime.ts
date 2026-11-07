@@ -35,7 +35,7 @@ socket, since a soft-trash DELETE is the one broadcast that never rides this fil
 Presence is deliberately NOT covered — it is out of scope for v1 (parked DRAFT-015).
 
 Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, scripts/seed.ts fixtures.
-Port 8107 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md).
+Port 8107 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md).
 */
 
 import fs from "node:fs";

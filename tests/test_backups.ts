@@ -10,8 +10,8 @@
  * Not provable here (needs a real S3 endpoint / live restart): a backup landing in
  * a bucket, the scheduled cron backup, and the point-in-time restore drill.
  *
- * Ports: 8095 (SET) then 8098 (UNSET) + PB_PORT_OFFSET, sequentially — see CLAUDE.md
- * port bands.
+ * Ports: 8095 (SET) then 8098 (UNSET) + PB_PORT_OFFSET, sequentially — see the port bands in
+ * .agents/rules/ports.md.
  */
 
 import fs from "node:fs";

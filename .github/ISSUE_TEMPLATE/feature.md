@@ -29,7 +29,7 @@ passes", "the gate fails on drift") — not "works well".
 
 ## Dependencies & gates
 
-What this blocks on, and which repo gates fire for this change surface (see `CLAUDE.md` Commands + CI).
+What this blocks on, and which repo gates fire for this change surface (see `AGENTS.md` Commands + CI).
 Be explicit about gates that do NOT fire.
 
 -

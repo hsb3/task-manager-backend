@@ -7,7 +7,7 @@ updated: 2026-11-05
 
 # Shared constants (mirror-site registry)
 
-Pooled JSVM forbids shared modules (see CLAUDE.md), so every constant list below is
+Pooled JSVM forbids shared modules (see `.agents/rules/pocketbase.md`), so every constant list below is
 INLINED at each mirror site listed. `scripts/check_constants.ts` parses each site's own
 literal (values, order, and declared subsets — not substring presence) and
 fails on drift; it also parses THIS file's `Values:` lines and cross-checks them

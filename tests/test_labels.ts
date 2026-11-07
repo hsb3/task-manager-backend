@@ -8,7 +8,7 @@
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy (label/status hooks under
  * test live there), scripts/seed.ts fixtures. Port 8100 + PB_PORT_OFFSET (suite self-boot
- * band per CLAUDE.md).
+ * band per .agents/rules/ports.md).
  */
 
 import fs from "node:fs";
