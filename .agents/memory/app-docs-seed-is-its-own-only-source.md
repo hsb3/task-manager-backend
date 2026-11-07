@@ -29,4 +29,4 @@ and template or escaping drift. It cannot catch a value edit, and its docstring 
 prose protection needs a source outside the file (a pinned span registry with its own committed
 copy, or review of the diff), not another replay.
 
-Related: [[app-docs-quotes-apostrophe-tokenizer]], [[proofs-must-be-falsifiable]].
+Related: the proof rule in `.agents/rules/pocketbase.md`.

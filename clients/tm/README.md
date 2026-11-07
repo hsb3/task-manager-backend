@@ -18,7 +18,7 @@ To call it as plain `tm`, link it onto your PATH once, for example
 `ln -s "$PWD/clients/tm/tm.ts" ~/.local/bin/tm`.
 
 The key is saved to a file only you can read, and the command prints where. To skip the file,
-set `TM_URL` and `TM_API_KEY` in the environment instead; they win over the saved login.
+set `TM_URL` and `TM_API_KEY` in the environment instead; they win over the saved login. `TM_API_KEY` holds an API key (`tmk_...`), not a login token; any other value is refused.
 
 ## Use it
 

@@ -79,7 +79,7 @@ are independent of each other):
 ## When a pocketbase deploy fails
 
 A refused boot migration takes pocketbase down until a good build is deployed; the old
-container is already stopped (`.agents/context/deploy.md`, the teardown line). The owner
+container is already stopped (`.agents/rules/deploy.md`, the teardown line). The owner
 accepts that outage; the response is an alert and this manual recovery. Measured in throwaway
 environments unless marked. Why nothing catches it earlier (Railway mounts no volume at pre-deploy time,
 and the start guard replays against the volume itself because a refused run records no migration and

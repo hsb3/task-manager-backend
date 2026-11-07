@@ -361,7 +361,9 @@ mirror site and the gate parses each site's own literal, so a copy that drifts i
 **Here:** `AGENTS.md`'s migration and schema laws route every correction to its single
 path and require the coupled regenerations in the same change; `scripts/check_app_docs_quotes.ts`
 gates quoted rule text; `docs/constants.md` registers every mirror site of every duplicated
-constant with the subsets each site legitimately holds.
+constant with the subsets each site legitimately holds. `scripts/gen_openapi.ts` writes
+byte-stable output (sorted keys, no timestamps), so rerunning it before and after a schema
+refactor must give byte-identical output, which proves the refactor changed nothing.
 
 **Rules out:** two true-looking copies of one fact, and a hand edit to a generated file.
 
@@ -400,8 +402,8 @@ structurally cannot exercise. Where a capability genuinely cannot be reached by 
 deterministic test, record a dated disposition naming how it is verified instead of an
 open task that implies future coverage.
 
-**Here:** `.agents/memory/proofs-must-be-falsifiable.md` records four consecutive waves of
-green proofs of untrue things.
+**Here:** the test-suite house style in `.agents/rules/pocketbase.md` carries this repo's
+version, written after consecutive waves shipped green proofs of untrue things.
 
 ### Invariants belong in the gate
 

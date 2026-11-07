@@ -8,7 +8,7 @@ Detail law lives next door; none of it auto-loads for every agent — read the f
 
 - `.agents/rules/pocketbase.md` — this repo's PB gotchas + test-suite house style (pb_hooks/, pb_migrations/, API rules, tests/)
 - `.agents/rules/ports.md` — port bands, `PB_PORT_OFFSET`, legacy-suite solo recipe (anything that binds a port)
-- `.agents/context/deploy.md` — Railway topology (session-owned)
+- `.agents/rules/deploy.md` — Railway topology + deploy traps beyond `deploy/README.md` (deploy/, workflows)
 - `.agents/memory/MEMORY.md` — project memory index (owner rulings, burns, gotchas); one line per fact file, follow the link before relying on it
 
 Shared agent material lives in `.agents/`; native paths link to it (`.agents/README.md`).
