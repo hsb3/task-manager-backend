@@ -11,7 +11,7 @@
  * which the rules DERIVE from `workspace.trashed` rather than stamping anything per item.
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, fixtures built by name.
- * Port 8119 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md).
+ * Port 8119 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md).
  */
 
 import fs from "node:fs";

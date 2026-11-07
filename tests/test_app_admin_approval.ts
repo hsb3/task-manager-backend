@@ -8,7 +8,7 @@
  *
  * Self-contained clean-room server (--hooksDir from a pb_hooks copy; the routes under test live
  * there), APP_ADMIN_EMAILS injected into the server process, scripts/seed.ts
- * fixtures. Port 8109 + PB_PORT_OFFSET — 8100+ suite self-boot band (CLAUDE.md),
+ * fixtures. Port 8109 + PB_PORT_OFFSET — 8100+ suite self-boot band (.agents/rules/ports.md),
  * distinct from the ports claimed by test_labels/test_statuses/test_comments/test_search/
  * test_productivity_flow/test_user_settings_font/test_vocab_upsert/test_realtime/
  * test_signup.

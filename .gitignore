@@ -1,32 +1,28 @@
-# secrets & local config — at any depth. The *.example siblings stay tracked.
+# Secrets and machine-local config (may carry tokens or per-machine URLs); the *.example templates stay tracked.
 .env*
 !.env*.example
+.kata.local.toml
+.opencode/opencode.json
+.claude/operations/
+.claude/agent-memory/
 
-# owner's scratchpad, never committed
+# The owner's personal notes, never committed.
 NOTES.md
 
-# PocketBase binary + data (rebuild from pb_migrations/ + scripts/seed.ts, don't inherit a DB)
+# PocketBase binary, local data and logs: rebuilt from pb_migrations/ and scripts/seed.ts; a .zip may be a whole-database backup.
 /pocketbase
 pb_data/
 pb.log
 *.zip
 
-# bun install (prettier, typescript, the Railway IaC SDK; clients/tm/ is a workspace with its own)
+# Installed and downloaded artifacts: bun install (clients/tm/ is a workspace with its own), CI's battery shard manifests.
 node_modules/
-
-# harness / editor noise
-logs/
-.DS_Store
 battery-manifests/
 
-# secrets & live-op files (repo-local, never tracked)
-.claude/operations/
-
-# machine-local opencode config (may carry MCP tokens; opencode can't read env from settings.local.json)
-.opencode/opencode.json
-
-# machine-local agent scratch (foreman-kit reviewer memory etc.)
-.claude/agent-memory/
+# Machine state: in-project linked worktrees (a machine without the owner's global git ignore still needs this), the atelier handoff mtime, Finder metadata.
+.worktrees/
+.agents/handoff.stamp
+.DS_Store
 
 # >>> cc-project-memory (managed) >>>
 # narrow-ignore: ignore only machine-local/transient; track everything else under .claude/
@@ -36,13 +32,3 @@ battery-manifests/
 .claude/*.lock
 .claude/**/.DS_Store
 # <<< cc-project-memory (managed) <<<
-
-# atelier handoff freshness signal. The handoff itself is the `handoff`-labelled kata card (project task-manager-backend); this file
-# carries no content, only an mtime, and machine-local mtime is not something to share.
-.agents/handoff.stamp
-
-# kata per-machine overrides (daemon URL etc.) — written by `kata init`, never committed
-.kata.local.toml
-
-# Per-checkout verification environment
-.venv/

@@ -15,7 +15,7 @@
  * shows nothing threw on the way (card 96a3).
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, scripts/seed.ts fixtures.
- * Port 8101 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md).
+ * Port 8101 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md).
  */
 
 import fs from "node:fs";

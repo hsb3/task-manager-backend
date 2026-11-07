@@ -7,7 +7,7 @@
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy. Port 8141 +
  * PB_PORT_OFFSET (suite
- * self-boot band per CLAUDE.md; 8100-8109 are all taken). The stub upstream binds an
+ * self-boot band per .agents/rules/ports.md; 8100-8109 are all taken). The stub upstream binds an
  * OS-assigned ephemeral port and the room is told about it through INSPIRE_UPSTREAM_URL, so
  * this suite makes no outbound call and can never collide with a band.
  */

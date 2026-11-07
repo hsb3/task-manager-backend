@@ -16,7 +16,7 @@
  *   §5 deleting a referenced status is BLOCKED (400); repointing then deleting
  *      succeeds (204).
  *
- * Port: 8094 + PB_PORT_OFFSET (per CLAUDE.md's port bands).
+ * Port: 8094 + PB_PORT_OFFSET (per .agents/rules/ports.md).
  */
 
 import fs from "node:fs";

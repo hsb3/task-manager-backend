@@ -161,7 +161,7 @@ class Room {
   async start(): Promise<void> {
     await roomkit.require_free_port(this.port);
     // upsert BEFORE serve: an empty --dir with no superuser makes serve launch
-    // the installer link in the machine's default browser (CLAUDE.md clean-room law).
+    // the installer link in the machine's default browser (AGENTS.md clean-room law).
     run_checked(
       [
         POCKETBASE_BIN,

@@ -908,7 +908,7 @@ export function die_no_server(pb_url: string, err: unknown): never {
   throw new SystemExit(
     `❌ NO SERVER AT ${pb_url} (${py_str(reason)}) — this suite does not ` +
       `boot its own room. Boot a clean room, seed it with scripts/seed.ts, and point ` +
-      `PB_URL at it (CLAUDE.md → 'Clean-room law').`,
+      `PB_URL at it (AGENTS.md → 'Clean-room law').`,
   );
 }
 

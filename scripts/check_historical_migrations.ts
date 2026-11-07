@@ -2,7 +2,7 @@
 /**
  * Historical-migration-edit guard, shared by the PreToolUse hook and the git pre-commit hook.
  *
- * CLAUDE.md migration law: a pb_migrations/ file already on origin/main is read-only — it
+ * AGENTS.md migration law: a pb_migrations/ file already on origin/main is read-only — it
  * already ran. The one exception is a comment fix, because a false comment is fixable where a
  * reader lands on it but a comment runs nothing, so it can never touch behaviour. This module
  * holds that comment-only predicate ONCE:
@@ -175,7 +175,7 @@ export function refusal_message(reason: string): string {
   return (
     `Blocked: ${reason}\n` +
     "A pb_migrations/ file already on the comparison ref is read-only: historical migrations " +
-    "are never edited, deleted or renamed (CLAUDE.md migration law). Write a NEW migration " +
+    "are never edited, deleted or renamed (AGENTS.md migration law). Write a NEW migration " +
     "instead; `make next-migration-slot` prints the next free timestamp.\n" +
     "Correcting a FALSE COMMENT is the one exception: use Edit (not Write) with only comment " +
     "lines on both sides. Wrong behaviour is never fixed here — it already ran; supersede it " +
@@ -197,7 +197,7 @@ export async function main(): Promise<number> {
     `${usage}
 
 Historical-migration-edit guard, shared by the PreToolUse hook and the git
-pre-commit hook. CLAUDE.md migration law: a pb_migrations/ file already on
+pre-commit hook. AGENTS.md migration law: a pb_migrations/ file already on
 origin/main is read-only — it already ran. The one exception is a comment fix,
 because a false comment is fixable where a reader lands on it but a comment
 runs nothing, so it can never touch behaviour. This module holds that comment-

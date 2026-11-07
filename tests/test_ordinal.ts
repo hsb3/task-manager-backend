@@ -30,7 +30,7 @@
  *       such a task under No priority)
  *   §15 a create carrying `move` is refused, plain and inside a batch, and nothing is created
  *
- * Port 8120 + PB_PORT_OFFSET — the suite self-boot band (CLAUDE.md); every other default in
+ * Port 8120 + PB_PORT_OFFSET — the suite self-boot band (.agents/rules/ports.md); every other default in
  * 8100-8122 is already a suite's.
  */
 

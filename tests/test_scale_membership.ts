@@ -47,7 +47,7 @@
  * mutant run can be reproduced bounded without editing this file.
  *
  * Fully self-contained clean-room server, real pb_hooks/ via roomkit. Port 8129 +
- * PB_PORT_OFFSET (suite self-boot band per CLAUDE.md).
+ * PB_PORT_OFFSET (suite self-boot band per .agents/rules/ports.md).
  */
 
 import fs from "node:fs";

@@ -13,7 +13,7 @@
  * roomkit.HOOK_LOAD_FAILURE matches, so roomkit.serve() refuses the room — the string was
  * previously verified against a hook that THREW at load, never one that failed to parse.
  *
- * Port 8145 + PB_PORT_OFFSET — the 8100+ suite self-boot band (CLAUDE.md).
+ * Port 8145 + PB_PORT_OFFSET — the 8100+ suite self-boot band (.agents/rules/ports.md).
  */
 
 import fs from "node:fs";
