@@ -16,6 +16,8 @@
  *
  * With an offset (--offset N, else PB_PORT_OFFSET in the environment) it also refuses any default (shell
  * `$((port + PB_PORT_OFFSET))` ones included) that offset would land on a local Postgres/Redis/MySQL/MongoDB port; without one it says nothing.
+ * An explicit nonzero --offset also refuses a default landing on a port something accepts a
+ * connection on right now; the environment alone never probes (check-static runs beside live rooms).
  *
  * Usage:
  *     bun scripts/check_port_collisions.ts [--repo DIR] [--ports-doc FILE] [--offset N]
@@ -37,6 +39,7 @@ import {
   truthy,
 } from "./_py.ts";
 import { parse_ts } from "./_ts_source.ts";
+import { port_is_free } from "../tests/roomkit.ts";
 
 const REPO = path.dirname(import.meta.dir);
 
@@ -214,6 +217,24 @@ export function offset_errors(decls: [string, number, number][], offset: number)
     );
 }
 
+/** Defaults an explicit offset would shift onto a port something is listening on right now. */
+export async function live_port_errors(
+  decls: [string, number, number][],
+  offset: number,
+): Promise<string[]> {
+  const ports = [...new Set(decls.map(([, , port]) => port + offset))];
+  const bound = new Set(
+    (await Promise.all(ports.map(async (p) => ((await port_is_free(p)) ? 0 : p)))).filter(Boolean),
+  );
+  return decls
+    .filter(([, , port]) => bound.has(port + offset))
+    .map(
+      ([rel, lineno, port]) =>
+        `${rel}:${lineno} default ${port} + offset ${offset} = ${port + offset}, ` +
+        "which something is listening on right now — pick another offset",
+    );
+}
+
 const SHELL_DEFAULT_RE = /\$\(\(\s*([0-9]{4,5})\s*\+\s*PB_PORT_OFFSET\b/g;
 
 /** (relpath, lineno, port) for each `$((<port> + PB_PORT_OFFSET))` in scripts/*.sh. */
@@ -331,10 +352,12 @@ options:
   --ports-doc PORTS_DOC
                         ports.md path (default: <repo>/.agents/rules/ports.md)
   --offset OFFSET       refuse defaults this offset lands on 5432/6379/3306/27017
-                        (default: PB_PORT_OFFSET from the environment, else none)
+                        (default: PB_PORT_OFFSET from the environment, else none);
+                        an explicit nonzero value also refuses a default landing
+                        on a port something is listening on right now
   --print-globs`;
 
-export function main(argv: string[] = process.argv.slice(2)): number {
+export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = parse_args(
     HELP.slice(0, HELP.indexOf("\n\n")),
     HELP + "\n",
@@ -366,11 +389,13 @@ export function main(argv: string[] = process.argv.slice(2)): number {
     return 2;
   }
   const decls = declarations(repo);
+  const all_decls = [...decls, ...shell_declarations(repo)];
   const errors = [
     ...duplicate_errors(decls),
     ...claim_errors(repo, decls),
     ...doc_errors(repo, ports_doc, decls),
-    ...offset_errors([...decls, ...shell_declarations(repo)], offset),
+    ...offset_errors(all_decls, offset),
+    ...(args.offset ? await live_port_errors(all_decls, offset) : []),
   ];
 
   if (errors.length) {
@@ -389,4 +414,4 @@ export function main(argv: string[] = process.argv.slice(2)): number {
   return 0;
 }
 
-if (import.meta.main) process.exit(main());
+if (import.meta.main) process.exit(await main());

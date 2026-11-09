@@ -12,12 +12,14 @@
  * scripts/ bind colliding with a suite, and a leading comment naming a port its own file never declares. §6
  * runs the real checker against the shipped tree.
  *
- * No server, no ports bound. A demonstrated RED carries the checker's refusal glyph, and the
+ * No server; §8c binds one ephemeral listener to prove the live-port refusal. A demonstrated RED carries the checker's refusal glyph, and the
  * battery reads a stray one as this suite failing — so every echoed line is quoted with that
  * glyph spelled out instead.
  */
 
 import fs from "node:fs";
+import { once } from "node:events";
+import net from "node:net";
 import path from "node:path";
 import { py_strip, splitlines } from "../scripts/_py.ts";
 
@@ -342,6 +344,30 @@ check(
     r8t.stdout.includes("PB_PORT_OFFSET") &&
     !(r8t.stdout + r8t.stderr).includes("    at "),
 );
+
+console.log(
+  "── 8c. an explicit --offset landing a default on a live listener → RED; env-only silent ──",
+);
+const [repo8c, doc8c] = make_repo("live-listener", { "tests/test_t.ts": suite(9037) }, "");
+const listener = net.createServer().listen(0, "127.0.0.1");
+await once(listener, "listening");
+const live_port = (listener.address() as net.AddressInfo).port;
+const live_offset = String(live_port - 9037);
+const live_args = ["--repo", repo8c, "--ports-doc", doc8c];
+const r8e = run_checker([...live_args, "--offset", live_offset]);
+echo(r8e.stdout);
+check(
+  "--offset onto a bound port exits 1 naming the port and the site",
+  r8e.returncode === 1 &&
+    r8e.stdout.includes(String(live_port)) &&
+    r8e.stdout.includes("tests/test_t.ts:3"),
+);
+const r8f = run_checker(live_args, undefined, live_offset);
+check("PB_PORT_OFFSET alone does not probe: GREEN", r8f.returncode === 0);
+listener.close();
+await once(listener, "close");
+const r8g = run_checker([...live_args, "--offset", live_offset]);
+check("the same --offset once the listener is closed is GREEN", r8g.returncode === 0);
 
 console.log("── 6. the shipped tree passes with no arguments ──");
 const r6 = run_checker([], REPO_ROOT);

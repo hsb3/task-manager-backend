@@ -47,7 +47,7 @@ PB_PORT_OFFSET="${PB_PORT_OFFSET:-0}"
 PB_PORT_OFFSET="$(bun -e 'const { py_int } = await import(process.argv[1]); process.stdout.write(String(py_int(process.argv[2])))' "$REPO_ROOT/scripts/_py.ts" "$PB_PORT_OFFSET")" \
   || { echo "❌ BATTERY FAILED: PB_PORT_OFFSET must be a decimal integer"; exit 1; }
 export PB_PORT_OFFSET                          # export: self-booting suites must inherit it
-bun "$REPO_ROOT/scripts/check_port_collisions.ts" >/dev/null || { bun "$REPO_ROOT/scripts/check_port_collisions.ts"; echo "❌ BATTERY FAILED: port plan refused (see above)"; exit 1; }
+bun "$REPO_ROOT/scripts/check_port_collisions.ts" --offset "$PB_PORT_OFFSET" >/dev/null || { bun "$REPO_ROOT/scripts/check_port_collisions.ts" --offset "$PB_PORT_OFFSET"; echo "❌ BATTERY FAILED: port plan refused (see above)"; exit 1; }
 LEGACY_PORT=$((8091 + PB_PORT_OFFSET))
 EMAIL_PORT=$((8092 + PB_PORT_OFFSET))
 HARD_PORT=$((8093 + PB_PORT_OFFSET))
@@ -60,16 +60,24 @@ export PB_SUPERUSER_PASSWORD="${PB_SUPERUSER_PASSWORD:-ci-battery-dummy-pw-000}"
 DUMMY_RESEND_KEY="dummy-ci-resend-key"   # non-empty so the boot hook runs; the sink ignores auth
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/pb-battery.XXXXXX")"
-ROOM_PIDS=()
-SINK_PIDS=()
 
-# ── Cleanup: kill every room/sink we started, drop the scratch tree ───────────
+stop_room() {
+  local pid="$1" i
+  [ -n "$pid" ] || return 0
+  kill "$pid" 2>/dev/null || true
+  # Grace for pocketbase's graceful shutdown, then SIGKILL: a TERM-ignoring child must not hang the wait.
+  for i in $(seq 100); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+  kill -9 "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+}
+
+# ── Cleanup: kill every room/sink still running, drop the scratch tree ───────────
 cleanup() {
   local pid
-  for pid in "${ROOM_PIDS[@]:-}" "${SINK_PIDS[@]:-}"; do
-    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  # jobs -p, not a list of every pid ever started: a reaped room's pid may now be a stranger's.
+  for pid in $(jobs -p); do
+    stop_room "$pid"
   done
-  wait 2>/dev/null || true
   if [ -n "${KEEP_SCRATCH:-}" ]; then
     echo "· scratch kept at $SCRATCH"
   else
@@ -302,7 +310,6 @@ start_room() {
   env "$@" "$PB_BIN" serve "--http=127.0.0.1:${port}" \
     --dir "$dir" --migrationsDir "$migdir" --hooksDir "$HOOKS_DIR" \
     >"$SCRATCH/pb-${port}.log" 2>&1 &
-  ROOM_PIDS+=("$!")
   ROOM_PID="$!"
   wait_health "$port" "$ROOM_PID"
   # AFTER health: a stranger can still have taken the port between the preflight and our
@@ -311,18 +318,11 @@ start_room() {
     || fail "room ${port} is not served by the process we launched (see the roomkit message above; log: $SCRATCH/pb-${port}.log)"
 }
 
-stop_room() {
-  local pid="$1"
-  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-}
-
 start_sink() {   # start_sink SINK_PORT MAIL_DIR
   local port="$1" maildir="$2"
   mkdir -p "$maildir"
   SINK_PORT="$port" MAIL_DIR="$maildir" bun "$REPO_ROOT/scripts/smtp_sink.ts" \
     >"$SCRATCH/sink-${port}.log" 2>&1 &
-  SINK_PIDS+=("$!")
   SINK_PID="$!"
   sleep 0.4
 }
@@ -424,7 +424,7 @@ run_suite "test_email" env \
   "MAIL_SINK_PORT=${EMAIL_SINK_PORT}" \
   "RESEND_API_KEY=${DUMMY_RESEND_KEY}" \
   bun tests/test_email.ts
-stop_room "$email_pid"; kill "$email_sink_pid" 2>/dev/null || true
+stop_room "$email_pid"; stop_room "$email_sink_pid"
 fi
 
 # ── hardening room — FULL (MFA-on) copy + scratch smtp->sink migration; boots WITHOUT RESEND_API_KEY so the boot hook no-ops ──
@@ -440,7 +440,7 @@ run_suite "test_hardening" env \
   "PB_MAILDIR=${hard_mail}" \
   "PB_SINK_PORT=${HARD_SINK_PORT}" \
   bun tests/test_hardening.ts
-stop_room "$hard_pid"; kill "$hard_sink_pid" 2>/dev/null || true
+stop_room "$hard_pid"; stop_room "$hard_sink_pid"
 fi
 
 # ── test_oauth — self-booting; strips GITHUB_ and GOOGLE_CLIENT_ID/SECRET so its "UNSET" room genuinely sees them absent ──
@@ -655,6 +655,7 @@ run_suite "test_roomkit_creds" bun tests/test_roomkit_creds.ts
 run_suite "test_make_targets" bun tests/test_make_targets.ts
 run_suite "test_verification_environment" bun tests/test_verification_environment.ts
 run_suite "test_battery_copy" bun tests/test_battery_copy.ts
+run_suite "test_battery_stop_room" bun tests/test_battery_stop_room.ts
 run_suite "test_pb_migrate" bun tests/test_pb_migrate.ts
 run_suite "test_tierkit" bun tests/test_tierkit.ts
 run_suite "test_script_help" bun tests/test_script_help.ts
