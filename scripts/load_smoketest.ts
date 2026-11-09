@@ -27,6 +27,7 @@ import {
   run_checked,
 } from "./_py.ts";
 import * as roomkit from "../tests/roomkit.ts";
+import { copy_tree } from "./_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(path.dirname(path.resolve(import.meta.path)));
 
@@ -196,7 +197,7 @@ class Server {
 
 /** Copy pb_migrations to dst, dropping the MFA migration (plain superuser auth). */
 function build_migrations_copy(dst: string): void {
-  fs.cpSync(REAL_MIGRATIONS_DIR, dst, { recursive: true, dereference: true });
+  copy_tree(REAL_MIGRATIONS_DIR, dst);
   for (const f of fs.readdirSync(dst)) {
     if (f.endsWith("superuser_mfa.js")) fs.rmSync(path.join(dst, f));
   }

@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { by_code_point, py_int, py_repr, read_text, py_strip } from "../scripts/_py.ts";
 import * as guards from "../scripts/check_rule_auth_guards.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 
@@ -388,7 +389,7 @@ check(
 const esc_scratch = fs.mkdtempSync(path.join(os.tmpdir(), "pbguard_esc_"));
 try {
   const esc_schema = path.join(esc_scratch, "schema");
-  fs.cpSync(guards.SCHEMA_DIR, esc_schema, { recursive: true });
+  copy_tree(guards.SCHEMA_DIR, esc_schema);
   const esc_path = path.join(esc_schema, "tasks.rules.json");
   for (const [label, rule] of [
     ["escaped", ESC_RULE],

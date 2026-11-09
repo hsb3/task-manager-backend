@@ -42,7 +42,7 @@ function copy_resolver(root: string): void {
   fs.mkdirSync(path.join(root, "scripts"), { recursive: true });
   fs.copyFileSync(path.join(ROOT, "Makefile"), path.join(root, "Makefile"));
   fs.copyFileSync(path.join(ROOT, "Dockerfile"), path.join(root, "Dockerfile"));
-  for (const name of ["pb_migrate.ts", "_py.ts", "_argparse.ts"]) {
+  for (const name of ["pb_migrate.ts", "_py.ts", "_argparse.ts", "_scratch_copy.ts"]) {
     fs.copyFileSync(path.join(ROOT, "scripts", name), path.join(root, "scripts", name));
   }
 }

@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import * as roomkit from "./roomkit.ts";
 import { run_checked } from "../scripts/_py.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const PORT = 8176 + roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0");
@@ -54,7 +55,7 @@ const S = fs.mkdtempSync(path.join(os.tmpdir(), "pb-delete-impact-test-"));
 const MIG = path.join(S, "pb_migrations");
 const DATA = path.join(S, "pb_data");
 fs.mkdirSync(DATA, { recursive: true });
-fs.cpSync(path.join(REPO_ROOT, "pb_migrations"), MIG, { recursive: true, dereference: true });
+copy_tree(path.join(REPO_ROOT, "pb_migrations"), MIG);
 for (const n of fs.readdirSync(MIG))
   if (n.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG, n));
 

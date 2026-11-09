@@ -20,6 +20,7 @@ import { parse_args } from "./_argparse.ts";
 import { by_code_point, json_dumps, read_text, sqlite_connect, py_get } from "./_py.ts";
 import { migrate_up, pb_bin_path } from "./pb_migrate.ts";
 import { VIEW_FIELD_HELP } from "./view_field_help.ts";
+import { copy_tree } from "./_scratch_copy.ts";
 
 const REPO = path.dirname(path.dirname(path.resolve(import.meta.path)));
 const PB = pb_bin_path(REPO);
@@ -74,7 +75,7 @@ export function fetch_replay(): Replay {
   let settings: any;
   try {
     const mig = path.join(tmp, "pb_migrations");
-    fs.cpSync(MIGRATIONS, mig, { recursive: true, dereference: true });
+    copy_tree(MIGRATIONS, mig);
     const data = path.join(tmp, "data");
     const [ok, out] = migrate_up(PB, data, mig);
     if (!ok) {

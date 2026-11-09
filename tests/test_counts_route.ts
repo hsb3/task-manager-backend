@@ -51,6 +51,7 @@ import {
   sqlite_connect,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const PB_BIN = roomkit.pb_bin();
@@ -306,7 +307,7 @@ const S = fs.mkdtempSync(path.join(os.tmpdir(), "pb-counts-route-test-"));
 const MIG_DIR = path.join(S, "pb_migrations");
 const DATA_DIR = path.join(S, "pb_data");
 fs.mkdirSync(DATA_DIR, { recursive: true });
-fs.cpSync(REAL_MIGRATIONS_DIR, MIG_DIR, { recursive: true, dereference: true });
+copy_tree(REAL_MIGRATIONS_DIR, MIG_DIR);
 for (const name of fs.readdirSync(MIG_DIR)) {
   if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_DIR, name));
 }
@@ -922,7 +923,7 @@ try {
   await roomkit.stop(server);
   server = null;
   const NO_GUARD = path.join(S, "pb_hooks_no_guard");
-  fs.cpSync(HOOKS, NO_GUARD, { recursive: true, dereference: true });
+  copy_tree(HOOKS, NO_GUARD);
   const guard_file = path.join(NO_GUARD, "counts.pb.js");
   const guard_lines = read_text(guard_file).split(/(?<=\n)/);
   const kept = guard_lines.filter(

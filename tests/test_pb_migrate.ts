@@ -13,6 +13,7 @@ import {
   pb_bin_path,
   pinned_pb_version,
 } from "../scripts/pb_migrate.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const PB_BIN = roomkit.pb_bin();
 
@@ -155,7 +156,7 @@ with_scratch((scratch) => {
     ok === true && stored_rule(data) === BAD_RULE,
   );
   const env_hooks = path.join(scratch, "env_hooks");
-  fs.cpSync(HOOKS, env_hooks, { recursive: true, dereference: true });
+  copy_tree(HOOKS, env_hooks);
   process.env.PB_HOOKS_DIR = env_hooks;
   data = make_dir(scratch, "data_env_hooks");
   [ok, out] = migrate_up(PB_BIN, data, bad);

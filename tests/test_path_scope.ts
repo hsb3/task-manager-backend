@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { py_repr, run_checked, truthy, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -73,7 +74,7 @@ const S = fs.mkdtempSync(path.join(os.tmpdir(), "pb-path-scope-test-"));
 const MIG_DIR = path.join(S, "pb_migrations");
 const DATA_DIR = path.join(S, "pb_data");
 fs.mkdirSync(DATA_DIR, { recursive: true });
-fs.cpSync(path.join(REPO_ROOT, "pb_migrations"), MIG_DIR, { recursive: true, dereference: true });
+copy_tree(path.join(REPO_ROOT, "pb_migrations"), MIG_DIR);
 for (const name of fs.readdirSync(MIG_DIR)) {
   if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_DIR, name));
 }

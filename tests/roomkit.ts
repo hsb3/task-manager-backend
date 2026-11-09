@@ -27,6 +27,7 @@ import {
   py_get,
 } from "../scripts/_py.ts";
 import { pb_bin_path } from "../scripts/pb_migrate.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 export { py_int, SystemExit };
 
@@ -122,21 +123,6 @@ export function pb_bin(repo_root: string = REPO_ROOT): string {
   );
 }
 
-/** Relative path of the first symlink under `dir` (depth-first, name order), else null. */
-function first_symlink(dir: string, rel: string = ""): string | null {
-  for (const ent of fs
-    .readdirSync(path.join(dir, rel), { withFileTypes: true })
-    .sort((a, b) => (a.name < b.name ? -1 : 1))) {
-    const r = path.join(rel, ent.name);
-    if (ent.isSymbolicLink()) return r;
-    if (ent.isDirectory()) {
-      const found = first_symlink(dir, r);
-      if (found !== null) return found;
-    }
-  }
-  return null;
-}
-
 /**
  * The hooksDir a room should boot with: $PB_HOOKS_DIR when set (the battery's one
  * shared copy, or a baseline tree for a deliberate red run), else a fresh copy of the
@@ -150,15 +136,7 @@ export function hooks_dir(scratch: string, src: string = path.join(REPO_ROOT, "p
   if (shared) {
     return shared;
   }
-  const dest = path.join(scratch, "pb_hooks");
-  const link = fs.lstatSync(src).isSymbolicLink() ? src : first_symlink(src);
-  if (link !== null) {
-    throw new Error(
-      `pb_hooks entry ${link} is a symlink — a room's copy must not alias the real tree`,
-    );
-  }
-  fs.cpSync(src, dest, { recursive: true });
-  return dest;
+  return copy_tree(src, path.join(scratch, "pb_hooks"));
 }
 
 /** Raised by require_free_port() when the port stays occupied for the whole window. */

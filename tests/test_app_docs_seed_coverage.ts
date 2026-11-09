@@ -15,6 +15,7 @@ import path from "node:path";
 import { read_text, sqlite_connect } from "../scripts/_py.ts";
 import { DEFAULT_OUTPUT, FIELDS } from "../scripts/gen_app_docs_seed.ts";
 import { migrate_up, pb_bin_path } from "../scripts/pb_migrate.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const PB = pb_bin_path(REPO_ROOT);
@@ -107,7 +108,7 @@ function mutated(mutate: (dir: string) => void): [string[], number, number] {
   const S = fs.mkdtempSync(path.join(os.tmpdir(), "v65a-seedcov-mut-"));
   try {
     const dir = path.join(S, "pb_migrations");
-    fs.cpSync(MIGRATIONS, dir, { recursive: true, dereference: true });
+    copy_tree(MIGRATIONS, dir);
     mutate(dir);
     return compare(dir);
   } finally {

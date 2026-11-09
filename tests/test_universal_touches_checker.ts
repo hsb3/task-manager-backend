@@ -4,6 +4,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const CHECKER = path.join(REPO_ROOT, "scripts", "check_universal_touches.ts");
@@ -23,7 +24,7 @@ function run(mutate: (hooks: string) => void = () => {}): [number, string] {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "touches_checker_"));
   try {
     const hooks = path.join(root, "pb_hooks");
-    fs.cpSync(path.join(REPO_ROOT, "pb_hooks"), hooks, { recursive: true, dereference: true });
+    copy_tree(path.join(REPO_ROOT, "pb_hooks"), hooks);
     mutate(hooks);
     const p = Bun.spawnSync([process.execPath, CHECKER, "--root", root], { cwd: root });
     return [p.exitCode ?? 1, p.stdout.toString()];

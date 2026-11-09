@@ -47,7 +47,7 @@ const unlink_missing_ok = (p: string): void => fs.rmSync(p, { force: true });
 
 /** The scripts `bun scripts/pb_migrate.ts --print-bin` needs in a scratch tree. */
 function copy_resolver(root: string): void {
-  for (const name of ["pb_migrate.ts", "_py.ts", "_argparse.ts"]) {
+  for (const name of ["pb_migrate.ts", "_py.ts", "_argparse.ts", "_scratch_copy.ts"]) {
     fs.copyFileSync(path.join(REPO, "scripts", name), path.join(root, "scripts", name));
   }
 }

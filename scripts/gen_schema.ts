@@ -19,6 +19,7 @@ import path from "node:path";
 import { parse_args } from "./_argparse.ts";
 import { by_code_point, json_dumps, py_repr, read_text, sqlite_connect } from "./_py.ts";
 import { migrate_up, pb_bin_path } from "./pb_migrate.ts";
+import { copy_tree } from "./_scratch_copy.ts";
 
 const REPO = path.dirname(path.dirname(path.resolve(import.meta.path)));
 const PB = pb_bin_path(REPO);
@@ -47,7 +48,7 @@ export function fetch_collections(migrations_dir: string = MIGRATIONS): any[] {
   let rows: any[];
   try {
     const mig = path.join(tmp, "pb_migrations");
-    fs.cpSync(migrations_dir, mig, { recursive: true, dereference: true });
+    copy_tree(migrations_dir, mig);
     const data = path.join(tmp, "data");
     const [ok, out] = migrate_up(PB, data, mig);
     if (!ok) {

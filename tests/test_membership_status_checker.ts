@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { by_code_point, py_repr, read_text, splitlines, truthy } from "../scripts/_py.ts";
 import * as guard from "../scripts/check_membership_status_guards.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 
@@ -649,7 +650,7 @@ const MUTANT_VIEW =
   'workspace_members_via_workspace.user ?= @request.auth.id) && trashed = ""';
 with_tmp("pbmem_mutant_", (tmp) => {
   const mutant_dir = path.join(tmp, "schema");
-  fs.cpSync(path.join(REPO_ROOT, "schema"), mutant_dir, { recursive: true });
+  copy_tree(path.join(REPO_ROOT, "schema"), mutant_dir);
   const ws_path = path.join(mutant_dir, "workspaces.rules.json");
   const ws_rules = JSON.parse(read_text(ws_path));
   ws_rules.viewRule = MUTANT_VIEW;

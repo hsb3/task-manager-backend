@@ -47,6 +47,7 @@ import {
 import * as roomkit from "./roomkit.ts";
 import { stop_server } from "./suitekit.ts";
 import * as tierkit from "./tierkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const SCHEMA_DIR = path.join(REPO_ROOT, "schema");
@@ -601,7 +602,7 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "pb-visibility-invariants-
 const MIG_DIR = path.join(scratch, "pb_migrations");
 const DATA_DIR = path.join(scratch, "pb_data");
 fs.mkdirSync(DATA_DIR, { recursive: true });
-fs.cpSync(path.join(REPO_ROOT, "pb_migrations"), MIG_DIR, { recursive: true, dereference: true });
+copy_tree(path.join(REPO_ROOT, "pb_migrations"), MIG_DIR);
 for (const name of fs.readdirSync(MIG_DIR)) {
   if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_DIR, name));
 }

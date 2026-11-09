@@ -34,6 +34,7 @@ import {
 } from "../scripts/_py.ts";
 import { DEFAULT_OUTPUT } from "../scripts/gen_app_docs_seed.ts";
 import { migrate_up, pb_bin_path } from "../scripts/pb_migrate.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 
@@ -122,7 +123,7 @@ console.log("\n── §2 negative control: the same comparison catches a seed t
 const S = fs.mkdtempSync(path.join(os.tmpdir(), "lv7-appdocs-broken-"));
 try {
   const broken_dir = path.join(S, "pb_migrations");
-  fs.cpSync(MIGRATIONS, broken_dir, { recursive: true, dereference: true });
+  copy_tree(MIGRATIONS, broken_dir);
   const file = path.join(broken_dir, SEED_FILE);
   const text = read_text(file);
   check(
