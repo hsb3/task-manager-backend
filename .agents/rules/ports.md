@@ -50,7 +50,7 @@ test_invite_mirror · 8145 = test_mutation_proof · 8146 = test_api_keys · 8149
 test_pb_refusal_statuses · 8148 = test_draft_publish · 8193 = test_tm_cli · 8194 = test_tm_mcp · 8195 = test_route_errors. SMTP sinks:
 2526 battery email · 2527 battery hardening · 2528-2531 test_observability · 2532
 test_collab_flow · 2533 test_subscribers_notifications · 2534 test_signup_verification · 2535 test_invitation_mail. `scripts/check_port_collisions.ts`
-prints the ports shared by design (the dev port, the probe band, the one hardening sink). With `PB_PORT_OFFSET` set (or `--offset N`) it also refuses an offset that lands any default on 5432/6379/3306/27017 (local Postgres/Redis/MySQL/MongoDB; 2900 puts test_collab_flow's 2532 sink on 5432), and `scripts/run_suite_battery.sh` runs it first so a battery at such an offset refuses before booting anything.
+prints the ports shared by design (the dev port, the probe band, the one hardening sink). With `PB_PORT_OFFSET` set (or `--offset N`) it also refuses an offset that lands any default on 5432/6379/3306/27017 (local Postgres/Redis/MySQL/MongoDB; 2900 puts test_collab_flow's 2532 sink on 5432), and `scripts/run_suite_battery.sh` runs it first so a battery at such an offset refuses before booting anything. With `--offset N` (N != 0) it also refuses a default that offset lands on a port something is listening on right now (offset 4300 puts test_subscribers_notifications's 8134 on Docker's 12434), and the battery runs it that way before booting anything; env-only `PB_PORT_OFFSET` (check-static) does not probe, because it runs beside the caller's own and sibling lanes' live rooms.
 
 # Two kinds of suite
 
