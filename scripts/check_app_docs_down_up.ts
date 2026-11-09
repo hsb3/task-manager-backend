@@ -33,6 +33,7 @@ import { by_code_point, decode_text, print, py_repr, tup, sqlite_connect } from 
 import { repo_root } from "./_repo_root.ts";
 import { MIN_SPAN_CHARS, normalize, spans } from "./check_app_docs_history.ts";
 import { migrate_up, pb_bin_path } from "./pb_migrate.ts";
+import { copy_tree } from "./_scratch_copy.ts";
 
 const REPO = repo_root(import.meta.path);
 const PB = pb_bin_path(REPO);
@@ -177,7 +178,7 @@ export function main(): number {
   try {
     const staged = path.join(scratch, "mig");
     const data = path.join(scratch, "pb_data");
-    fs.cpSync(args.migrations_dir, staged, { recursive: true, dereference: true });
+    copy_tree(args.migrations_dir, staged);
 
     let [ok, out] = migrate_up(PB, data, staged);
     if (!ok) {

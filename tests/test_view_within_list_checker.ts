@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { by_code_point, glob_sorted, py_repr, read_text, truthy } from "../scripts/_py.ts";
 import * as vwl from "../scripts/check_view_within_list.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 
@@ -85,7 +86,7 @@ function mutate(rules_dir: string, collection: string, cut: string): string {
 const copy_schema = (prefix: string): [string, string] => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   const schema = path.join(dir, "schema");
-  fs.cpSync(SCHEMA_DIR, schema, { recursive: true });
+  copy_tree(SCHEMA_DIR, schema);
   return [dir, schema];
 };
 
@@ -400,7 +401,7 @@ const tasks_bytes_before = fs.readFileSync(TASKS_RULES);
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "pbvwl_"));
 try {
   const mutant = path.join(scratch, "schema");
-  fs.cpSync(SCHEMA_DIR, mutant, { recursive: true });
+  copy_tree(SCHEMA_DIR, mutant);
   const mutant_view = mutate(mutant, "tasks", TASKS_CUT);
   check("the mutant viewRule really lost the clause", mutant_view.includes(TASKS_CUT), false);
 

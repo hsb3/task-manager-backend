@@ -36,6 +36,7 @@ import {
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 import { esc } from "./suitekit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 const POCKETBASE_BIN = roomkit.pb_bin();
@@ -102,7 +103,7 @@ class Room {
     this.data_dir = path.join(this.tmp, "pb_data");
     this.migrations_dir = path.join(this.tmp, "pb_migrations");
     fs.mkdirSync(this.data_dir, { recursive: true });
-    fs.cpSync(REAL_MIGRATIONS_DIR, this.migrations_dir, { recursive: true, dereference: true });
+    copy_tree(REAL_MIGRATIONS_DIR, this.migrations_dir);
     for (const f of fs.readdirSync(this.migrations_dir)) {
       if (f.endsWith("superuser_mfa.js")) fs.rmSync(path.join(this.migrations_dir, f));
     }

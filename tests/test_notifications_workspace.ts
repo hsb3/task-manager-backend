@@ -17,6 +17,7 @@ import os from "node:os";
 import path from "node:path";
 import { by_code_point, getitem, py_repr, py_str, run_checked, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -70,7 +71,7 @@ function make_room(name: string): [string, string] {
   const mig = path.join(S, name, "pb_migrations");
   const data = path.join(S, name, "pb_data");
   fs.mkdirSync(data, { recursive: true });
-  fs.cpSync(REAL_MIGRATIONS_DIR, mig, { recursive: true, dereference: true });
+  copy_tree(REAL_MIGRATIONS_DIR, mig);
   for (const f of fs.readdirSync(mig)) {
     if (f.endsWith("superuser_mfa.js")) fs.rmSync(path.join(mig, f));
   }

@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { py_repr, py_split, read_text, splitlines, truthy } from "../scripts/_py.ts";
 import * as cc from "../scripts/check_constants.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(path.dirname(path.resolve(import.meta.path)));
 
@@ -49,10 +50,7 @@ function check(label: string, got: any, want: any): void {
 function mirror(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pbconst_"));
   for (const name of MIRRORED_TREES) {
-    fs.cpSync(path.join(REPO_ROOT, name), path.join(root, name), {
-      recursive: true,
-      dereference: true,
-    });
+    copy_tree(path.join(REPO_ROOT, name), path.join(root, name));
   }
   return root;
 }

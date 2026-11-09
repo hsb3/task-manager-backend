@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { by_code_point, py_repr, read_text } from "../scripts/_py.ts";
 import * as rescope from "../scripts/check_rescope_guards.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 
@@ -36,10 +37,8 @@ const sorted = (xs: Iterable<string>): string[] => [...xs].sort(by_code_point);
 /** A full schema/ + model/current/ copy; caller removes the returned root. */
 function scratch_tree(): [string, string, string] {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pb-rescope-checker-"));
-  fs.cpSync(path.join(REPO_ROOT, "schema"), path.join(root, "schema"), { recursive: true });
-  fs.cpSync(path.join(REPO_ROOT, "scripts", "model", "current"), path.join(root, "current"), {
-    recursive: true,
-  });
+  copy_tree(path.join(REPO_ROOT, "schema"), path.join(root, "schema"));
+  copy_tree(path.join(REPO_ROOT, "scripts", "model", "current"), path.join(root, "current"));
   return [root, path.join(root, "schema"), path.join(root, "current")];
 }
 

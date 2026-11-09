@@ -29,6 +29,7 @@ import os from "node:os";
 import path from "node:path";
 import { getitem, py_repr, py_strip, read_text, run_checked, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 // The platform's refusal statuses, measured by this suite. A sibling gate imports this dict as
 // the single source of which non-2xx codes PocketBase itself can produce — its name and flat
@@ -147,7 +148,7 @@ async function main(): Promise<number> {
   const mig_dir = path.join(scratch, "pb_migrations");
   const data_dir = path.join(scratch, "pb_data");
   fs.mkdirSync(data_dir, { recursive: true });
-  fs.cpSync(path.join(REPO_ROOT, "pb_migrations"), mig_dir, { recursive: true, dereference: true });
+  copy_tree(path.join(REPO_ROOT, "pb_migrations"), mig_dir);
   for (const name of fs.readdirSync(mig_dir)) {
     if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(mig_dir, name));
   }

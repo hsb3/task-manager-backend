@@ -7,6 +7,9 @@ import os from "node:os";
 import path from "node:path";
 
 import { py_strip, read_text } from "../scripts/_py.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
+import { ALLOWED, audit } from "../scripts/check_scratch_copies.ts";
+import { pb_bin_path } from "../scripts/pb_migrate.ts";
 import * as roomkit from "./roomkit.ts";
 
 const FAILS: string[] = [];
@@ -423,6 +426,150 @@ console.log("── hooks_dir() refuses a symlinked entry ──");
     msg.includes("symlink") && msg.includes("rootlink"),
   );
   check("a symlink-free tree copies", fs.existsSync(path.join(dest, "a.pb.js")));
+  fs.rmSync(fx, { recursive: true, force: true });
+}
+
+console.log("── every scratch copy of pb_migrations/ or pb_hooks/ refuses an inner symlink ──");
+{
+  // The sites read fixed repo paths, so each runs from a fixture root whose trees carry a planted link.
+  const fx = fs.mkdtempSync(path.join(os.tmpdir(), "rk-copysites-"));
+  const root = path.join(fx, "repo");
+  const outside = path.join(fx, "outside.txt");
+  fs.writeFileSync(outside, "outside\n");
+  for (const rel of [
+    "Dockerfile",
+    "scripts/_argparse.ts",
+    "scripts/_py.ts",
+    "scripts/_repo_root.ts",
+    "scripts/_scratch_copy.ts",
+    "scripts/check_app_docs_down_up.ts",
+    "scripts/check_app_docs_history.ts",
+    "scripts/gen_openapi.ts",
+    "scripts/gen_schema.ts",
+    "scripts/load_smoketest.ts",
+    "scripts/pb_migrate.ts",
+    "scripts/view_field_help.ts",
+    "tests/roomkit.ts",
+  ]) {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.copyFileSync(path.join(REPO, rel), path.join(root, rel));
+  }
+  const MIG_LINK = "zz_mig_link.txt";
+  const HOOK_LINK = "zz_hook_link.txt";
+  copy_tree(path.join(REPO, "pb_migrations"), path.join(root, "pb_migrations"));
+  copy_tree(path.join(REPO, "pb_hooks"), path.join(root, "pb_hooks"));
+  fs.symlinkSync(outside, path.join(root, "pb_migrations", MIG_LINK));
+  fs.symlinkSync(outside, path.join(root, "pb_hooks", HOOK_LINK));
+  fs.mkdirSync(path.join(fx, "empty_mig"));
+
+  const env: Record<string, string> = { ...(process.env as Record<string, string>) };
+  env.PB_BIN = pb_bin_path(REPO);
+  delete env.PB_HOOKS_DIR; // the battery exports it, and a set one skips the pb_hooks copy under test
+  const lib = (rel: string): string => JSON.stringify(path.join(root, rel));
+  const sites: [string, string[], string][] = [
+    ["gen_openapi.ts", ["scripts/gen_openapi.ts", "--check"], MIG_LINK],
+    ["gen_schema.ts", ["scripts/gen_schema.ts", "--check"], MIG_LINK],
+    ["check_app_docs_down_up.ts", ["scripts/check_app_docs_down_up.ts"], MIG_LINK],
+    ["load_smoketest.ts", ["scripts/load_smoketest.ts"], MIG_LINK],
+    [
+      "pb_migrate.ts migrate_up (its pb_hooks copy)",
+      [
+        "-e",
+        `import { migrate_up } from ${lib("scripts/pb_migrate.ts")};\n` +
+          `migrate_up(process.env.PB_BIN, ${JSON.stringify(path.join(fx, "data"))}, ` +
+          `${JSON.stringify(path.join(fx, "empty_mig"))});`,
+      ],
+      HOOK_LINK,
+    ],
+    [
+      "roomkit.ts hooks_dir",
+      [
+        "-e",
+        `import { hooks_dir } from ${lib("tests/roomkit.ts")};\n` +
+          `hooks_dir(${JSON.stringify(path.join(fx, "room"))});`,
+      ],
+      HOOK_LINK,
+    ],
+  ];
+  for (const [label, argv, link] of sites) {
+    // A site that does not refuse runs on (load_smoketest boots a room), so the clock is the verdict.
+    const r = Bun.spawnSync([process.execPath, ...argv], {
+      cwd: root,
+      env,
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 30_000,
+    });
+    const out = r.stdout.toString() + r.stderr.toString();
+    const refused = r.exitCode !== 0 && out.includes(link) && out.includes("symlink");
+    check(`${label} refuses ${link} inside its source`, refused);
+    if (!refused)
+      console.log(`        exit ${r.exitCode}: ${out.trim().split("\n").slice(-3).join(" | ")}`);
+  }
+  let msg = "";
+  try {
+    copy_tree(path.join(root, "pb_migrations"), path.join(fx, "direct"));
+  } catch (e) {
+    msg = String(e);
+  }
+  check(
+    "copy_tree itself refuses, naming the entry",
+    msg.includes(MIG_LINK) && msg.includes("symlink"),
+  );
+  check("copy_tree copied nothing", !fs.existsSync(path.join(fx, "direct")));
+  check("the link target was never written", read_text(outside) === "outside\n");
+  fs.rmSync(fx, { recursive: true, force: true });
+}
+
+console.log("── check_scratch_copies refuses a raw tree copy outside copy_tree ──");
+{
+  check("the real tree is clean", audit(REPO).length === 0);
+  const fx = fs.mkdtempSync(path.join(os.tmpdir(), "rk-copygate-"));
+  const plant = (rel: string, text: string): string[] => {
+    fs.mkdirSync(path.dirname(path.join(fx, rel)), { recursive: true });
+    fs.writeFileSync(path.join(fx, rel), text);
+    const found = audit(fx);
+    fs.rmSync(path.join(fx, rel));
+    return found;
+  };
+  const CP_SYNC = ["cp", "Sync"].join(""); // spelled apart so this file stays clean under the gate
+  let found = plant("tests/test_x.ts", `fs.${CP_SYNC}(MIGS, dir, { recursive: true });\n`);
+  check(
+    "a raw recursive copy in tests/ is refused",
+    found.length === 1 && found[0]!.startsWith("tests/test_x.ts:1:"),
+  );
+  found = plant(
+    "scripts/x.ts",
+    `\n${CP_SYNC}(HOOKS, dir, { recursive: true, dereference: true });\n`,
+  );
+  check(
+    "a raw copy in scripts/ is refused at its line",
+    found.length === 1 && found[0]!.startsWith("scripts/x.ts:2:"),
+  );
+  found = plant("scripts/x.sh", `cp -R pb_migrations "$S/mig"\n`);
+  check("a shell `cp -R pb_migrations` is refused", found.length === 1);
+  found = plant("Makefile", `x:\n\t@cp -a pb_hooks "$$S/hooks"\n`);
+  check("a Makefile `cp -a` is refused", found.length === 1);
+  found = plant("scripts/x.sh", `# cp -R in a comment\ncp a.txt b.txt\n`);
+  check("a comment and a single-file cp pass", found.length === 0);
+  const battery = [...ALLOWED["scripts/run_suite_battery.sh"]!].map((l) => `  ${l}\n`).join("");
+  found = plant("scripts/run_suite_battery.sh", battery + `cp -R "$REPO_ROOT/pb_hooks" "$X"\n`);
+  check(
+    "the battery's guarded copies pass and a new one there is refused",
+    found.length === 1 && found[0]!.includes("$X"),
+  );
+  found = plant("scripts/run_suite_battery.sh", battery + battery.split("\n")[0] + "\n");
+  check("an allowlisted battery line passes once; its duplicate is refused", found.length === 1);
+  const CALL = "cp" + "("; // spelled apart, as CP_SYNC is
+  found = plant(
+    "tests/x.ts",
+    `await fs.promises.${CALL}a, b);\nfsp.${CALL}a, b);\n${CALL}a, b);\n`,
+  );
+  check("the promises, fsp and bare node:fs copy calls are refused", found.length === 3);
+  found = plant("scripts/x.sh", `/bin/cp -R pb_hooks "$S"\ncp --recursive pb_hooks "$S"\n`);
+  check("`/bin/cp -R` and `cp --recursive` are refused", found.length === 2);
+  found = plant("scripts/_scratch_copy.ts", `fs.${CP_SYNC}(src, dest, { recursive: true });\n`);
+  check("the helper itself is exempt", found.length === 0);
   fs.rmSync(fx, { recursive: true, force: true });
 }
 

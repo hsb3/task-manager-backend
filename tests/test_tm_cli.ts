@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { py_repr, run_checked, tup, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -58,7 +59,7 @@ const DATA_DIR = path.join(S, "pb_data");
 const XDG = path.join(S, "xdg");
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(XDG, { recursive: true });
-fs.cpSync(REAL_MIGRATIONS_DIR, MIG_DIR, { recursive: true, dereference: true });
+copy_tree(REAL_MIGRATIONS_DIR, MIG_DIR);
 for (const name of fs.readdirSync(MIG_DIR)) {
   if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_DIR, name));
 }
@@ -608,7 +609,7 @@ try {
     check("the key never appears on the terminal", pty.out.includes(WRITE_KEY), false);
     // Self-check: the same run without raw mode echoes the key, so the terminal really echoes.
     const NO_RAW = path.join(S, "no-raw");
-    fs.cpSync(path.join(path.dirname(TM), "src"), path.join(NO_RAW, "src"), { recursive: true });
+    copy_tree(path.join(path.dirname(TM), "src"), path.join(NO_RAW, "src"));
     const real = fs.readFileSync(TM, "utf8");
     const src = real.replace("process.stdin.setRawMode(true);", "");
     fs.writeFileSync(path.join(NO_RAW, "tm.ts"), src);

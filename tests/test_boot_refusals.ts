@@ -28,6 +28,7 @@ import {
 } from "../scripts/_py.ts";
 import { migrate_up } from "../scripts/pb_migrate.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 
@@ -217,7 +218,7 @@ const SERVER_STARTED = "Server started at";
 // ── Scratch tree: one migrated pb_data, cloned per room ─────────────────────────
 const S = fs.mkdtempSync(path.join(os.tmpdir(), "pb-boot-refusals-test-"));
 const MIG_ALL = path.join(S, "pb_migrations");
-fs.cpSync(REAL_MIGRATIONS_DIR, MIG_ALL, { recursive: true, dereference: true });
+copy_tree(REAL_MIGRATIONS_DIR, MIG_ALL);
 for (const name of fs.readdirSync(MIG_ALL)) {
   if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_ALL, name));
 }
@@ -241,7 +242,7 @@ run_checked(
 
 function clone_base(tag: string): string {
   const dest = path.join(S, `pb_data_${tag}`);
-  fs.cpSync(BASE_DATA, dest, { recursive: true, dereference: true });
+  copy_tree(BASE_DATA, dest);
   return dest;
 }
 
@@ -429,7 +430,7 @@ async function run_healthy(
 }
 
 const MIG_PLANTED = path.join(S, "pb_migrations_planted");
-fs.cpSync(MIG_ALL, MIG_PLANTED, { recursive: true, dereference: true });
+copy_tree(MIG_ALL, MIG_PLANTED);
 fs.writeFileSync(path.join(MIG_PLANTED, BENIGN_PLANT), "migrate((app) => {}, (app) => {});\n");
 // counts.pb.js refuses a project_items listRule naming anything but @request.auth.id.
 fs.writeFileSync(

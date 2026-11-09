@@ -32,6 +32,7 @@ import {
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 import { esc } from "./suitekit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -126,12 +127,12 @@ class Room {
     fs.rmSync(this.migrations_dir, { recursive: true, force: true });
     fs.rmSync(this.hooks_dir, { recursive: true, force: true });
     fs.mkdirSync(this.data_dir, { recursive: true });
-    fs.cpSync(REAL_MIGRATIONS_DIR, this.migrations_dir, { recursive: true, dereference: true });
+    copy_tree(REAL_MIGRATIONS_DIR, this.migrations_dir);
     for (const name of fs.readdirSync(this.migrations_dir)) {
       if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(this.migrations_dir, name));
     }
     const source = roomkit.hooks_dir(path.join(this.tmp, "hooks_src"));
-    fs.cpSync(source, this.hooks_dir, { recursive: true, dereference: true });
+    copy_tree(source, this.hooks_dir);
     // Written into every room: inert until §6 mints the one workspace it names.
     const probe = path.join(this.hooks_dir, "zz_shadow_fault_probe.pb.js");
     fs.writeFileSync(probe, FAULT_PROBE_HOOK, "utf-8");

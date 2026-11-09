@@ -41,6 +41,7 @@ import {
   sqlite_connect,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const POCKETBASE_BIN = roomkit.pb_bin();
@@ -148,7 +149,7 @@ class Room {
     this.data_dir = path.join(this.tmp, "pb_data");
     this.migrations_dir = path.join(this.tmp, "pb_migrations");
     fs.mkdirSync(this.data_dir, { recursive: true });
-    fs.cpSync(REAL_MIGRATIONS_DIR, this.migrations_dir, { recursive: true, dereference: true });
+    copy_tree(REAL_MIGRATIONS_DIR, this.migrations_dir);
     for (const name of fs.readdirSync(this.migrations_dir)) {
       if (name.endsWith(MFA_SUFFIX)) fs.rmSync(path.join(this.migrations_dir, name));
     }
@@ -173,7 +174,7 @@ class Room {
     );
     // A private hooks copy (the battery shares one) carrying the h9b interleaving hook.
     const hooks = path.join(this.tmp, "pb_hooks_h9b");
-    fs.cpSync(roomkit.hooks_dir(this.tmp), hooks, { recursive: true, dereference: true });
+    copy_tree(roomkit.hooks_dir(this.tmp), hooks);
     fs.writeFileSync(path.join(hooks, "zz_test_h9b_interleave.pb.js"), H9B_HOOK);
     this.proc = await roomkit.serve(this.port, this.data_dir, this.migrations_dir, hooks);
   }

@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { decode_text, py_strip, read_text } from "./_py.ts";
 import { parse_args } from "./_argparse.ts";
+import { copy_tree } from "./_scratch_copy.ts";
 
 export { decode_text };
 
@@ -170,7 +171,7 @@ export function migrate_up(
   try {
     if (!hooks_dir) {
       hooks_dir = path.join(scratch, "pb_hooks");
-      fs.cpSync(HOOKS, hooks_dir, { recursive: true, dereference: true });
+      copy_tree(HOOKS, hooks_dir);
     }
     // Without --hooksDir (the Dockerfile CMD passes it too) no model-tier guard sees a save.
     r = Bun.spawnSync(

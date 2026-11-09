@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { offenders } from "../scripts/check_route_statuses.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(path.dirname(path.resolve(import.meta.path)));
 const CHECKER = path.join(REPO_ROOT, "scripts", "check_route_statuses.ts");
@@ -33,7 +34,7 @@ function tree_hash(): string {
 
 function mirror(): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "pbstatuses_"));
-  fs.cpSync(path.join(REPO_ROOT, "pb_hooks"), path.join(root, "pb_hooks"), { recursive: true });
+  copy_tree(path.join(REPO_ROOT, "pb_hooks"), path.join(root, "pb_hooks"));
   return root;
 }
 

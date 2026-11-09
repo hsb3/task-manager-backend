@@ -103,9 +103,12 @@ state only what a test or live call demonstrated.
   expected-failure marker (it goes green for ANY error); prove persistence from a fresh read,
   never an in-memory echo; a concurrency claim needs a barrier-released probe, not a sequential
   suite.
-- **A clean-room copy refuses symlinks itself.** Node's `cpSync({dereference: true})` still
-  copies a symlink INSIDE the tree as a symlink, so a write into the copy lands in the real tree;
-  only `tests/roomkit.ts` `hooks_dir` and the battery's migrations copy refuse symlinks.
+- **A clean-room copy refuses symlinks itself.** A recursive copy can carry a symlink inside the
+  tree across as a symlink, so a write into the copy lands in the real tree. Copy a tree with
+  `copy_tree` (`scripts/_scratch_copy.ts`), which refuses a symlink at or under its source;
+  `scripts/check_scratch_copies.ts` line-scans for `cpSync`/`fs.cp` in `.ts` and `cp -R/-r/-a` in
+  shell outside it (the battery's guarded copies allowlisted); a spawned argv or a shell string in
+  a TS template is not seen.
 - **A conflicted generated file shows NO conflict markers** (`merge=binary` in the generated
   `.gitattributes`) and looks clean: resolve it by rerunning its generator, never `git add`, and
   rebase just before the final gate run so the gate proves the rebased tree.

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { offenders } from "../scripts/check_field_help.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = path.dirname(path.dirname(path.resolve(import.meta.path)));
 const CHECKER = path.join(REPO_ROOT, "scripts", "check_field_help.ts");
@@ -39,7 +40,7 @@ function with_planted(opts: string, base: string[]) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pbhelp_"));
   try {
     const mig = path.join(dir, "mig");
-    fs.cpSync(path.join(REPO_ROOT, "pb_migrations"), mig, { recursive: true });
+    copy_tree(path.join(REPO_ROOT, "pb_migrations"), mig);
     fs.writeFileSync(path.join(mig, "1785199900_planted.js"), planted(opts));
     return {
       extra: offenders(mig).filter((o) => !base.includes(o)),

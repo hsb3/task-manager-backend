@@ -35,6 +35,7 @@ import {
   truthy,
 } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
+import { copy_tree } from "../scripts/_scratch_copy.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const POCKETBASE_BIN = roomkit.pb_bin();
@@ -142,7 +143,7 @@ class Room {
     this.data_dir = path.join(this.tmp, "pb_data");
     this.migrations_dir = path.join(this.tmp, "pb_migrations");
     fs.mkdirSync(this.data_dir, { recursive: true });
-    fs.cpSync(REAL_MIGRATIONS_DIR, this.migrations_dir, { recursive: true, dereference: true });
+    copy_tree(REAL_MIGRATIONS_DIR, this.migrations_dir);
     for (const name of fs.readdirSync(this.migrations_dir)) {
       if (name.endsWith(MFA_SUFFIX)) {
         fs.rmSync(path.join(this.migrations_dir, name));
@@ -445,7 +446,7 @@ const idp_url = `http://127.0.0.1:${idp.port}`;
 const link_room = new Room(8099 + PORT_OFFSET, null, true);
 // The battery points every suite at one shared hooks dir; the scratch hook below needs a private copy.
 link_room.hooks_dir = path.join(link_room.tmp, "pb_hooks_private");
-fs.cpSync(path.join(REPO_ROOT, "pb_hooks"), link_room.hooks_dir, { recursive: true });
+copy_tree(path.join(REPO_ROOT, "pb_hooks"), link_room.hooks_dir);
 // Scratch hook: the verified save of a "refuse." account is refused with a status, as a rule hook of the app could.
 fs.writeFileSync(
   path.join(link_room.hooks_dir, "zz_probe_refuse.pb.js"),
