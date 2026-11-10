@@ -147,7 +147,7 @@ onRecordCreateRequest((e) => {
     e.record.setRandomPassword();
     return e.next();
   }
-  // A batch sub-request has its own rate-limit bucket, so a batch signup would double the signup allowance.
+  // A batch sub-request has its own rate-limit bucket, so a batch signup would double the signup allowance (decision:batch-signup-refused).
   if (info.context === "batch" && !e.hasSuperuserAuth()) {
     throw new BadRequestError(
       "Sign up with a single request, not inside a batch.",
