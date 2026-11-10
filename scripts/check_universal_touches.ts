@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /** Refuses a model-tier update guard (`onRecordUpdate`/`onRecordUpdateExecute`) whose handler
- * throws without reading `.original()` — the touches predicate memory
- * universal-guard-needs-touches-predicate demands. Bound: textual presence of `.original()` in the
+ * throws without reading `.original()` — the touches predicate .agents/rules/pocketbase.md
+ * demands of a universal-tier guard. Bound: textual presence of `.original()` in the
  * handler body, not dataflow; only pb_hooks/*.pb.js registrations whose handler is inline or a
  * function declared in the same file (an undeclared name fails closed); a registration made via a
  * variable verb or a helper is not seen. */
@@ -137,7 +137,7 @@ if (import.meta.main) {
     console.log(
       `❌ check_universal_touches: ${offenders.length} model-tier update guard(s) throw without ` +
         "reading original() — guard only a save that changes the fields it checks " +
-        "(.agents/memory/universal-guard-needs-touches-predicate.md):",
+        "(.agents/rules/pocketbase.md, universal-tier guards):",
     );
     for (const o of offenders) {
       console.log(`  pb_hooks/${o.file}:${o.line}  ${o.verb}  ${o.tags}  ${o.handler}`);

@@ -641,6 +641,7 @@ run_suite "test_app_docs_seed_idempotent" bun tests/test_app_docs_seed_idempoten
 
 # ── integrity: a fresh boot's app_docs + app_settings rows equal the newest seed's own data, column for column.
 run_suite "test_app_docs_seed_coverage" bun tests/test_app_docs_seed_coverage.ts
+run_suite "test_app_docs_seed_digest" bun tests/test_app_docs_seed_digest.ts
 
 # ── serverless proofs of the gate scripts and the shared libraries they lean on; make
 #    check-static runs the gates themselves (generators --check, scripts/check_*.ts).
