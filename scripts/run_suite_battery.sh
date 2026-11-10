@@ -263,6 +263,7 @@ build_migration_copies() {
   compgen -G "$LEGACY_MIGRATIONS/$MFA_MIGRATION_GLOB" >/dev/null \
     && fail "failed to drop MFA migration from legacy copy"
 
+  assert_copy_source "$REPO_ROOT/pb_migrations" || exit 1
   cp -R "$REPO_ROOT/pb_migrations" "$HARD_MIGRATIONS" || fail "could not copy migrations"
   assert_scratch_migration_copy "$HARD_MIGRATIONS" || exit 1
   # Scratch migration (CI battery only, never committed).
