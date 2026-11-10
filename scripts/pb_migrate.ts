@@ -192,7 +192,7 @@ export function migrate_up(
     fs.rmSync(scratch, { recursive: true, force: true });
   }
   const out = decode_text(r.stdout) + decode_text(r.stderr);
-  // KEEP IN SYNC: Dockerfile's CMD preflight — same `exitCode` verdict (check_raw_migrate_up.ts reconciles the two).
+  // KEEP IN SYNC (below): Dockerfile's CMD preflight — same `exitCode` verdict (check_raw_migrate_up.ts reconciles the two).
   const ok = r.exitCode === 0;
   return [ok, out];
 }

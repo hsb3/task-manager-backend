@@ -104,7 +104,7 @@ if [ -n "$SHARD_SET" ]; then
   shard_i="${BASH_REMATCH[1]}"; shard_n="${BASH_REMATCH[2]}"
   [ "$shard_i" -le "$shard_n" ] || fail "BATTERY_SHARD=$SHARD_SPEC names shard $shard_i of only $shard_n"
   [ -f "$SHARD_TSV" ] || fail "BATTERY_SHARD is set but $SHARD_TSV does not exist"
-  # KEEP IN SYNC: shard_errors' `[1-9][0-9]*` row check in scripts/check_battery_suites.ts.
+  # KEEP IN SYNC (below): shard_errors' `[1-9][0-9]*` row check in scripts/check_battery_suites.ts.
   SHARD_LABELS="$(awk -F'\t' -v i="$shard_i" -v n="$shard_n" '
     { sub(/\r$/, "") }
     /^#/ { next }

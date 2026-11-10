@@ -536,7 +536,7 @@ onRecordCreateRequest((e) => {
     throw new BadRequestError("templateData must be a JSON object");
   }
   const type = e.record.get("type");
-  // KEEP IN SYNC: TEMPLATE_DATA_KEYS (docs/constants.md) — the `TASK_KEYS` / `DOC_KEYS` arrays below
+  // KEEP IN SYNC (below): TEMPLATE_DATA_KEYS (docs/constants.md) — the `TASK_KEYS` array and the DOC_KEYS one after it.
   const TASK_KEYS = [
     "title",
     "description",
@@ -583,14 +583,15 @@ onRecordCreateRequest((e) => {
     } catch (_) {
       ws = null;
     }
-    // KEEP IN SYNC: validateTaskPriorityWs (pb_hooks/main.pb.js) — the same `"null"` guard: .get() yields a JsonRaw
-    // wrapper whose String() is JSON text ("null" when empty), never a native array.
+    // .get() yields a JsonRaw wrapper whose String() is JSON text ("null" when empty), never a
+    // native array.
     const rawPriorities = ws === null ? null : ws.get("priorities");
     const priorityText =
       rawPriorities === null || rawPriorities === undefined
         ? ""
         : String(rawPriorities);
     let vocab = [];
+    // KEEP IN SYNC (below): validateTaskPriorityWs (pb_hooks/main.pb.js) — the same `"null"` guard.
     if (priorityText !== "" && priorityText !== "null") {
       try {
         vocab = JSON.parse(priorityText);
@@ -657,8 +658,8 @@ onRecordCreateRequest((e) => {
   if (parsed.assignee) {
     let assignable = false;
     try {
-      // KEEP IN SYNC: validateTaskAssignee (pb_hooks/main.pb.js), `user = {:u} && status = 'active'` — the workspace owner is
-      // assignable without a roster row, and only an ACTIVE membership counts.
+      // The workspace owner is assignable without a roster row, and only an ACTIVE membership
+      // counts, as in validateTaskAssignee (pb_hooks/main.pb.js).
       assignable =
         e.app.findRecordById("workspaces", wsId).get("owner") ===
         parsed.assignee;
@@ -667,6 +668,7 @@ onRecordCreateRequest((e) => {
     }
     if (!assignable) {
       try {
+        // KEEP IN SYNC (below): validateTaskAssignee (pb_hooks/main.pb.js), `user = {:u} && status = 'active'`.
         e.app.findFirstRecordByFilter(
           "workspace_members",
           "workspace = {:w} && user = {:u} && status = 'active'",
@@ -709,7 +711,7 @@ onRecordUpdateRequest((e) => {
     throw new BadRequestError("templateData must be a JSON object");
   }
   const type = e.record.get("type");
-  // KEEP IN SYNC: TEMPLATE_DATA_KEYS (docs/constants.md) — the `TASK_KEYS` / `DOC_KEYS` arrays below
+  // KEEP IN SYNC (below): TEMPLATE_DATA_KEYS (docs/constants.md) — the `TASK_KEYS` array and the DOC_KEYS one after it.
   const TASK_KEYS = [
     "title",
     "description",
@@ -756,14 +758,15 @@ onRecordUpdateRequest((e) => {
     } catch (_) {
       ws = null;
     }
-    // KEEP IN SYNC: validateTaskPriorityWs (pb_hooks/main.pb.js) — the same `"null"` guard: .get() yields a JsonRaw
-    // wrapper whose String() is JSON text ("null" when empty), never a native array.
+    // .get() yields a JsonRaw wrapper whose String() is JSON text ("null" when empty), never a
+    // native array.
     const rawPriorities = ws === null ? null : ws.get("priorities");
     const priorityText =
       rawPriorities === null || rawPriorities === undefined
         ? ""
         : String(rawPriorities);
     let vocab = [];
+    // KEEP IN SYNC (below): validateTaskPriorityWs (pb_hooks/main.pb.js) — the same `"null"` guard.
     if (priorityText !== "" && priorityText !== "null") {
       try {
         vocab = JSON.parse(priorityText);
@@ -830,8 +833,8 @@ onRecordUpdateRequest((e) => {
   if (parsed.assignee) {
     let assignable = false;
     try {
-      // KEEP IN SYNC: validateTaskAssignee (pb_hooks/main.pb.js), `user = {:u} && status = 'active'` — the workspace owner is
-      // assignable without a roster row, and only an ACTIVE membership counts.
+      // The workspace owner is assignable without a roster row, and only an ACTIVE membership
+      // counts, as in validateTaskAssignee (pb_hooks/main.pb.js).
       assignable =
         e.app.findRecordById("workspaces", wsId).get("owner") ===
         parsed.assignee;
@@ -840,6 +843,7 @@ onRecordUpdateRequest((e) => {
     }
     if (!assignable) {
       try {
+        // KEEP IN SYNC (below): validateTaskAssignee (pb_hooks/main.pb.js), `user = {:u} && status = 'active'`.
         e.app.findFirstRecordByFilter(
           "workspace_members",
           "workspace = {:w} && user = {:u} && status = 'active'",

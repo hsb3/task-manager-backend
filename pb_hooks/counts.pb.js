@@ -280,7 +280,7 @@ onRecordEnrich((e) => {
     e.app
       .db()
       .newQuery(
-        // KEEP IN SYNC: subtask done: STATUS_CATEGORIES' resolved half, `completed` and `canceled`, as schema/project_items.view.json reads it (scripts/check_constants.ts).
+        // KEEP IN SYNC (below): subtask done: STATUS_CATEGORIES' resolved half, `completed` and `canceled`, as schema/project_items.view.json reads it (scripts/check_constants.ts).
         "SELECT COUNT(*) AS total, COALESCE(SUM(EXISTS (SELECT 1 FROM statuses ks WHERE ks.id = k.status AND ks.workspace = k.workspace AND ks.category IN ('completed', 'canceled'))), 0) AS done" +
           " FROM tasks k WHERE k." +
           (type === "task" ? "parent" : "milestone") +
@@ -293,7 +293,7 @@ onRecordEnrich((e) => {
     total = res.total;
     done = res.done;
   }
-  // KEEP IN SYNC: viewer's day — project_stats enrich below and routes.pb.js GET /api/tracker/trash resolve it the same way, `String(new Timezone(sent).string()) !== sent`.
+  // KEEP IN SYNC (below): viewer's day — project_stats enrich below and routes.pb.js GET /api/tracker/trash resolve it the same way, `String(new Timezone(sent).string()) !== sent`.
   const info = e.requestInfo;
   const viewer = info && info.auth ? info.auth.id : "";
   const sent = info && info.query ? String(info.query["time_zone"] || "") : "";
@@ -359,7 +359,7 @@ onRecordEnrich((e) => {
 
 // next_milestone: the earliest live published milestone dated on or after the viewer's today, else the latest dated one.
 onRecordEnrich((e) => {
-  // KEEP IN SYNC: viewer's day — the project_items enrich above and routes.pb.js GET /api/tracker/trash resolve it the same way, `String(new Timezone(sent).string()) !== sent`.
+  // KEEP IN SYNC (below): viewer's day — the project_items enrich above and routes.pb.js GET /api/tracker/trash resolve it the same way, `String(new Timezone(sent).string()) !== sent`.
   const info = e.requestInfo;
   const viewer = info && info.auth ? info.auth.id : "";
   const sent = info && info.query ? String(info.query["time_zone"] || "") : "";
@@ -407,7 +407,7 @@ onRecordEnrich((e) => {
   return e.next();
 }, "project_stats");
 
-// KEEP IN SYNC: statuses enrich: terminal and off_pipeline — STATUS_CATEGORIES' resolved half, `completed` and `canceled`, as schema/project_items.view.json reads it (scripts/check_constants.ts).
+// KEEP IN SYNC (below): statuses enrich: terminal and off_pipeline — STATUS_CATEGORIES' resolved half, `completed` and `canceled`, as schema/project_items.view.json reads it (scripts/check_constants.ts).
 onRecordEnrich((e) => {
   const category = e.record.get("category");
   e.record.withCustomData(true);
