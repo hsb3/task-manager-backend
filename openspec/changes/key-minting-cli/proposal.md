@@ -119,23 +119,29 @@ carry it.
   settled, and it carries the phishing risk RFC 8628 names, which the GitHub, Vercel and Railway
   CLIs accept.
 
-Proposed: the loopback browser flow for `tm login` and for minting, with today's paste kept as
-the fallback for a machine with no browser (`tm login --with-key`, as `gh auth login
---with-token` and `stripe login --interactive` do). It is the one option that adds no route to
-the authorization server the hosted endpoint already needs; the device flow is the closer match to
-the surveyed CLIs and the better fit for SSH. Open Question 1 asks for the ruling.
+Ruled 2026-11-10 (Open Question 1): the loopback browser flow for `tm login` and for minting,
+with today's paste kept as the fallback for a machine with no browser (`tm login --with-key`, as
+`gh auth login --with-token` and `stripe login --interactive` do). It is the one option that adds
+no route to the authorization server the hosted endpoint already needs; the device flow, the
+closer match to the surveyed CLIs and the better fit for SSH, is not adopted.
 
 ## What Changes
 
 - `tm login` signs in through the browser and saves a newly minted key; `tm login --with-key`
-  keeps today's paste. `tm logout` deletes the saved login and revokes its key, by whichever
-  route Open Question 2 settles (today a key cannot revoke even itself).
+  keeps today's paste. `tm logout` deletes the saved login and revokes its key through that
+  key's manage-keys permission (today a key cannot revoke even itself).
 - `tm keys create --name <name> --scope read|write [--expires <date>]` mints a key for another
   agent or script through the same browser consent, prints the secret once and does not save it.
   Minting needs a person at the browser, and a key can never mint a key.
+- The key `tm login` saves carries a manage-keys permission, granted on the consent page: it
+  lists and revokes the user's keys and never mints. A key minted by `tm keys create` or by a
+  hosted connection does not carry it.
 - `tm keys list` shows each of the user's keys: name, scope, the OAuth client it was granted to,
   created, expires, revoked. It never shows a secret; the server keeps only a hash.
 - `tm keys revoke <id>` revokes one key. Revocation stays one-way.
+- `tm` keeps the saved key in the operating system's credential store through `Bun.secrets`
+  (built into the pinned Bun, `mise.toml`); the 0600 file keeps the server URL, and the key too
+  only where no credential store is available.
 - Every verb takes `--json`, as the existing verbs do.
 - `README.md` "What a client does" and `clients/tm/README.md` "Set up once" show `tm login` and
   `tm keys` in place of `curl`, and AC-9's evidence moves to them.
@@ -157,7 +163,7 @@ the surveyed CLIs and the better fit for SSH. Open Question 1 asks for the rulin
   names) apply to `tm` exactly as to a hosted client. It extends the page in three ways that the
   contract has to carry: `--scope` pre-selects read or write through the standard `scope`
   parameter; `tm keys create` passes a key name and an optional expiry on the authorize request;
-  and, under Open Question 2's recommended answer, consent offers a manage-keys permission.
+  and consent offers the manage-keys permission (Open Question 2).
 - **Ruling 4, CIMD plus pre-registered client ids.** `tm` becomes one more pre-registered client:
   public (no secret, RFC 8252 section 8.4) with a loopback redirect whose port is chosen at
   request time (RFC 8252 section 7.3). The hosted-mcp-endpoint contract has to admit a loopback
@@ -171,12 +177,12 @@ the surveyed CLIs and the better fit for SSH. Open Question 1 asks for the rulin
 - **Ruling 8, rate limits.** If the consent page signs in through PocketBase's existing password
   and code routes, `tm` sign-ins count against their existing per-address limits and add no new
   budget.
-- **Not workable as stated: listing and revoking from a key.** After the browser flow the CLI
+- **Listing and revoking from a key needs a new decision.** After the browser flow the CLI
   holds only a key, and a key cannot read or change key records (decision:api-key-reads-refused).
-  `tm keys list` and `tm keys revoke` therefore need either a new, narrow permission on the key
-  `tm login` mints, or a second sign-in per command. Open Question 2 asks which. Ruling 6 has the
-  grant produce a key and nothing else, so the browser flow cannot hand the CLI a session token
-  instead without a new decision.
+  Ruled 2026-11-10 (Open Question 2): the key `tm login` mints carries a manage-keys permission
+  that lists and revokes, never mints. That partly supersedes decision:api-key-reads-refused, so a
+  new decision record states it before the contract is written. Ruling 6 stands: the grant still
+  produces a key and nothing else.
 
 ## What the first key needs
 
@@ -189,8 +195,9 @@ the approval wait: it can create an account already verified and approved, and m
 user it names (`pb_hooks/api_keys.pb.js`). But superuser sign-in itself needs an emailed code
 (decision:rate-limits-batch-and-superuser-mfa), so a mailbox is still required.
 
-This change does not alter that. Every option above signs in through PocketBase's own sign-in, so
-each later key needs only a signed-in, approved user, and no option lets a key mint a key.
+This change does not alter that. The browser flow signs in through PocketBase's own sign-in, so
+each later key needs only a signed-in, approved user, and no key, the manage-keys one included,
+can mint a key.
 
 ## Capabilities
 
@@ -199,22 +206,15 @@ each later key needs only a signed-in, approved user, and no option lets a key m
 
 ## Open Questions
 
-1. **How `tm` signs in to mint a key.** Options: the browser against the built-in authorization
-   server through a loopback redirect, with key paste kept for a machine with no browser
-   (proposed above; adds no route, needs the authorization server first, no use over SSH); a password or emailed code typed in the
-   terminal (no server change, works over SSH, two kinds of key in the list); or the device flow
-   (what the surveyed CLIs use; works over SSH; adds a route and a page to the authorization
-   server; phishing risk those CLIs accept).
-2. **How `tm keys list` and `tm keys revoke` are authorized, since a key cannot read or change
-   keys.** Options: the key `tm login` mints carries a manage-keys permission, granted on the
-   consent page, that lists and revokes the user's keys and never mints, so a new decision
-   supersedes decision:api-key-reads-refused in part (one sign-in, then plain commands; a leaked
-   CLI key could see key names and revoke keys, though never mint); each list or revoke signs in
-   again in the terminal with a password or emailed code held in memory only (keeps that decision
-   whole, adds a second sign-in path); or each opens the browser again for a one-command
-   credential (a second thing a grant produces, which ruling 6 does not allow without a new
-   decision).
-3. **Where `tm` stores the saved key.** Options: the operating system's credential store
-   through `Bun.secrets` (built into the pinned Bun, `mise.toml`), falling back to today's 0600
-   file where the store is unavailable, as the GitHub and Stripe CLIs do (more code paths to
-   test per platform); or today's 0600 file only (no change, readable by anything running as the user).
+Each was ruled on 2026-11-10 with the option shown; the rejected options are kept for the record.
+
+1. **How `tm` signs in to mint a key.** Ruled: the browser against the built-in authorization
+   server through a loopback redirect, with key paste kept for a machine with no browser.
+   Rejected: a password or emailed code in the terminal; the device flow.
+2. **How `tm keys list` and `tm keys revoke` are authorized.** Ruled: the key `tm login` mints
+   carries a manage-keys permission, granted on the consent page, that lists and revokes the
+   user's keys and never mints; a new decision supersedes decision:api-key-reads-refused in part.
+   Rejected: a terminal sign-in per command; a browser sign-in per command.
+3. **Where `tm` stores the saved key.** Ruled: the operating system's credential store through
+   `Bun.secrets`, falling back to the 0600 file where no store is available. Rejected: the 0600
+   file only.
