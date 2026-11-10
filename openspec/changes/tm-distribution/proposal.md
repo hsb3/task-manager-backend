@@ -42,8 +42,9 @@ What the client is today (tree paths as cited; probes run 2026-11-10 with Bun 1.
 - A saved login lives in `$XDG_CONFIG_HOME/tm/config.json`, falling back to
   `~/.config/tm/config.json` (`config_path` in `clients/tm/src/api.ts`). `TM_URL` and
   `TM_API_KEY` override it.
-- The repository is private (`gh repo view`: `"visibility":"PRIVATE"`). Its release assets and
-  GitHub Packages entries need a GitHub credential to download.
+- The repository is private today (`gh repo view`: `"visibility":"PRIVATE"`) and is to be made
+  public (ruling on question 1 below), after which its source and release assets need no GitHub
+  credential to read.
 
 ### Two consumers
 
@@ -113,12 +114,13 @@ npm package. MCP hosts' own examples launch npm-published servers with `npx -y`.
 
 ## What Changes
 
-- `tm` becomes installable with no checkout, as one versioned artifact that runs the CLI and
-  `tm mcp` unchanged. The install and the MCP host config fit in one command each.
-- The published client runs on the runtime the Open Questions settle. If that is Node as well as
-  Bun, the one Bun-only call (`Bun.stdin` in `tm login`) gives way to a `node:` equivalent, and
-  the artifact is a single bundled file with the MCP SDK inside, so nothing installs on first
-  use.
+- `tm` becomes installable with no checkout as the public npm package `@hsb3/tm`, one versioned
+  artifact that runs the CLI and `tm mcp` unchanged. The install and the MCP host config fit in
+  one command each (`npx -y @hsb3/tm mcp`).
+- The published client runs on Node, with Bun optional (`bunx --bun`). The one Bun-only call
+  (`Bun.stdin` in `tm login`) gives way to a `node:` equivalent, and the artifact is a single
+  bundled file with the MCP SDK inside and a `node` shebang, so nothing installs on first use.
+- No standalone binaries ship in this milestone.
 - A client has one version, read by `tm --version`, reported as the MCP `serverInfo.version`, and
   sent on every request as `User-Agent: tm/<version>`. The server can then log which clients
   call it.
@@ -147,32 +149,36 @@ name the mismatch. That comparison belongs to the versioning policy, not to this
 
 ## Open Questions
 
-1. **Where the client is published.** The repository is private, so the channel decides who can
-   install without a GitHub credential.
-   - Public npm under a scope (recommended): `npx -y <scope>/tm mcp` works anywhere, as MCP hosts'
-     own examples do. The bundled client source becomes public; the server's code does not.
+All four were ruled on 2026-11-10; the options are kept as the record of what was weighed.
+
+1. **Where the client is published.** The channel decides who can install without a GitHub
+   credential.
+   - Public npm under a scope: `npx -y <scope>/tm mcp` works anywhere, as MCP hosts' own
+     examples do.
    - GitHub Packages (private npm): installing needs a GitHub token in the machine's npm config,
      which breaks the one-line install and every MCP host config.
-   - Release binaries on this repository only: downloading needs a GitHub credential while the
-     repository is private.
-2. **Which runtime the published client requires** (depends on 1).
-   - Node, Bun optional (recommended): a single bundled JavaScript file with its first line
-     rewritten to a `node` shebang. `npx -y` runs it wherever Node is installed, as MCP hosts' own
-     examples assume; a machine with only Bun runs it with `bunx --bun`. It costs replacing the
-     one `Bun.stdin` call and a post-build shebang rewrite.
+   - Release binaries on this repository only.
+   - Ruled 2026-11-10: the repository goes public and the client is published to public npm.
+2. **Which runtime the published client requires.**
+   - Node, Bun optional: a single bundled JavaScript file with its first line rewritten to a
+     `node` shebang. `npx -y` runs it wherever Node is installed, as MCP hosts' own examples
+     assume; a machine with only Bun runs it with `bunx --bun`. It costs replacing the one
+     `Bun.stdin` call and a post-build shebang rewrite.
    - Bun only: the package ships as it is today. Every operator has to install Bun first, and
      `npx` fails without it.
-3. **Whether standalone binaries ship too** (depends on 1).
-   - Not in this milestone (recommended): npm covers Claude Code and Cursor. Binaries are about 71 to
-     97 MB per platform. macOS signing and notarisation of a downloaded binary were not tried.
-   - Yes, on a release: per-platform `bun build --compile` executables, for machines with no Node
-     or Bun. They need public release assets, or a separate public host, while the repository is
-     private.
+   - Ruled 2026-11-10: Node, Bun optional.
+3. **Whether standalone binaries ship too.**
+   - Not in this milestone: npm covers Claude Code and Cursor. Binaries are about 71 to 97 MB per
+     platform. macOS signing and notarisation of a downloaded binary were not tried.
+   - Yes, on a release: per-platform `bun build --compile` executables attached to the public
+     repository's releases, for machines with no Node or Bun.
    - Yes, plus a Homebrew tap: `brew install` on macOS, at the cost of a tap repository to keep
      in step with each release.
-4. **The package name** (depends on 1). Unscoped `tm` is taken on npm.
-   - `@hsb3/tm` (recommended): the command stays `tm`, matching the GitHub account that owns the
-     repository. It needs an npm user or organisation named `hsb3`; whether one exists or is free
-     on npmjs.com is unverified.
+   - Ruled 2026-11-10: no standalone binaries in this milestone.
+4. **The package name.** Unscoped `tm` is taken on npm.
+   - `@hsb3/tm`: the command stays `tm`, matching the GitHub account that owns the repository. It
+     needs an npm user or organisation named `hsb3`; whether one exists or is free on npmjs.com
+     is unverified.
    - A product-named scope or package (for example an organisation scope): it reads better to
      outside operators, but needs a name chosen and an npm organisation created first.
+   - Ruled 2026-11-10: `@hsb3/tm`.
