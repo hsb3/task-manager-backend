@@ -152,6 +152,20 @@ With S3 enabled, every backup operation (list, create, restore) goes to the buck
 
 The backup bucket holds only backups. Retention deletes objects in it and a restore treats its archive set as the whole story, so permanent user files never share it; uploaded files use their own bucket (decision:file-storage-s3-from-env).
 
+## batch-signup-refused
+
+- **Slug:** `decision:batch-signup-refused`
+- **Title:** A signup cannot ride /api/batch: creating a users record inside a batch is refused for everyone but a superuser, so signup has one rate-limit bucket.
+- **Ref:** `users`
+
+Supersedes the batch and signup-limit statements in decision:rate-limits-batch-and-superuser-mfa. Measured on PocketBase 0.40.4.
+
+- **The gap.** The record-create rate limiter is keyed by route pattern, and a sub-request of `POST /api/batch` has a different pattern from `POST /api/collections/users/records`. A batch signup therefore had its own bucket: one client address could make 5 direct signups and 5 more in batches within a minute. No settings rule merges the two: a `users:create` tag rule was tried and the buckets stayed separate.
+- **The rule.** A batch request that creates a `users` record, by create or by upsert, answers 400 unless the caller is a superuser. Superusers bypass the limiter anyway, so seeding and import through a batch keep working. Every other collection is unaffected, and batch stays enabled with its size and timeout limits.
+- **The result.** Signup has one bucket: 5 a minute per client address on `POST /api/collections/users/records`, direct only.
+
+`tests/test_signup_verification.ts` proves it.
+
 ## comment-threads-single-level
 
 - **Slug:** `decision:comment-threads-single-level`
@@ -267,6 +281,18 @@ Options weighed. (a) Backfills as first-class migrations that repair rows, the p
 Decision. Every database, development, test rooms, the continuous-integration replay, staging when one exists, and production, boots from the current migration set, and the set is written for an empty database. A migration never repairs rows. The one exception is the field-type-change recipe, whose row copy is part of a schema change and runs correctly on an empty database, where it copies nothing. A migration that must touch rows for any other reason is a sign that the fix belongs elsewhere: in a hook that keeps the invariant on every write, or in a one-off operation against the one database that holds the rows. No gate enforces this, by this decision: the review of a migration that writes rows asks which of the two admitted shapes it is, the replay of every migration into an empty database with the hooks loaded, at commit time and on every pull request, catches a repair the hooks refuse, and the backup replay job catches one that production data refuses.
 
 Prior art. Rails: the migrations guide states that migrations are not the authoritative source for the database schema, that a new database is created faster and with fewer errors by loading the schema file than by replaying the migration history, and that modifying data in a migration is to be approached with caution (Active Record Migrations guide: Schema Dumping and You; Migrations and Seed Data). Prisma: each migration records the state it starts from and the state it ends at, so the history is a chain of named versions and a database applies only the migrations it still lacks, and seeding is a separate command run only when invoked (Prisma Migrate: the migration graph; Seeding).
+
+## field-goes-with-last-reader
+
+- **Slug:** `decision:field-goes-with-last-reader`
+- **Title:** A field goes when its last reader goes: the column, its index, its hooks and its tests are deleted in the same change.
+
+Owner ruling 2026-08-07, after the question of whether to keep a column once its use was retired.
+
+- **The rule.** When a field stops being read, delete the column, its index, its hooks and its tests together. "Keep it, it is harmless" is not a reason.
+- **Why.** An unread field still occupies the schema, the published API contract and the generated model, still has to be maintained, and still invites the next reader to assume it means something.
+- **Vocabulary.** A value in a fixed vocabulary obeys the same rule: it ships with a live producer, or it goes (decision:notification-kinds-ship-with-producer).
+- **Before leaving a field in place** "for now", delete it. An unused flag is dropped rather than given a branch it would need (decision:draft-private-publish-one-way).
 
 ## file-storage-s3-from-env
 
@@ -448,6 +474,20 @@ GET /api/tracker/me (route:tracker-me) now serves it from the server in one call
 
 Open means a live task whose status category is neither completed nor canceled, the same two categories project_items treats as resolved, so the name of a custom status never changes the count. A task with no status counts as open. The unread count is decided row by row by the live notifications list rule, so it cannot drift from what the inbox lists. A suspended membership stays in the list with its status, because a client must tell a closed workspace from a missing one, but the workspace name and counts are withheld: the workspace rules give a suspended member no read.
 
+## names-display-only
+
+- **Slug:** `decision:names-display-only`
+- **Title:** A name a person typed is display only: nothing is keyed, addressed or resolved by it, or by anything derived from it.
+
+Owner ruling 2026-08-07, after the shell addressed one account at another account's workspace.
+
+- **The rule.** A text name never serves as a key. That covers a lookup string, slug or folder name computed from a name as much as a literal name column, because a slug derived from a name is still a name used as a key. It holds for URLs and for every resolution path, not only for database columns.
+- **Why.** What a person typed changes and collides, and whatever is derived from it inherits both faults. The incident was a name-based resolution answering with the wrong account's workspace.
+- **What to use.** The record id, or an identifier the system mints once and never changes (decision:item-display-keys). A human-readable label is minted at creation and then follows the record, even when it stops matching its surroundings, and a name a person can rename is a placeholder, never an address (decision:cycle-rollover).
+- **Before adding a lookup** keyed on something a user typed, check whether the opaque id would do.
+
+Prior art: Linear mints an issue identifier once and keeps the identifier through a rename of the title. It rules out a link that breaks on rename, two records colliding on one derived key, and a second reader assuming the label is a lookup.
+
 ## notification-fanout-semantics
 
 - **Slug:** `decision:notification-fanout-semantics`
@@ -584,6 +624,8 @@ These settings are applied by migration.
 - **Superuser MFA.** `_superusers` requires MFA with an emailed one-time password (8 digits, valid for 5 minutes), so a superuser login depends on working mail.
 
 CORS is a server start flag rather than a setting, and its allow-list comes from the deployment environment.
+
+**Superseded in part:** a batch cannot create a `users` record unless the caller is a superuser (decision:batch-signup-refused), so the signup limit is a single bucket of direct signups; the rest of this record is unchanged.
 
 ## reactions-own-id-toggle
 

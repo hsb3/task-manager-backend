@@ -147,6 +147,12 @@ onRecordCreateRequest((e) => {
     e.record.setRandomPassword();
     return e.next();
   }
+  // A batch sub-request has its own rate-limit bucket, so a batch signup would double the signup allowance.
+  if (info.context === "batch" && !e.hasSuperuserAuth()) {
+    throw new BadRequestError(
+      "Sign up with a single request, not inside a batch.",
+    );
+  }
   // A superuser create keeps what it submitted (seed/import).
   if (!e.hasSuperuserAuth()) {
     const body = info.body || {};

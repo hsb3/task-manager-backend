@@ -337,7 +337,7 @@ try {
     tup(1, true),
   );
   const BATCHED = "batched-signup@example.com";
-  [s, r] = await api(
+  [s] = await api(
     "POST",
     "/api/batch",
     null,
@@ -353,16 +353,20 @@ try {
     { "X-Forwarded-For": "203.0.113.13" },
   );
   check(
-    "anonymous batch signup → 200, its create 200",
-    tup(s, r?.[0]?.status ?? null),
-    tup(200, 200),
+    "anonymous batch signup is refused: the batch 400s, no account is created",
+    tup(
+      s,
+      (
+        await api(
+          "GET",
+          `/api/collections/users/records?${urlencode({ filter: `email="${BATCHED}"` })}`,
+          su,
+        )
+      )[1]?.totalItems,
+    ),
+    tup(400, 0),
   );
-  check(
-    "exactly ONE welcome mail follows the batch signup once it commits",
-    (await wait_for_mail(MAIL_DIR_2, BATCHED)).length,
-    1,
-  );
-  const SEND_ROUTE = `/internal/signup-verification/${r?.[0]?.body?.id}`;
+  const SEND_ROUTE = `/internal/signup-verification/${r?.id}`;
   check(
     "the signup-mail route refuses a caller without the server secret → 404",
     tup(
@@ -372,9 +376,91 @@ try {
     tup(404, 404),
   );
   check(
-    "no further mail went to the batch signup",
+    "no mail went to the refused batch signup",
     (await wait_for_mail(MAIL_DIR_2, BATCHED)).length,
-    1,
+    0,
+  );
+
+  console.log("\n── (e2) batch signups share the signup allowance of direct ones ──");
+  const RL = { "X-Forwarded-For": "203.0.113.40" };
+  const rl_email = (i: number) => `rl-${i}@example.com`;
+  let direct_ok = 0;
+  let n = 0;
+  for (; n < 12; n++) {
+    [s] = await api(
+      "POST",
+      "/api/collections/users/records",
+      null,
+      signup_body(rl_email(n), "RL"),
+      RL,
+    );
+    if (s === 429) break;
+    if (s === 200) direct_ok++;
+  }
+  check(
+    "direct signups from one address hit the limit (5 allowed then 429)",
+    tup(direct_ok, s),
+    tup(5, 429),
+  );
+  for (let i = 0; i < 4; i++) {
+    const k = 100 + i;
+    await api(
+      "POST",
+      "/api/batch",
+      null,
+      {
+        requests: [
+          {
+            method: "POST",
+            url: "/api/collections/users/records",
+            body: signup_body(rl_email(k), "RL"),
+          },
+        ],
+      },
+      RL,
+    );
+  }
+  const created = (
+    await api(
+      "GET",
+      `/api/collections/users/records?${urlencode({ filter: "email~'rl-'", perPage: 100 })}`,
+      su,
+    )
+  )[1]?.totalItems;
+  check(
+    "accounts created from that address, direct plus batch, equal the direct limit",
+    created,
+    direct_ok,
+  );
+
+  const UPSERT = "rl-upsert@example.com";
+  [s, r] = await api(
+    "POST",
+    "/api/batch",
+    null,
+    {
+      requests: [
+        {
+          method: "PUT",
+          url: "/api/collections/users/records",
+          body: { id: "rlupsert0000001", ...signup_body(UPSERT, "RL") },
+        },
+      ],
+    },
+    { "X-Forwarded-For": "203.0.113.41" },
+  );
+  console.log(`  ·  anonymous batch PUT upsert of a new user → ${s} ${JSON.stringify(r)}`);
+  const upserted = (
+    await api(
+      "GET",
+      `/api/collections/users/records?${urlencode({ filter: `email="${UPSERT}"` })}`,
+      su,
+    )
+  )[1]?.totalItems;
+  check(
+    "anonymous batch PUT upsert of a new user → batch 400, no account exists",
+    tup(s, upserted),
+    tup(400, 0),
   );
 
   // Last: this burst spends the API rate limit of 127.0.0.1, which every later call here shares.
