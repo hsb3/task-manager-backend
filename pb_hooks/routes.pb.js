@@ -992,7 +992,7 @@ require(`${__hooks}/lib/routes.js`).add(
         }
       }
       if (!existing) {
-        // KEEP IN SYNC: transfer-ownership's catch and membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
+        // KEEP IN SYNC (below): transfer-ownership's catch and membership_status.pb.js `v.status || typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
         const v = err.value || err;
         if (v && (v.status || typeof v.marshalJSON === "function")) throw err;
         e.app
@@ -1620,7 +1620,7 @@ require(`${__hooks}/lib/routes.js`).add(
         }
       });
     } catch (err) {
-      // KEEP IN SYNC: pb_hooks/membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal or field validation error keeps its own answer; a 500 (the membership hook's) is this route's own.
+      // KEEP IN SYNC (below): pb_hooks/membership_status.pb.js `v.status || typeof v.marshalJSON === "function"` — a refusal or field validation error keeps its own answer; a 500 (the membership hook's) is this route's own.
       const v = err.value || err;
       if (
         v &&

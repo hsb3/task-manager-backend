@@ -18,8 +18,9 @@
  * self-fulfilling and CANNOT be detected here — measured, not assumed. What --check does catch
  * is drift the replay does not reproduce: a record seeded by some OTHER migration and never
  * regenerated into this file, a hand-reordering (rows render in slug order), a changed field
- * set, and any template or escaping edit. Treat it as generator parity, never as prose
- * integrity; no gate in this repo currently detects a one-byte prose edit to the seed.
+ * set, and any template or escaping edit. Prose integrity is the DIGEST's job: a write records
+ * the seed's digest in scripts/app_docs_seed.sha256 and --check refuses a seed that no longer
+ * matches it, so a one-byte edit made outside this generator goes red.
  */
 
 import fs from "node:fs";
@@ -37,6 +38,27 @@ export const MIGRATIONS = path.join(REPO, "pb_migrations");
 // .gitattributes is generated from this constant, so a re-seed moves `merge=binary` onto the new
 // seed and the superseded one drops out of it; gen_gitattributes.ts --check blesses that move.
 export const DEFAULT_OUTPUT = path.join(REPO, "pb_migrations", "1785189300_seed_app_docs.js");
+
+// The seed's prose has no other source, so a value edit is caught against this committed digest.
+export const DIGEST = path.join(REPO, "scripts", "app_docs_seed.sha256");
+
+/** `<sha256 of the seed's non-comment lines>  v2:<seed basename>\n`; comments stay editable. */
+export function digest_line(seed_text: string, seed: string = DEFAULT_OUTPUT): string {
+  const code = splitlines(seed_text)
+    .filter((l) => !l.trimStart().startsWith("//"))
+    .join("\n");
+  return `${new Bun.CryptoHasher("sha256").update(code).digest("hex")}  v2:${path.basename(seed)}\n`;
+}
+
+/** Why the seed and its committed digest disagree, or null. */
+export function digest_drift(seed_text: string, committed: string | null): string | null {
+  if (committed === digest_line(seed_text)) return null;
+  return (
+    `${path.relative(REPO, DEFAULT_OUTPUT)} no longer matches ${path.relative(REPO, DIGEST)} — ` +
+    "seed prose changed outside the generator (a hand-edit or a merge that kept one side). " +
+    "If the change is intended, regenerate both with: bun scripts/gen_app_docs_seed.ts"
+  );
+}
 
 // `created`/`updated` are autodate fields: seeding them would make every regeneration differ.
 export const FIELDS = ["id", "slug", "refName", "title", "body"];
@@ -243,6 +265,14 @@ export function main(): number {
       return 1;
     }
     const committed = read_text(args.output);
+    const drift =
+      // Any copy named like the seed is held to the digest, so a symlinked or scratch path cannot skip it.
+      path.basename(args.output) === path.basename(DEFAULT_OUTPUT) &&
+      digest_drift(committed, fs.existsSync(DIGEST) ? read_text(DIGEST) : null);
+    if (drift) {
+      print(`❌ gen_app_docs_seed --check: ${drift}`);
+      return 1;
+    }
     if (committed !== rendered) {
       print(
         `❌ gen_app_docs_seed --check: ${args.output} has drifted from the corpus ` +
@@ -259,6 +289,8 @@ export function main(): number {
   }
 
   fs.writeFileSync(args.output, rendered);
+  if (fs.realpathSync(args.output) === fs.realpathSync(DEFAULT_OUTPUT))
+    fs.writeFileSync(DIGEST, digest_line(rendered));
   print(`✅ gen_app_docs_seed: wrote ${records.length} record(s) to ${args.output}`);
   return 0;
 }

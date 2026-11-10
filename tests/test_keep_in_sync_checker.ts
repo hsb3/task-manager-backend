@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // Unit-pin scripts/check_keep_in_sync.ts: the token-boundary match rule and the three
 // dispositions a marker can take (enforced / unverified / free-form), on synthetic scratch trees
-// only (no server, no DB, the shipped tree is never asserted about so marker conversion is free
-// to move its counts).
+// only (no server, no DB, no marker counts asserted so marker conversion is free to move them),
+// plus one pin over copies of the shipped error-predicate sites.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -208,6 +208,57 @@ check(
 
 [rc, out] = verdict(mirrored, ["--table"], ["a.py"]);
 check("an untracked, unignored marker file is not scanned", out.includes("a.py:1"), false);
+
+console.log("\n── (h) a `(below)` marker holds the code right under it, not the whole file ──");
+const twin_sites = {
+  "a.py": "# KEEP IN SYNC (below): b.py `BUDGET = 5`.\nBUDGET = 5\n\n\n\n\n\n\n\nBUDGET = 5\n",
+  "b.py": "BUDGET = 5\n",
+};
+[rc, out] = verdict(twin_sites);
+check("a `(below)` literal right under its marker exits 0", rc, 0);
+[rc, out] = verdict({
+  ...twin_sites,
+  "a.py": twin_sites["a.py"].replace("\nBUDGET = 5\n\n", "\nBUDGET = 6\n\n"),
+});
+check("...moved under the marker while a far copy remains exits 1", rc, 1);
+
+console.log(
+  "\n── (i) the shipped error-predicate sites: either half moved at any one site goes red ──",
+);
+// Shipped-tree pin: the refusal-vs-500 predicate is inlined per pooled-JSVM callback.
+const PRED = 'v.status || typeof v.marshalJSON === "function"';
+const HOOKS = ["routes.pb.js", "membership_status.pb.js", "oauth.pb.js"];
+const shipped = Object.fromEntries(
+  HOOKS.map((f) => [
+    `pb_hooks/${f}`,
+    fs.readFileSync(path.join(REPO_ROOT, "pb_hooks", f), "utf-8"),
+  ]),
+);
+const pred_errors = (o: string): string[] => o.split("\n").filter((l) => l.includes("marshalJSON"));
+[rc, out] = verdict(shipped);
+check("the shipped sites raise no predicate error", pred_errors(out), []);
+for (const [rel, text] of Object.entries(shipped)) {
+  const lines = text.split("\n");
+  const sites = lines.flatMap((l, i) =>
+    l.includes("typeof v.marshalJSON") && !l.includes("KEEP IN SYNC") ? [i] : [],
+  );
+  check(`${rel} has at least one predicate site`, sites.length > 0, true);
+  for (const i of sites) {
+    for (const [half, from, to] of [
+      ["status", "v.status ||", "v.code ||"],
+      ["marshalJSON", "v.marshalJSON", "v.toJSON"],
+    ] as const) {
+      const moved = [...lines];
+      moved[i] = moved[i]!.replace(from, to);
+      [rc, out] = verdict({ ...shipped, [rel]: moved.join("\n") });
+      check(
+        `${rel}:${i + 1} ${half} half moved goes red`,
+        pred_errors(out).some((l) => l.includes(PRED)),
+        true,
+      );
+    }
+  }
+}
 
 console.log();
 if (failures) {

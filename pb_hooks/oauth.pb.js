@@ -120,7 +120,7 @@ onRecordAuthWithOAuth2Request((e) => {
       typeof w.rawData === "function"
         ? w.rawData()
         : null;
-    // KEEP IN SYNC: membership_status.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
+    // KEEP IN SYNC (below): membership_status.pb.js `v.status || typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
     if (v && !(v.status || typeof v.marshalJSON === "function")) {
       e.app
         .logger()
