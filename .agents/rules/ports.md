@@ -64,6 +64,7 @@ failure modes name themselves via `roomkit.die_no_server`/`roomkit.token_of` ins
 dying on `KeyError: 'token'`. Solo-run recipe — **one legacy suite per room**:
 
 ```bash
+find pb_migrations pb_hooks -type l   # must print nothing: a copied symlink aliases the real tree
 S=$(mktemp -d); cp -R pb_migrations "$S/mig"; rm -f "$S/mig/"*superuser_mfa.js; cp -R pb_hooks "$S/hooks"
 ./pocketbase superuser upsert probe@example.com probe123456 --dir "$S/pb_data" --migrationsDir "$S/mig"
 ./pocketbase serve --http=127.0.0.1:8091 --dir "$S/pb_data" --migrationsDir "$S/mig" --hooksDir "$S/hooks" &
