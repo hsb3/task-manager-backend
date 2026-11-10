@@ -151,7 +151,7 @@ export const CONSTANTS: Record<string, Spec> = {
       },
       {
         file: "pb_hooks/counts.pb.js",
-        marker: "KEEP IN SYNC: subtask done",
+        marker: "KEEP IN SYNC (below): subtask done",
         each: String.raw`(?<=category IN \([^)]*)'([^']*)'`,
         values: ["completed", "canceled"],
         note: "project_items enrich hook: subtask_done counts children in a resolved-half status",
@@ -165,7 +165,7 @@ export const CONSTANTS: Record<string, Spec> = {
       },
       {
         file: "pb_hooks/counts.pb.js",
-        marker: "KEEP IN SYNC: statuses enrich: terminal and off_pipeline",
+        marker: "KEEP IN SYNC (below): statuses enrich: terminal and off_pipeline",
         each: String.raw`category === "([^"]*)"`,
         values: ["completed", "canceled"],
         emitters: {
@@ -365,7 +365,7 @@ export const CONSTANTS: Record<string, Spec> = {
 
 export const TEMPLATE_KEYS_FILE = "pb_hooks/scope.pb.js";
 // Load-bearing, not decorative: each occurrence of this comment anchors one inlined copy.
-export const TEMPLATE_KEYS_ANCHOR = "KEEP IN SYNC: TEMPLATE_DATA_KEYS";
+export const TEMPLATE_KEYS_ANCHOR = "KEEP IN SYNC (below): TEMPLATE_DATA_KEYS";
 export const TEMPLATE_KEYS_ARRAYS: Record<string, string> = {
   TEMPLATE_DATA_KEYS_TASK: "TASK_KEYS",
   TEMPLATE_DATA_KEYS_DOCUMENT: "DOC_KEYS",
@@ -375,7 +375,7 @@ export const PRIORITY_TOKEN_NAME = "PRIORITY_UNSET_TOKEN";
 export const PRIORITY_TOKEN_FILE = "pb_hooks/lib/workspace_rules.js";
 // Load-bearing: the token is read off the first code line under this comment, so the
 // comment must stay directly above the comparison it governs.
-export const PRIORITY_TOKEN_ANCHOR = "KEEP IN SYNC: PRIORITY_UNSET_TOKEN";
+export const PRIORITY_TOKEN_ANCHOR = "KEEP IN SYNC (below): PRIORITY_UNSET_TOKEN";
 
 /** Every marker registered against a file — each one ends the region before it. */
 export function _markers_of(file: string): string[] {

@@ -250,7 +250,7 @@ onBootstrap((e) => {
           );
           // Resolved work stays behind: canceled is as resolved as completed, and carrying
           // it forward would make every later cycle accumulate abandoned work.
-          // KEEP IN SYNC: the resolved half of STATUS_CATEGORIES — `completed` and `canceled` (scripts/check_constants.ts).
+          // KEEP IN SYNC (below): the resolved half of STATUS_CATEGORIES — `completed` and `canceled` (scripts/check_constants.ts).
           var resolved = $app.findRecordsByFilter(
             "statuses",
             "workspace = {:w} && (category = 'completed' || category = 'canceled')",
@@ -387,7 +387,7 @@ require(`${__hooks}/lib/routes.js`).add(
           );
           // Resolved work stays behind: canceled is as resolved as completed, and carrying
           // it forward would make every later cycle accumulate abandoned work.
-          // KEEP IN SYNC: the resolved half of STATUS_CATEGORIES — `completed` and `canceled` (scripts/check_constants.ts).
+          // KEEP IN SYNC (below): the resolved half of STATUS_CATEGORIES — `completed` and `canceled` (scripts/check_constants.ts).
           var resolved = e.app.findRecordsByFilter(
             "statuses",
             "workspace = {:w} && (category = 'completed' || category = 'canceled')",

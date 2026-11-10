@@ -16,7 +16,7 @@
  *   literal     — the inner text of a backticked or double-quoted span. Delimiters are dropped,
  *                 so JSON's \" escaping cannot hide an otherwise identical match.
  *
- * Three assertions follow, and only these:
+ * The assertions, and only these:
  *
  *   1. every named file resolves to an existing file;
  *   2. a marker that names at least one resolved file quotes at least one literal that is really
@@ -28,7 +28,10 @@
  *      with every KEEP IN SYNC comment run masked out, so no marker can satisfy another
  *      marker's claim with its own prose. A `KEEP IN SYNC (below)` marker narrows its own
  *      file's side to the BELOW_LINES code lines under its comment run, for a fact inlined at
- *      several sites of one file, where any other site would otherwise stand in for a moved one.
+ *      several sites of one file, where any other site would otherwise stand in for a moved one;
+ *   4. a plain-form literal sits on at most one code line of its own file's body, since
+ *      otherwise one of its sites can move unseen; such a fact takes the `(below)` form at
+ *      each site. A whole-line comment is never a site, here or in a `(below)` window.
  *
  * FREE-FORM PROSE to this gate is a marker naming no file at all, and a literal on such a
  * marker. Those are counted and printed on every run (--table names them), never silently
@@ -315,13 +318,23 @@ export function audit(root: string): Report {
       // `(below)`: the own-file side is the code under the marker run, so a twin elsewhere in
       // the same file cannot stand in for this site.
       let below: string | null = null;
+      let window = rel;
       if (line.includes(BELOW)) {
         const prefix = comment_prefix(line);
         let j = i + 1;
         while (prefix !== null && j < lines.length && comment_prefix(lines[j]!) === prefix) j += 1;
-        below = lines.slice(j, j + BELOW_LINES).join("\n");
+        // A comment line is not a site, so it neither matches nor uses up the window.
+        const code: number[] = [];
+        for (; j < lines.length && code.length < BELOW_LINES; j++) {
+          if (comment_prefix(lines[j]!) === null) code.push(j);
+        }
+        below = code.map((k) => lines[k]!).join("\n");
+        window =
+          `${rel}:${code[0]! + 1}-${code.at(-1)! + 1} ` +
+          `(the ${BELOW_LINES} code lines under the marker)`;
       }
       const side = (m: string): string => (m === rel && below !== null ? below : body_of(m));
+      const label = (m: string): string => (m === rel ? window : m);
       const enforced_literals: string[] = [];
       const unmirrored: string[] = [];
       for (const literal of literals_of(line)) {
@@ -340,9 +353,22 @@ export function audit(root: string): Report {
         const absent = mirror.filter((m) => !present.includes(m));
         if (absent.length) {
           report.errors.push(
-            `${where}: ${py_repr(literal)} still appears in ${present.join(", ")} but no ` +
-              `longer in ${absent.join(", ")} — the marker names these as one ` +
-              "mirror and exactly one side moved.",
+            `${where}: ${py_repr(literal)} still appears in ${present.map(label).join(", ")} ` +
+              `but no longer in ${absent.map(label).join(", ")} — the marker names these as ` +
+              "one mirror and exactly one side moved.",
+          );
+        }
+        const own =
+          below === null
+            ? splitlines(body_of(rel)).filter(
+                (l) => comment_prefix(l) === null && occurrence(literal).test(l),
+              ).length
+            : 0;
+        if (own > 1) {
+          report.errors.push(
+            `${where}: ${py_repr(literal)} occurs on ${own} code lines of ${rel}, so any one ` +
+              "site can move while another still satisfies this marker — mark each site " +
+              `\`${BELOW}:\` with the literal in the ${BELOW_LINES} lines under it.`,
           );
         }
       }

@@ -5,7 +5,7 @@
 // record: a non-empty stamp means the save came through the API, "-" that it carries no
 // attributable user (superuser or anon). Custom keys never serialize, so this reaches no
 // response body, no stored row and no broadcast payload.
-// KEEP IN SYNC: realtime.pb.js stamps the same "_actor" key under the same convention.
+// KEEP IN SYNC (below): realtime.pb.js stamps the same "_actor" key under the same convention.
 onRecordUpdateRequest((e) => {
   e.record.set("_actor", e.auth && !e.auth.isSuperuser() ? e.auth.id : "-");
   // A superuser id names no users row, so their edit is attributed via operator instead.
