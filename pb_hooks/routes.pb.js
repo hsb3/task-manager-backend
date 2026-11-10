@@ -193,7 +193,7 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/trash", (e) => {
   const uid = e.auth.id;
   const wsId = (e.request.url.query().get("workspace") || "").trim();
   if (!wsId) throw new BadRequestError("workspace query param required");
-  // KEEP IN SYNC: project_items viewRule trash branch in schema/project_items.view.json — the owner or an active member, never a trashed workspace, and for non-task items an owner/admin or `draft = false || author`.
+  // KEEP IN SYNC: the project_items viewRule trash branch — the owner or an active member, never a trashed workspace.
   // MEMBERSHIP SCOPE BY HAND — a wrong scope leaks another tenant's trash. Caller must own
   // wsId OR have a workspace_members row (R7 find-first-or-throw idiom, trash.pb.js:59-67).
   // An unknown id, a stranger and a trashed workspace all answer the one 404 the other workspace
@@ -337,6 +337,7 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/trash", (e) => {
   const params = { w: wsId };
   let where = "workspace = {:w} && trashed != ''";
   if (!canSeeDrafts) {
+    // KEEP IN SYNC (below): project_items viewRule trash branch in schema/project_items.view.json — for non-task items an owner/admin or `draft = false || author`.
     where += " && (draft = false || author = {:uid})";
     params.uid = uid;
   }
@@ -626,7 +627,7 @@ require(`${__hooks}/lib/routes.js`).add(
     }
 
     const deriveStatusCategory = function (existingCategory, terminal) {
-      // KEEP IN SYNC: pb_hooks/counts.pb.js statuses enrich, terminal = {`completed`, `canceled`}
+      // KEEP IN SYNC (below): pb_hooks/counts.pb.js statuses enrich, terminal = {`completed`, `canceled`}
       const isTerminalCat = function (c) {
         return c === "completed" || c === "canceled";
       };

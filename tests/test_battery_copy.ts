@@ -68,6 +68,9 @@ function run_case(
     if (kind === "root") {
       fs.renameSync(source, path.join(repo, "real-source"));
       fs.symlinkSync(path.join(repo, "real-source"), source, "dir");
+    } else if (kind === "late") {
+      // Planted by the cp stub right after the legacy copy: only a check before the hard copy sees it.
+      linked = path.join(source, "late.js");
     } else if (kind !== "ordinary") {
       linked = path.join(source, "linked.js");
       if (kind === "nested") {
@@ -96,9 +99,11 @@ compgen -G "$HARD_MIGRATIONS/$MFA_MIGRATION_GLOB" >/dev/null || exit 1
       cp,
       `#!/bin/sh
 printf '%s\\n' "$2" >> "$COPY_LOG"
-exec ` +
+` +
         shlex_quote(Bun.which("cp")!) +
-        ' "$@"\n',
+        ` "$@" || exit $?
+if [ "$2" = "\${LATE_SOURCE:-}" ] && [ ! -L "$LATE_LINK" ]; then ln -s "$LATE_TARGET" "$LATE_LINK"; fi
+`,
     );
     fs.chmodSync(cp, 0o755);
     const copy_log = path.join(root, "copies.log");
@@ -109,6 +114,8 @@ exec ` +
       PATH: bin_dir + path.delimiter + ENV.PATH,
     };
     delete env.KEEP_SCRATCH;
+    if (kind === "late")
+      Object.assign(env, { LATE_SOURCE: source, LATE_LINK: linked, LATE_TARGET: outside });
     const result = Bun.spawnSync(["bash", script], { env, stdout: "pipe", stderr: "pipe" });
     const output = result.stdout.toString() + result.stderr.toString();
     if (port_plan === "refused") {
@@ -134,7 +141,11 @@ exec ` +
       assert.ok(result.exitCode !== 0, `${holder}/${kind} was copied`);
       assert.ok(output.includes(linked) && output.includes("symlink"), output);
       const copies = fs.existsSync(copy_log) ? splitlines(read_text(copy_log)) : [];
-      assert.ok(!copies.includes(source), `${holder}/${kind} refused only after copying`);
+      const allowed = kind === "late" ? 1 : 0; // the legacy copy ran before the link existed
+      assert.ok(
+        copies.filter((c) => c === source).length === allowed,
+        `${holder}/${kind} refused only after copying`,
+      );
     }
     assert.ok(fs.readdirSync(scratch).length === 0, `${holder}/${kind} leaked scratch`);
     assert.ok(read_text(outside) === "// outside\n");
@@ -224,6 +235,7 @@ if (!argv.includes("--hook-environment-check")) {
   for (const mfa_names of [[], [MFA_FIXTURE, "1799999998_superuser_mfa.js"]]) {
     run_case("pb_migrations", "ordinary", mfa_names);
   }
+  run_case("pb_migrations", "late");
   run_case("pb_hooks", "ordinary", [MFA_FIXTURE], "refused");
 }
 if (!argv.includes("--hook-fixture")) check_hook_environment();

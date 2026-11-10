@@ -221,6 +221,44 @@ check("a `(below)` literal right under its marker exits 0", rc, 0);
   "a.py": twin_sites["a.py"].replace("\nBUDGET = 5\n\n", "\nBUDGET = 6\n\n"),
 });
 check("...moved under the marker while a far copy remains exits 1", rc, 1);
+check(
+  "...naming the window under the marker, not the whole file",
+  out.includes("no longer in a.py:2-7 (the 6 code lines under the marker)"),
+  true,
+);
+
+[rc, out] = verdict({
+  ...twin_sites,
+  "a.py":
+    "# KEEP IN SYNC (below): b.py `BUDGET = 5`.\nx = 1\n# BUDGET = 5 lived here\nBUDGET = 6\n",
+});
+check("...a comment line under the marker is not a site, so a moved one exits 1", rc, 1);
+[rc, out] = verdict({
+  ...twin_sites,
+  "a.py":
+    "# KEEP IN SYNC (below): b.py `BUDGET = 5`.\nx = 1\n# a\n# b\n# c\n# d\n# e\nBUDGET = 5\n",
+});
+check("...and comment lines do not use up the window", rc, 0);
+
+console.log("\n── (j) a plain marker whose literal recurs in its own file is refused ──");
+const repeated = {
+  "a.py": "# KEEP IN SYNC: b.py `BUDGET = 5`.\nBUDGET = 5\n\nBUDGET = 5\n",
+  "b.py": "BUDGET = 5\n",
+};
+[rc, out] = verdict(repeated);
+check("a plain-form literal at two sites of its own file exits 1", rc, 1);
+check(
+  "...pointing the author at the (below) form",
+  out.includes("a.py:1: 'BUDGET = 5' occurs on 2 code lines of a.py") && out.includes("(below)"),
+  true,
+);
+[rc, out] = verdict({ ...repeated, "a.py": "# KEEP IN SYNC: b.py `BUDGET = 5`.\nBUDGET = 5\n" });
+check("...while one own-file site under the plain form exits 0", rc, 0);
+[rc, out] = verdict({
+  ...repeated,
+  "a.py": "# KEEP IN SYNC: b.py `BUDGET = 5`.\nBUDGET = 5\n# BUDGET = 5 is the budget\n",
+});
+check("...and a mention in an ordinary comment is not a second site", rc, 0);
 
 console.log(
   "\n── (i) the shipped error-predicate sites: either half moved at any one site goes red ──",

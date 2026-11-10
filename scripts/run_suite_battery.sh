@@ -104,7 +104,7 @@ if [ -n "$SHARD_SET" ]; then
   shard_i="${BASH_REMATCH[1]}"; shard_n="${BASH_REMATCH[2]}"
   [ "$shard_i" -le "$shard_n" ] || fail "BATTERY_SHARD=$SHARD_SPEC names shard $shard_i of only $shard_n"
   [ -f "$SHARD_TSV" ] || fail "BATTERY_SHARD is set but $SHARD_TSV does not exist"
-  # KEEP IN SYNC: shard_errors' `[1-9][0-9]*` row check in scripts/check_battery_suites.ts.
+  # KEEP IN SYNC (below): shard_errors' `[1-9][0-9]*` row check in scripts/check_battery_suites.ts.
   SHARD_LABELS="$(awk -F'\t' -v i="$shard_i" -v n="$shard_n" '
     { sub(/\r$/, "") }
     /^#/ { next }
@@ -263,6 +263,7 @@ build_migration_copies() {
   compgen -G "$LEGACY_MIGRATIONS/$MFA_MIGRATION_GLOB" >/dev/null \
     && fail "failed to drop MFA migration from legacy copy"
 
+  assert_copy_source "$REPO_ROOT/pb_migrations" || exit 1
   cp -R "$REPO_ROOT/pb_migrations" "$HARD_MIGRATIONS" || fail "could not copy migrations"
   assert_scratch_migration_copy "$HARD_MIGRATIONS" || exit 1
   # Scratch migration (CI battery only, never committed).

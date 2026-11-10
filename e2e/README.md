@@ -45,8 +45,9 @@ create, because a world is seeded into a fresh room only.
 
 ## Rate limits
 
-PocketBase counts requests per client IP in fixed 60-second windows. Behind a proxy, the
-client IP is the leftmost `X-Forwarded-For` entry.
+PocketBase counts requests per client IP in fixed 60-second windows. The client IP is the
+rightmost `X-Real-IP` entry, which Railway's edge sets; without that header it is the address
+the request arrives from. `X-Forwarded-For` is ignored (decision:rate-limit-counts-x-real-ip).
 
 - **Each collection route has its own bucket.** For example, the `workspaces` list and the
   `projects` list are counted separately. The general limit is 300 requests per window, so
@@ -65,6 +66,7 @@ client IP is the leftmost `X-Forwarded-For` entry.
 - **Seeding spends the same buckets.** Right after `seed.ts`, the client's IP has already
   used one sign-in per world user and a few dozen calls from the shared `/api/` bucket.
 
-`tests/test_agent_probe.ts` measures the per-collection buckets, the 429 body and the missing
-headers. `tests/test_e2e_world.ts` measures the shared custom-route bucket and the
-superuser-token exemption. The rest is read from the settings migration and PocketBase's limiter.
+`tests/test_agent_probe.ts` measures the per-collection buckets, the 429 body, the missing
+headers and which client address is counted. `tests/test_e2e_world.ts` measures the shared
+custom-route bucket and the superuser-token exemption. The rest is read from the settings
+migration and PocketBase's limiter.

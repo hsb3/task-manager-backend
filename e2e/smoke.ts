@@ -31,6 +31,7 @@ const COMPOSE = [
 ];
 const HEALTH_TIMEOUT_MS = 120_000;
 const SIGNUP_LIMIT = 5; // settings rateLimits rule "POST /api/collections/users/records"
+const SIGNIN_LIMIT = 10; // settings rateLimits rule "POST /api/collections/users/auth-with-password"
 
 let BASE_URL = "";
 let failures = 0;
@@ -49,10 +50,14 @@ function run(cmd: string[], env: Record<string, string> = {}): { code: number; o
   return { code: p.exitCode ?? 1, out: p.stdout.toString() + p.stderr.toString() };
 }
 
-async function post(url: string, body: unknown): Promise<{ status: number; json: any }> {
+async function post(
+  url: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; json: any }> {
   const r = await fetch(BASE_URL + url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
   return { status: r.status, json: await r.json().catch(() => null) };
@@ -105,6 +110,29 @@ async function probe_password_signup(): Promise<void> {
   );
 }
 
+// Without the edge, the counted address is the Docker gateway that publishes the port.
+async function probe_forged_client_address(): Promise<void> {
+  const signin = (headers: Record<string, string> = {}) =>
+    post(
+      "/api/collections/users/auth-with-password",
+      { identity: "nobody@example.com", password: "wrong-password" },
+      headers,
+    ).then((r) => r.status);
+  const statuses: number[] = [];
+  for (let i = 0; i < SIGNIN_LIMIT + 1; i++) statuses.push(await signin());
+  check(`failed sign-ins x${SIGNIN_LIMIT + 1}`, statuses, [...Array(SIGNIN_LIMIT).fill(400), 429]);
+  check(
+    "sign-in with a forged X-Forwarded-For after the 429",
+    await signin({ "X-Forwarded-For": "203.0.113.7" }),
+    429,
+  );
+  check(
+    "sign-in from another X-Real-IP after the 429",
+    await signin({ "X-Real-IP": "203.0.113.8" }),
+    400,
+  );
+}
+
 async function probe_signup_rate_limit(): Promise<void> {
   const statuses: number[] = [];
   for (let i = 0; i < SIGNUP_LIMIT + 1; i++) {
@@ -122,6 +150,7 @@ const PROBES = [
   probe_batch_create,
   probe_batch_upsert,
   probe_password_signup,
+  probe_forged_client_address,
   probe_signup_rate_limit,
 ];
 

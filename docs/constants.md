@@ -108,7 +108,7 @@ Sites:
 ## 7. TEMPLATE_DATA_KEYS
 
 Two type-scoped whitelists, both inlined in `pb_hooks/scope.pb.js` (marked
-`// KEEP IN SYNC: TEMPLATE_DATA_KEYS`, byte-parallel in the create + update handlers).
+`// KEEP IN SYNC (below): TEMPLATE_DATA_KEYS`, byte-parallel in the create + update handlers).
 That marker is the checker's parse anchor — moving or deleting it fails the gate. The
 `Values:` lines below are ASSERTED against those arrays, not the other way round: change
 the hook first, then paste what it now says here.
@@ -143,7 +143,7 @@ Values: none
 
 Sites:
 - `pb_hooks/lib/workspace_rules.js` — the reserved-token comparison inside
-  `validateWorkspacePriorities` (marked `// KEEP IN SYNC: PRIORITY_UNSET_TOKEN`). That
+  `validateWorkspacePriorities` (marked `// KEEP IN SYNC (below): PRIORITY_UNSET_TOKEN`). That
   marker is the checker's parse anchor and must stay directly above the comparison it
   governs; the `Values:` line is ASSERTED against that literal, not the other way round.
 

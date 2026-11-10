@@ -377,10 +377,20 @@ try {
   check("same token, another collection's list after the 429", s, 200);
   [s] = await api("GET", list("workspaces", { perPage: 1 }), me);
   check("same token + route again, no header (control)", s, 429);
+  // decision:rate-limit-counts-x-real-ip. Without the header the room counts its peer, 127.0.0.1,
+  // which stands in for the edge's X-Real-IP; a client value the edge appends to sits left of it.
   [s] = await api("GET", list("workspaces", { perPage: 1 }), me, null, {
     "X-Forwarded-For": "203.0.113.7",
   });
-  check("same token + route, client-set X-Forwarded-For after the 429", s, 200);
+  check("same token + route, client-set X-Forwarded-For after the 429", s, 429);
+  [s] = await api("GET", list("workspaces", { perPage: 1 }), me, null, {
+    "X-Real-IP": "203.0.113.7, 127.0.0.1",
+  });
+  check("same token + route, client X-Real-IP left of the edge's", s, 429);
+  [s] = await api("GET", list("workspaces", { perPage: 1 }), me, null, {
+    "X-Real-IP": "203.0.113.8",
+  });
+  check("another client address in X-Real-IP has its own bucket", s, 200);
 } finally {
   if (sse !== null) sse.stop = true;
   if (server !== null) await roomkit.stop(server);

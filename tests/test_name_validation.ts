@@ -63,7 +63,7 @@ const SU_PASSWORD = "probe123456";
 // Every whitespace run PB's `required` lets through; "" is already rejected by PB itself.
 const BLANKS = [" ", "   ", "\t", "\n", " \t \n "];
 
-// KEEP IN SYNC: pb_hooks/lib/workspace_rules.js's `guarded` array — the field names the shared hook judges.
+// KEEP IN SYNC (below): pb_hooks/lib/workspace_rules.js's guarded array `["name", "title", "slug", "body", "key"]` — the field names the shared hook judges.
 const GUARDED_FIELDS = new Set(["name", "title", "slug", "body", "key"]);
 
 // Dispositioned-accept: a required text field deliberately left unguarded, and why.

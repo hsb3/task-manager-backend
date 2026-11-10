@@ -96,13 +96,13 @@ onRecordDeleteRequest((e) => {
     e.record.set("trashed", new Date().toISOString().replace("T", " "));
     e.record.set("trashed_by", e.auth ? e.auth.id : "");
     e.app.save(e.record);
-    // KEEP IN SYNC: realtime.pb.js hides on the same `findRecordById("projects", __pid)` read — a row parked in a trashed
-    // project was ALREADY hidden before this set, so hidden -> hidden is no transition and
-    // owes no envelope; the live -> trashed hide still broadcasts, below.
+    // A row parked in a trashed project was ALREADY hidden before this set, so hidden -> hidden
+    // is no transition and owes no envelope; the live -> trashed hide still broadcasts, below.
     var __hiddenBefore = false;
     var __pid = e.record.get("project");
     if (__pid) {
       try {
+        // KEEP IN SYNC (below): realtime.pb.js hides on the same `findRecordById("projects", __pid)` read.
         __hiddenBefore =
           String(
             e.app.findRecordById("projects", __pid).get("trashed") || "",
@@ -121,9 +121,10 @@ onRecordDeleteRequest((e) => {
     if (!__wsRec || String(__wsRec.get("trashed") || "") !== "")
       return e.noContent(204);
     // the programmatic save above bypasses the request-hook broadcast tier, so the
-    // trash-SET event is emitted inline — its `rawChangedFields` envelope + delivery guard KEEP IN SYNC with realtime.pb.js
+    // trash-SET event is emitted inline.
     try {
       var __ws = e.record.get("workspace");
+      // KEEP IN SYNC (below): realtime.pb.js — the same `rawChangedFields` envelope and delivery guard.
       var __env = {
         collection: "tasks",
         id: e.record.id,
@@ -147,13 +148,14 @@ onRecordDeleteRequest((e) => {
         var __auth = __client.get("auth");
         var __uid = __auth ? String(__auth.id) : "";
         if (__allow[__uid] === undefined) {
-          // KEEP IN SYNC: realtime.pb.js's delivery guard — same owner-or-member predicate, `user = {:u} && status = 'active'`,
-          // re-checked at DELIVERY so a revoked membership stops the stream now (PBTT-484).
+          // The owner-or-member predicate is re-checked at DELIVERY so a revoked membership
+          // stops the stream now (PBTT-484).
           var __ok =
             !!(__auth && __auth.isSuperuser()) ||
             (!!__uid && __uid === __owner);
           if (!__ok && __uid) {
             try {
+              // KEEP IN SYNC (below): realtime.pb.js's delivery guard, `user = {:u} && status = 'active'`.
               e.app.findFirstRecordByFilter(
                 "workspace_members",
                 "workspace = {:w} && user = {:u} && status = 'active'",
@@ -213,13 +215,13 @@ onRecordDeleteRequest((e) => {
     e.record.set("trashed", new Date().toISOString().replace("T", " "));
     e.record.set("trashed_by", e.auth ? e.auth.id : "");
     e.app.save(e.record);
-    // KEEP IN SYNC: realtime.pb.js hides on the same `findRecordById("projects", __pid)` read — a row parked in a trashed
-    // project was ALREADY hidden before this set, so hidden -> hidden is no transition and
-    // owes no envelope; the live -> trashed hide still broadcasts, below.
+    // A row parked in a trashed project was ALREADY hidden before this set, so hidden -> hidden
+    // is no transition and owes no envelope; the live -> trashed hide still broadcasts, below.
     var __hiddenBefore = false;
     var __pid = e.record.get("project");
     if (__pid) {
       try {
+        // KEEP IN SYNC (below): realtime.pb.js hides on the same `findRecordById("projects", __pid)` read.
         __hiddenBefore =
           String(
             e.app.findRecordById("projects", __pid).get("trashed") || "",
@@ -238,9 +240,10 @@ onRecordDeleteRequest((e) => {
     if (!__wsRec || String(__wsRec.get("trashed") || "") !== "")
       return e.noContent(204);
     // the programmatic save above bypasses the request-hook broadcast tier, so the
-    // trash-SET event is emitted inline — its `rawChangedFields` envelope + delivery guard KEEP IN SYNC with realtime.pb.js
+    // trash-SET event is emitted inline.
     try {
       var __ws = e.record.get("workspace");
+      // KEEP IN SYNC (below): realtime.pb.js — the same `rawChangedFields` envelope and delivery guard.
       var __env = {
         collection: "decisions",
         id: e.record.id,
@@ -254,11 +257,12 @@ onRecordDeleteRequest((e) => {
         data: JSON.stringify(__env),
       });
       var __owner = __wsRec.get("owner");
-      // Draft privacy — KEEP IN SYNC: realtime.pb.js's `&& role = 'admin'` draft branch and this collection's
-      // viewRule (an ACTIVE-member author OR the workspace owner OR an ACTIVE admin); an empty author
+      // Draft privacy follows realtime.pb.js's draft branch and this collection's viewRule (an
+      // ACTIVE-member author OR the workspace owner OR an ACTIVE admin); an empty author
       // matches nobody, so a legacy/superuser-created draft stays owner+admin-only (PBTT-543).
       var __draft = e.record.get("draft") === true;
       var __author = String(e.record.get("author") || "");
+      // KEEP IN SYNC (below): realtime.pb.js's delivery guard, `user = {:u} && status = 'active'`.
       var __memberBase = "workspace = {:w} && user = {:u} && status = 'active'";
       var __clients = e.app.subscriptionsBroker().clients();
       var __allow = Object.create(null); // prototype-less: a subscriber id must never inherit a verdict
@@ -268,8 +272,8 @@ onRecordDeleteRequest((e) => {
         var __auth = __client.get("auth");
         var __uid = __auth ? String(__auth.id) : "";
         if (__allow[__uid] === undefined) {
-          // KEEP IN SYNC: realtime.pb.js's delivery guard — same owner-or-member predicate, `user = {:u} && status = 'active'`,
-          // re-checked at DELIVERY so a revoked membership stops the stream now (PBTT-484).
+          // The owner-or-member predicate is re-checked at DELIVERY so a revoked membership
+          // stops the stream now (PBTT-484).
           var __ok =
             !!(__auth && __auth.isSuperuser()) ||
             (!!__uid && __uid === __owner);
@@ -277,6 +281,7 @@ onRecordDeleteRequest((e) => {
             try {
               // The author leg rides this SAME lookup, so a suspended author is cut off
               // like everyone else (PBTT-462); the owner short-circuits above and has no row.
+              // KEEP IN SYNC (below): realtime.pb.js's `&& role = 'admin'` draft branch.
               e.app.findFirstRecordByFilter(
                 "workspace_members",
                 __draft && __uid !== __author
@@ -336,13 +341,13 @@ onRecordDeleteRequest((e) => {
     e.record.set("trashed", new Date().toISOString().replace("T", " "));
     e.record.set("trashed_by", e.auth ? e.auth.id : "");
     e.app.save(e.record);
-    // KEEP IN SYNC: realtime.pb.js hides on the same `findRecordById("projects", __pid)` read — a row parked in a trashed
-    // project was ALREADY hidden before this set, so hidden -> hidden is no transition and
-    // owes no envelope; the live -> trashed hide still broadcasts, below.
+    // A row parked in a trashed project was ALREADY hidden before this set, so hidden -> hidden
+    // is no transition and owes no envelope; the live -> trashed hide still broadcasts, below.
     var __hiddenBefore = false;
     var __pid = e.record.get("project");
     if (__pid) {
       try {
+        // KEEP IN SYNC (below): realtime.pb.js hides on the same `findRecordById("projects", __pid)` read.
         __hiddenBefore =
           String(
             e.app.findRecordById("projects", __pid).get("trashed") || "",
@@ -361,9 +366,10 @@ onRecordDeleteRequest((e) => {
     if (!__wsRec || String(__wsRec.get("trashed") || "") !== "")
       return e.noContent(204);
     // the programmatic save above bypasses the request-hook broadcast tier, so the
-    // trash-SET event is emitted inline — its `rawChangedFields` envelope + delivery guard KEEP IN SYNC with realtime.pb.js
+    // trash-SET event is emitted inline.
     try {
       var __ws = e.record.get("workspace");
+      // KEEP IN SYNC (below): realtime.pb.js — the same `rawChangedFields` envelope and delivery guard.
       var __env = {
         collection: "milestones",
         id: e.record.id,
@@ -377,11 +383,12 @@ onRecordDeleteRequest((e) => {
         data: JSON.stringify(__env),
       });
       var __owner = __wsRec.get("owner");
-      // Draft privacy — KEEP IN SYNC: realtime.pb.js's `&& role = 'admin'` draft branch and this collection's
-      // viewRule (an ACTIVE-member author OR the workspace owner OR an ACTIVE admin); an empty author
+      // Draft privacy follows realtime.pb.js's draft branch and this collection's viewRule (an
+      // ACTIVE-member author OR the workspace owner OR an ACTIVE admin); an empty author
       // matches nobody, so a legacy/superuser-created draft stays owner+admin-only (PBTT-543).
       var __draft = e.record.get("draft") === true;
       var __author = String(e.record.get("author") || "");
+      // KEEP IN SYNC (below): realtime.pb.js's delivery guard, `user = {:u} && status = 'active'`.
       var __memberBase = "workspace = {:w} && user = {:u} && status = 'active'";
       var __clients = e.app.subscriptionsBroker().clients();
       var __allow = Object.create(null); // prototype-less: a subscriber id must never inherit a verdict
@@ -391,8 +398,8 @@ onRecordDeleteRequest((e) => {
         var __auth = __client.get("auth");
         var __uid = __auth ? String(__auth.id) : "";
         if (__allow[__uid] === undefined) {
-          // KEEP IN SYNC: realtime.pb.js's delivery guard — same owner-or-member predicate, `user = {:u} && status = 'active'`,
-          // re-checked at DELIVERY so a revoked membership stops the stream now (PBTT-484).
+          // The owner-or-member predicate is re-checked at DELIVERY so a revoked membership
+          // stops the stream now (PBTT-484).
           var __ok =
             !!(__auth && __auth.isSuperuser()) ||
             (!!__uid && __uid === __owner);
@@ -400,6 +407,7 @@ onRecordDeleteRequest((e) => {
             try {
               // The author leg rides this SAME lookup, so a suspended author is cut off
               // like everyone else (PBTT-462); the owner short-circuits above and has no row.
+              // KEEP IN SYNC (below): realtime.pb.js's `&& role = 'admin'` draft branch.
               e.app.findFirstRecordByFilter(
                 "workspace_members",
                 __draft && __uid !== __author
@@ -459,13 +467,13 @@ onRecordDeleteRequest((e) => {
     e.record.set("trashed", new Date().toISOString().replace("T", " "));
     e.record.set("trashed_by", e.auth ? e.auth.id : "");
     e.app.save(e.record);
-    // KEEP IN SYNC: realtime.pb.js hides on the same `findRecordById("projects", __pid)` read — a row parked in a trashed
-    // project was ALREADY hidden before this set, so hidden -> hidden is no transition and
-    // owes no envelope; the live -> trashed hide still broadcasts, below.
+    // A row parked in a trashed project was ALREADY hidden before this set, so hidden -> hidden
+    // is no transition and owes no envelope; the live -> trashed hide still broadcasts, below.
     var __hiddenBefore = false;
     var __pid = e.record.get("project");
     if (__pid) {
       try {
+        // KEEP IN SYNC (below): realtime.pb.js hides on the same `findRecordById("projects", __pid)` read.
         __hiddenBefore =
           String(
             e.app.findRecordById("projects", __pid).get("trashed") || "",
@@ -484,9 +492,10 @@ onRecordDeleteRequest((e) => {
     if (!__wsRec || String(__wsRec.get("trashed") || "") !== "")
       return e.noContent(204);
     // the programmatic save above bypasses the request-hook broadcast tier, so the
-    // trash-SET event is emitted inline — its `rawChangedFields` envelope + delivery guard KEEP IN SYNC with realtime.pb.js
+    // trash-SET event is emitted inline.
     try {
       var __ws = e.record.get("workspace");
+      // KEEP IN SYNC (below): realtime.pb.js — the same `rawChangedFields` envelope and delivery guard.
       var __env = {
         collection: "documents",
         id: e.record.id,
@@ -500,11 +509,12 @@ onRecordDeleteRequest((e) => {
         data: JSON.stringify(__env),
       });
       var __owner = __wsRec.get("owner");
-      // Draft privacy — KEEP IN SYNC: realtime.pb.js's `&& role = 'admin'` draft branch and this collection's
-      // viewRule (an ACTIVE-member author OR the workspace owner OR an ACTIVE admin); an empty author
+      // Draft privacy follows realtime.pb.js's draft branch and this collection's viewRule (an
+      // ACTIVE-member author OR the workspace owner OR an ACTIVE admin); an empty author
       // matches nobody, so a legacy/superuser-created draft stays owner+admin-only (PBTT-543).
       var __draft = e.record.get("draft") === true;
       var __author = String(e.record.get("author") || "");
+      // KEEP IN SYNC (below): realtime.pb.js's delivery guard, `user = {:u} && status = 'active'`.
       var __memberBase = "workspace = {:w} && user = {:u} && status = 'active'";
       var __clients = e.app.subscriptionsBroker().clients();
       var __allow = Object.create(null); // prototype-less: a subscriber id must never inherit a verdict
@@ -514,8 +524,8 @@ onRecordDeleteRequest((e) => {
         var __auth = __client.get("auth");
         var __uid = __auth ? String(__auth.id) : "";
         if (__allow[__uid] === undefined) {
-          // KEEP IN SYNC: realtime.pb.js's delivery guard — same owner-or-member predicate, `user = {:u} && status = 'active'`,
-          // re-checked at DELIVERY so a revoked membership stops the stream now (PBTT-484).
+          // The owner-or-member predicate is re-checked at DELIVERY so a revoked membership
+          // stops the stream now (PBTT-484).
           var __ok =
             !!(__auth && __auth.isSuperuser()) ||
             (!!__uid && __uid === __owner);
@@ -523,6 +533,7 @@ onRecordDeleteRequest((e) => {
             try {
               // The author leg rides this SAME lookup, so a suspended author is cut off
               // like everyone else (PBTT-462); the owner short-circuits above and has no row.
+              // KEEP IN SYNC (below): realtime.pb.js's `&& role = 'admin'` draft branch.
               e.app.findFirstRecordByFilter(
                 "workspace_members",
                 __draft && __uid !== __author
@@ -904,7 +915,6 @@ onRecordUpdateRequest((e) => {
 //      request hooks above do NOT fire (real delete).
 // ═══════════════════════════════════════════════════════════════════════════
 
-// KEEP IN SYNC: routes.pb.js GET /api/tracker/trash reads `trash_retention_days` this same way to date purge_at.
 onBootstrap((e) => {
   e.next();
 
@@ -915,6 +925,7 @@ onBootstrap((e) => {
     try {
       var retentionDays = 30;
       try {
+        // KEEP IN SYNC (below): routes.pb.js GET /api/tracker/trash reads `trash_retention_days` this same way to date purge_at.
         var setRec = $app.findFirstRecordByFilter(
           "app_settings",
           "key = {:k}",

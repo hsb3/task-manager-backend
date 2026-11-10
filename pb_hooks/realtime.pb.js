@@ -6,7 +6,6 @@
 // at subscribe, so revoking a membership cuts the live feed immediately (PBTT-462).
 // A DRAFT decision/document/milestone is delivered only to the roles its viewRule admits, so
 // every field of rawRecord is REST-readable by every recipient — no payload scoping (PBTT-543).
-// KEEP IN SYNC: trash.pb.js's inlined soft-trash envelope carries the same `&& role = 'admin'` draft branch.
 // ponytail: one membership query per distinct subscriber per event — memoize across events if hot.
 
 // Pooled JSVM forbids a shared top-level helper (ReferenceError at request time —
@@ -145,7 +144,7 @@ onRecordCreateRequest((e) => {
 // record: a non-empty stamp means the save came through the API, "-" that it carries no
 // attributable user (superuser or anon). Custom keys never serialize, so this reaches no
 // response body, no stored row and no rawRecord payload.
-// KEEP IN SYNC: activity.pb.js stamps the same "_actor" key under the same convention.
+// KEEP IN SYNC (below): activity.pb.js stamps the same "_actor" key under the same convention.
 onRecordUpdateRequest((e) => {
   e.record.set("_actor", e.auth && !e.auth.isSuperuser() ? e.auth.id : "-");
   e.next();
@@ -512,6 +511,7 @@ onRecordUpdateRequest((e) => {
           try {
             // The author leg rides this SAME lookup, so a suspended author is cut off
             // like everyone else (PBTT-462); the owner short-circuits above and has no row.
+            // KEEP IN SYNC (below): trash.pb.js's inlined soft-trash envelope carries the same `&& role = 'admin'` draft branch.
             e.app.findFirstRecordByFilter(
               "workspace_members",
               __draft && __uid !== __author

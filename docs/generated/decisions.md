@@ -627,6 +627,17 @@ On `projects`:
 
 `owner` records who created the project and grants no write: no create, update or delete rule treats it as authority, so there is no project ownership transfer. It grants no read either: the task counts of the project follow workspace membership alone (decision:project-stats-membership). The workspace of a project is immutable (decision:project-workspace-immutable). Role tiers themselves are described in decision:role-tiers.
 
+## rate-limit-counts-x-real-ip
+
+- **Slug:** `decision:rate-limit-counts-x-real-ip`
+- **Title:** The rate limiter counts the client address Railway's edge sets in X-Real-IP, never one a client sends in X-Forwarded-For.
+
+Supersedes the client-address statement in decision:rate-limits-batch-and-superuser-mfa, which keyed the limiter on the leftmost `X-Forwarded-For` entry. That entry is whatever a client sends: a room proved it, a client-set `X-Forwarded-For` after a 429 got a fresh bucket. Railway documents no handling of an inbound `X-Forwarded-For`, so nothing rules out the same answer behind its edge, and PocketBase's own setting warns that a proxy may let a client prepend to that header.
+
+- **The rule.** `trustedProxy` names `X-Real-IP` alone and reads its rightmost entry. Railway's public-networking reference lists `X-Real-IP` as the header "for identifying client's remote IP". PocketBase 0.40.4 reads only the last line of a repeated header and, with `useLeftmostIP` false, the last address in it, so a value a client sends does not count when the edge writes a bare address that replaces the header, is appended to it or sits on its own line after it. A request without the header is counted by the address it arrives from. Every rate limit (sign-in, signup, `request-otp`, the `/api/` pool) uses this address.
+- **Proof.** `tests/test_agent_probe.ts` shows a client-set `X-Forwarded-For` after a 429 still answering 429, a client `X-Real-IP` entry left of the edge's still answering 429, and another `X-Real-IP` address getting its own bucket. `e2e/smoke.ts` shows the same for sign-in against the production image. Neither has Railway's edge in front, so both stand in for the address the edge sets.
+- **Limit.** PocketBase trusts the header from any peer. A caller that reaches the server without passing Railway's edge, such as another service on the project's private network, chooses the address it is counted as. Railway documents neither whether its edge replaces a client-sent `X-Real-IP` nor the exact form of the value it writes; if it passes a client value through unchanged, that client chooses its address too.
+
 ## rate-limits-batch-and-superuser-mfa
 
 - **Slug:** `decision:rate-limits-batch-and-superuser-mfa`
@@ -641,6 +652,8 @@ These settings are applied by migration.
 CORS is a server start flag rather than a setting, and its allow-list comes from the deployment environment.
 
 **Superseded in part:** a batch cannot create a `users` record unless the caller is a superuser (decision:batch-signup-refused), so the signup limit is a single bucket of direct signups; the rest of this record is unchanged.
+
+**Superseded in part:** the limiter reads the client address from `X-Real-IP`, not `X-Forwarded-For` (decision:rate-limit-counts-x-real-ip).
 
 ## reactions-own-id-toggle
 

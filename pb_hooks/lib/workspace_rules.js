@@ -47,7 +47,7 @@ function validateDefaultProject(app, record) {
         "default_project must belong to this workspace",
       );
     }
-    // KEEP IN SYNC: pb_hooks/scope.pb.js guards its project pointers with the same `pick one from the project list` refusal.
+    // KEEP IN SYNC (below): pb_hooks/scope.pb.js guards its project pointers with the same `pick one from the project list` refusal.
     if (project.get("shadow")) {
       throw new BadRequestError(
         "that project cannot be chosen here; pick one from the project list",
@@ -145,7 +145,7 @@ function validateWorkspacePriorities(record) {
         "priorities entry id must be 15 lowercase letters or digits",
       );
     }
-    // KEEP IN SYNC: PRIORITY_UNSET_TOKEN (docs/constants.md) — `none` is the wire token that
+    // KEEP IN SYNC (below): PRIORITY_UNSET_TOKEN (docs/constants.md) — `none` is the wire token that
     // clears a priority, so it can never also be a vocabulary entry.
     if (p.toLowerCase() === "none") {
       throw new BadRequestError(
@@ -200,7 +200,7 @@ function validateUserSettings(app, info, next, prev) {
     } catch (_) {
       rec = null;
     }
-    // KEEP IN SYNC: pb_hooks/scope.pb.js guards its project pointers with the same `pick one from the project list` refusal.
+    // KEEP IN SYNC (below): pb_hooks/scope.pb.js guards its project pointers with the same `pick one from the project list` refusal.
     if (rec && field === "default_project" && rec.get("shadow"))
       throw new BadRequestError(
         "that project cannot be chosen here; pick one from the project list",

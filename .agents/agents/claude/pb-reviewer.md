@@ -19,6 +19,7 @@ For each claim in the brief:
 
 Clean room — never reuse a producer's server, never touch 8090:
 
+    find pb_migrations pb_hooks -type l   # must print nothing
     cp -R pb_migrations <scratch>/mig && rm <scratch>/mig/*superuser_mfa.js
     cp -R pb_hooks <scratch>/hooks
     ./pocketbase serve --http=127.0.0.1:<port> --dir <scratch>/pb_data \
