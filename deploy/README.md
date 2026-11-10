@@ -19,7 +19,7 @@ and its preview/apply commands are in [railway/README.md](railway/README.md).
 
 ## Local
 
-`make local-up` builds the `Dockerfile` image and runs it at `http://127.0.0.1:8090` (`+ PB_PORT_OFFSET`), with `pb_data` in a named volume; `make local-logs` follows the log and `make local-down` removes the container. Drop the data too with `docker compose -f deploy/local/compose.yaml down -v`. No superuser, mail, S3 or OAuth is configured. Files: [local/compose.yaml](local/compose.yaml).
+`make local-up` builds the `Dockerfile` image and runs it at `http://127.0.0.1:8090` (`+ PB_PORT_OFFSET`), with `pb_data` in a named volume; `make local-logs` follows the log and `make local-down` removes the container. Drop the data too with `docker compose -f deploy/local/compose.yaml down -v`. No superuser, mail, S3 or OAuth is configured. `make smoke` builds the same image under its own compose project on a free port, runs the live probes in `e2e/smoke.ts` against it, and removes the container, volume and image tag whatever the result. Files: [local/compose.yaml](local/compose.yaml).
 
 ## Bootstrapping a new Railway project
 
