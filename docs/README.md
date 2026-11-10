@@ -1,7 +1,7 @@
 ---
 title: docs/
 status: current
-version: 13
+version: 14
 updated: 2026-11-10
 ---
 
@@ -22,6 +22,7 @@ fail on the drift. The directory is split by provenance:
 | [`self-documenting-app.md`](self-documenting-app.md) | How the `app_docs` convention works: the app describes its own collections | Adding or changing a collection |
 | [`constants.md`](constants.md) | Values duplicated across hooks, scripts and tests, and the guard that keeps them in step | Changing a shared vocabulary |
 | [`design-patterns.md`](design-patterns.md) | The framework-agnostic patterns this app instantiates, each citing the decision record or repo law that settled it | Carrying a rule proved here into another project, or arguing a design choice |
+| [`readiness/`](readiness/README.md) | What must be true for agent clients, an outside web team and an outside mobile team, with the measured gap per criterion id | Planning or citing work that makes the backend ready for a new kind of client |
 
 ## Generated: do not edit
 
