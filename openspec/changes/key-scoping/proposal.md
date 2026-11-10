@@ -125,11 +125,15 @@ resource outside the credential reads as absent (404), while a missing permissio
 ## What Changes
 
 - A key carries two limits, both fixed when the key is made, like `scope` today, and both
-  shown in the key list: which part of the tracker it reaches (every workspace, as today, or a
-  narrower part) and what it may do there (read, write, or a level above write that alone
-  reaches the destructive and ownership surfaces above).
-- Under a key, the caller can do only what both the user's role and the key's limits allow; a
-  key never adds to the role.
+  shown in the key list: which part of the tracker it reaches (every workspace, as today, or
+  one workspace, optionally narrowed to some of its projects) and its level, which follows the
+  role tiers of decision:role-tiers: `read`, `write` (items and projects, including the trash),
+  `manage` (settings, vocabulary, invitations, purge) or `own` (roles, transfer, workspace
+  deletion). A `write` key therefore cannot purge, invite, change settings or roles, hand over
+  ownership or delete a workspace. It keeps deleting a comment, removing an attachment and
+  moving a project to the trash.
+- Under a key, the caller acts at the lower of the key's level and the user's role, within the
+  key's reach; a key never adds to the role.
 - A request under a limited key behaves as if the user could reach only the key's part of the
   tracker: a record outside it reads as absent (404 on view, left out of lists and counts), and
   a write naming it gets the answer a write to an unreachable workspace gets today. A request
@@ -143,13 +147,19 @@ resource outside the credential reads as absent (404), while a missing permissio
   second call.
 - A key limited to part of the tracker cannot create a workspace, or accept or decline an
   invitation; those act outside any one workspace. A key limited to some projects cannot act
-  above write, because settings, invitations, members and ownership are workspace-wide.
-- A key with no new limits keeps today's reach, except that the meaning of an existing write
-  key is an open question below. Narrowing what `write` reaches changes an accepted limit of
+  above write, because settings, invitations, members and ownership are workspace-wide. Outside
+  its projects it reads only the workspace's settings (statuses, labels, cycles, members); work
+  filed under no project is out of its reach.
+- A key made before this change reaches every workspace as today, and a stored `write` means
+  the new `write` tier: existing write keys lose manage and own powers, and a key that needs
+  them is reissued at a higher level. Narrowing what `write` reaches changes an accepted limit of
   decision:api-keys ("Write keys reach every non-admin tracker route"), so a new decision record
   supersedes that limit.
-- The OAuth consent page of the hosted MCP auth decision (rulings 3, 6 and 7) lets the user pick
-  the limits before approving, and the minted key carries them. A refresh issues a key with the
+- The OAuth consent page of the hosted MCP auth decision (rulings 3, 6 and 7) offers a workspace
+  picker (one workspace, or every workspace) and read or write, defaulting to what the client
+  requested; a level above write is offered only when the client asks for it by name, and the
+  user may lower it. Project narrowing is left to keys made in the account. The minted key
+  carries the chosen limits. A refresh issues a key with the
   same limits; only a new consent changes them. The hosted MCP endpoint lists only the tools the
   key's level allows, extending ruling 7's read-only rule.
 - Key minting through a client command (AC-9, a separate change) lets the operator set the same
@@ -159,9 +169,9 @@ resource outside the credential reads as absent (404), while a missing permissio
 
 The hosted MCP auth decision is settled and this change works inside it. Ruling 6 makes an OAuth
 grant a key, so a grant has exactly the limits a key has, with no second set of rules to keep in
-step. Ruling 7 already has consent choose read or write; this change adds reach and the levels
-above write to the same choice. Ruling 3's consent page is minimal, which bounds how much choice
-it can show (Open Question 6). Ruling 5's MCP service calls PocketBase with the caller's
+step. Ruling 7 already has consent choose read or write; this change adds a workspace and, on request, the levels
+above write to the same choice, and keeps project narrowing off the page so it stays as minimal
+as ruling 3 requires. Ruling 5's MCP service calls PocketBase with the caller's
 credential, so the limits are enforced where the data is, whatever the service does.
 
 AC-5 (revoking a key ends its open realtime stream) is a separate criterion; both need an open
@@ -174,54 +184,18 @@ stream to answer to the key that opened it, not only to its user.
 
 ## Open Questions
 
-1. **How narrow a key's reach can be.** Options:
-   - (Recommended) One workspace, optionally narrowed to some of its projects, or every
-     workspace as today. Mirrors GitHub's one resource owner plus selected repositories, and
-     covers both halves of AC-3. An agent working in two workspaces needs two keys.
-   - Any set of workspaces, with no project narrowing. Mirrors Linear's team list, but leaves
-     the project half of AC-3 unmet.
-   - Any set of workspaces, each optionally narrowed to projects. The most general, and the most
-     to build, show on consent and test on every surface.
-2. **What a project-limited key sees of its workspace outside those projects.** Depends on 1.
-   Statuses, labels, cycles and member names are workspace-wide, and an agent cannot set a
-   task's status without reading them; decisions, documents and saved views may have no project.
-   Such a key never changes workspace settings (settled above). Options:
-   - (Recommended) It reads the workspace's settings (statuses, labels, cycles, members) and
-     nothing else outside its projects; work filed under no project is out of reach.
-   - It also reads work filed under no project, but writes only inside its projects.
-   - Nothing outside its projects; a client must learn status and label ids some other way.
-3. **How AC-4's limit is expressed.** Options:
-   - (Recommended) Key levels follow the existing role tiers of decision:role-tiers: `read`,
-     `write` (items and projects, including the trash), `manage` (settings, vocabulary,
-     invitations, purge) and `own` (roles, transfer, workspace deletion). A key acts at the lower
-     of its level and the user's role, and `me` already reports these tiers. A `write` key then
-     cannot purge, invite, change settings or roles, hand over ownership or delete a workspace.
-   - One level above `write` (named, say, `full`) that reaches everything a write key reaches
-     today. Simpler, as Linear's `admin`, but splits the role tiers: a key needing to edit
-     statuses also gets transfer and workspace deletion.
-   - Per-surface permissions, as GitHub fine-grained tokens have. The most precise and the most
-     to build, show and test.
-4. **Whether a write key keeps deletes that have no trash.** Depends on 3. Under the tiers, a
-   `write` key can still delete a comment and remove a file attached to an item, both
-   permanent, and can move a whole project to the trash. Options:
-   - (Recommended) Keep them at `write`: deleting a comment and replacing an attachment are
-     ordinary edits, and a trashed project can be restored.
-   - Move permanent deletes (comments, attachment removal) to `manage`: no `write` key destroys
-     anything for good, but an agent cannot delete its own comment or replace a file.
-5. **What happens to write keys that exist when this ships.** Depends on 3. The deployed server
-   is a test service, and the database rule is that a migration never rewrites rows, so the
-   choice is what a stored `write` means from then on. Options:
-   - (Recommended) A stored `write` means the new `write` tier and loses manage and own powers; a
-     key that needs them is reissued at a higher level. Fails safe.
-   - A stored `write` is treated as the highest level and keeps today's reach, while new keys
-     choose a tier. Nothing breaks, and every existing key stays as powerful as today.
-6. **What the OAuth consent page offers.** Depends on 1 and 3. Options:
-   - (Recommended) A workspace picker (one workspace, or every workspace) and read or write,
-     defaulting to what the client requested. A level above write is offered only when the
-     client asks for it by name, and the user may lower it. Project narrowing is left to keys
-     made in the account. Keeps the page minimal, as ruling 3 requires, while GitHub Apps and
-     Notion show that resources belong on consent.
-   - Everything a key can carry: workspace, projects and every level. Same power as a key made
-     in the account, at the cost of a larger page.
-   - The client names the limits in the OAuth `scope` parameter and the user only approves or
-     denies. Smallest page, but the user cannot narrow what the client asks for.
+All ruled 2026-11-10, each with the recommended option; the rulings are stated above.
+
+1. **How narrow a key's reach can be.** Ruled: every workspace, or one workspace optionally
+   narrowed to some of its projects (not sets of workspaces).
+2. **What a project-limited key sees outside its projects.** Ruled: the workspace's settings
+   (statuses, labels, cycles, members) only; work filed under no project is out of reach.
+3. **How AC-4's limit is expressed.** Ruled: key levels follow decision:role-tiers (`read`,
+   `write`, `manage`, `own`), at the lower of level and role (not one level above write, not
+   per-surface permissions).
+4. **Whether a write key keeps deletes that have no trash.** Ruled: kept at `write` (deleting a
+   comment, removing an attachment, moving a project to the trash).
+5. **What happens to existing write keys.** Ruled: a stored `write` means the new `write` tier;
+   a key needing more is reissued.
+6. **What the OAuth consent page offers.** Ruled: workspace picker plus read or write; a higher
+   level only when the client requests it by name; no project narrowing on consent.
