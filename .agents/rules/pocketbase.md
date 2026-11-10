@@ -21,7 +21,8 @@ pocketbase plugin's field notes; what follows is what this repo's hooks add.
 - Pooled JSVM: hooks cannot share top-level functions/constants across callbacks —
   INLINE per site with `// KEEP IN SYNC:` comments (check_constants gates drift). A fact inlined
   at several sites of ONE file marks each site `// KEEP IN SYNC (below):`, so check_keep_in_sync
-  reads that file's side from the lines under the marker, not from any other site.
+  reads that file's side from the lines under the marker, not from any other site; a plain
+  marker whose literal recurs in its own file is refused.
 - Repo pointers for the generic traps: never subscribe to `project_stats` (a view: no realtime
   events; clients recompute on `tasks` events); `users.email` is hidden on others' records, so
   fixtures resolve users by `name`; the atomic `UPDATE … RETURNING` counter is `projects.item_seq`

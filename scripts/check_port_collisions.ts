@@ -16,6 +16,8 @@
  *
  * With an offset (--offset N, else PB_PORT_OFFSET in the environment) it also refuses any default (shell
  * `$((port + PB_PORT_OFFSET))` ones included) that offset would land on a local Postgres/Redis/MySQL/MongoDB port; without one it says nothing.
+ * Any offset landing one default on another is refused, as is a minimum ("N or more", "at least N
+ * apart") in ports.md or AGENTS.md below the lowest safe offset the layout supports.
  * An explicit nonzero --offset also refuses a default landing on a port something accepts a
  * connection on right now; the environment alone never probes (check-static runs beside live rooms).
  *
@@ -217,6 +219,56 @@ export function offset_errors(decls: [string, number, number][], offset: number)
     );
 }
 
+/** Offset -> [from, onto] for every offset that shifts one default onto another. */
+export function colliding_offsets(
+  decls: [string, number, number][],
+): Map<number, [number, number]> {
+  const ports = [...new Set(decls.map(([, , port]) => port))].sort((a, b) => a - b);
+  const bad = new Map<number, [number, number]>();
+  for (const a of ports)
+    for (const b of ports) if (b > a && !bad.has(b - a)) bad.set(b - a, [a, b]);
+  return bad;
+}
+
+/** The lowest offset above the run of colliding offsets that starts at 1. */
+export function safe_minimum(bad: Map<number, [number, number]>): number {
+  let m = 1;
+  while (bad.has(m)) m++;
+  return m;
+}
+
+export function self_offset_errors(bad: Map<number, [number, number]>, offset: number): string[] {
+  const hit = bad.get(Math.abs(offset));
+  return hit
+    ? [`offset ${offset} lands default ${hit[0]} on default ${hit[1]} — pick another offset`]
+    : [];
+}
+
+const MINIMUM_CLAIM_RE = /\b([0-9]+) or more\b|at least ([0-9]+) apart|≥\s*([0-9]+) apart/g;
+
+/** A stated offset minimum ("N or more", "at least N apart") the computed layout does not support. */
+export function minimum_claim_errors(
+  repo: string,
+  docs: string[],
+  bad: Map<number, [number, number]>,
+): string[] {
+  const minimum = safe_minimum(bad);
+  const errors: string[] = [];
+  for (const doc of docs) {
+    if (!fs.existsSync(doc)) continue;
+    for (const m of read_text(doc).matchAll(MINIMUM_CLAIM_RE)) {
+      const n = Number(m[1] ?? m[2] ?? m[3]);
+      if (n < minimum || bad.has(n)) {
+        errors.push(
+          `${path.relative(repo, doc)} states "${m[0]}", but the lowest safe offset is ${minimum}` +
+            (bad.has(n) ? ` and ${n} lands default ${bad.get(n)![0]} on ${bad.get(n)![1]}` : ""),
+        );
+      }
+    }
+  }
+  return errors;
+}
+
 /** Defaults an explicit offset would shift onto a port something is listening on right now. */
 export async function live_port_errors(
   decls: [string, number, number][],
@@ -351,7 +403,8 @@ options:
   --repo REPO           repo root to scan (default: this checkout)
   --ports-doc PORTS_DOC
                         ports.md path (default: <repo>/.agents/rules/ports.md)
-  --offset OFFSET       refuse defaults this offset lands on 5432/6379/3306/27017
+  --offset OFFSET       refuse an offset landing a default on another default or on
+                        5432/6379/3306/27017
                         (default: PB_PORT_OFFSET from the environment, else none);
                         an explicit nonzero value also refuses a default landing
                         on a port something is listening on right now
@@ -390,8 +443,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   }
   const decls = declarations(repo);
   const all_decls = [...decls, ...shell_declarations(repo)];
+  const bad = colliding_offsets(all_decls);
   const errors = [
     ...duplicate_errors(decls),
+    ...self_offset_errors(bad, offset),
+    ...minimum_claim_errors(repo, [ports_doc, path.join(repo, "AGENTS.md")], bad),
     ...claim_errors(repo, decls),
     ...doc_errors(repo, ports_doc, decls),
     ...offset_errors(all_decls, offset),
@@ -406,7 +462,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   print(
     `✅ check_port_collisions: ${new Set(decls.map(([, , p]) => p)).size} default port(s) in ` +
       `${SCAN_GLOBS.join(", ")}, each owned by one file; every docstring claim matches its ` +
-      "file's binds; .agents/rules/ports.md's named ports all resolve",
+      "file's binds; .agents/rules/ports.md's named ports all resolve; lowest safe offset " +
+      `${safe_minimum(bad)} (a larger offset landing one default on another is refused)`,
   );
   for (const [port, [, reason]] of [...SHARED].sort((a, b) => a[0] - b[0])) {
     print(`     shared by design: ${port} — ${reason}`);
