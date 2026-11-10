@@ -23,7 +23,11 @@ the only task system: OpenSpec holds the design, kata holds the work.
 A change's artifacts, each requiring the one before: `proposal.md` (why and what), spec deltas
 under `specs/` (observable behaviour), `contract.md` (routes, request and response shapes,
 error codes, auth, compatibility) and `design.md` (how the contract is met). There is no tasks
-artifact. Its `.openspec.yaml` lists under `x-criteria:` the readiness criterion ids it moves.
+artifact. The design is the implementation plan, and it is ready when a session unfamiliar
+with the codebase can build the change correctly with no design decision left to make: every
+choice is settled under Decisions, and the Implementation Plan is cut into phases that each
+leave the tree buildable, naming the exact files created, modified or deleted, the change to
+each, the test cases with input and expected result, and the gate commands. Its `.openspec.yaml` lists under `x-criteria:` the readiness criterion ids it moves.
 
 ## Lifecycle
 
