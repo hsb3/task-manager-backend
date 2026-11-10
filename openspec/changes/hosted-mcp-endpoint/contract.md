@@ -17,9 +17,10 @@ A value marked *(Q n)* is set by that ruling in Open Questions.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/mcp` | The MCP endpoint (Streamable HTTP). Its URL `{MCP}/mcp` is the canonical resource identifier. |
-| GET, DELETE | `/mcp` | 405 Method Not Allowed: no stream and no session to end. |
-| GET | `/.well-known/oauth-protected-resource/mcp` | Protected Resource Metadata (RFC 9728 §3.1, path-inserted form). |
-| GET | `/.well-known/oauth-protected-resource` | The same document, for clients that try the root form (see Protected Resource Metadata). |
+| GET, DELETE, any other method but OPTIONS | `/mcp` | 405 Method Not Allowed, `Allow: POST`: no stream and no session to end. |
+| OPTIONS | `/mcp` | 204, `Allow: POST`; CORS preflight headers only for an allowed `Origin` (see Origin). |
+| GET, HEAD | `/.well-known/oauth-protected-resource/mcp` | Protected Resource Metadata (RFC 9728 §3.1, path-inserted form). Other methods 405. |
+| GET, HEAD | `/.well-known/oauth-protected-resource` | The same document, for clients that try the root form (see Protected Resource Metadata). Other methods 405. |
 | any | any other path | 404, whatever the credential. |
 
 ### API, `{API}` (PocketBase)
@@ -43,17 +44,18 @@ of scope (ruling 4).
 ### Protocol revisions and transport
 
 The endpoint speaks Streamable HTTP without sessions: revision 2026-07-28, plus the stateless
-2025-era form (2025-11-25 and 2025-06-18) for clients that have not moved. Version 2 of the MCP
+2025-era form for clients that have not moved: 2025-11-25 and 2025-06-18, and the older
+revisions the SDK still accepts on that form (2025-03-26, 2024-11-05, 2024-10-07). Version 2 of the MCP
 TypeScript SDK (`@modelcontextprotocol/server`, `latest` 2.4.0 on 2026-11-10) implements
 2026-07-28 and falls back to stateless 2025-era serving; `tm mcp` today pins
 `@modelcontextprotocol/sdk` 1.32.2, whose newest revision is 2025-11-25.
 
-| Item | 2025-11-25 / 2025-06-18 | 2026-07-28 |
+| Item | 2025-era (2025-11-25 and older) | 2026-07-28 |
 | --- | --- | --- |
 | Handshake | `initialize` answered; no `Mcp-Session-Id` minted; `notifications/initialized` answers 202 | No `initialize`; `server/discover` answered |
 | Version header | `MCP-Protocol-Version` read when present | `MCP-Protocol-Version` required and must equal `_meta` `io.modelcontextprotocol/protocolVersion`, else 400 `-32020` HeaderMismatch |
 | Other headers | `Mcp-Session-Id` ignored | `Mcp-Method` (all) and `Mcp-Name` (`tools/call`) required, else 400 `-32020` |
-| Unsupported version | 400 with the supported list | 400 `-32022` UnsupportedProtocolVersionError with the supported list |
+| Unsupported version | 400 JSON-RPC error `-32000` naming the supported list | 400 `-32022` UnsupportedProtocolVersionError with the supported list |
 
 Common to both:
 
@@ -210,7 +212,8 @@ The page:
    cannot sign in yet and why, and no code is issued. GitHub and Google sign-in are not offered on
    this page; every account can use the emailed code. No sign-in is remembered between
    authorizations.
-2. **Consent.** Shows the client's name, the `client_id` host, the redirect URI's host (with a
+2. **Consent.** Shows the client's name, the `client_id` host (for a pre-registered client, its
+   id), the redirect URI's host (with a
    warning when it is a loopback address, as the MCP security page asks), and a choice between
    "Read" and "Read and write". *(Q2)* The choice the client asked for is preselected. Buttons:
    Approve, Deny.
@@ -237,7 +240,7 @@ Known documents for the milestone clients (ruling 1):
 | Client | `client_id` | Redirect |
 | --- | --- | --- |
 | Claude Code | `https://claude.ai/oauth/claude-code-client-metadata` | `http://localhost/callback`, `http://127.0.0.1/callback`, any port |
-| Claude (web, desktop, mobile) | Anthropic's published document (URL not stated by Anthropic) | `https://claude.ai/api/mcp/auth_callback` |
+| Claude (web, desktop, mobile) | `https://claude.ai/oauth/mcp-oauth-client-metadata` | `https://claude.ai/api/mcp/auth_callback` |
 
 **Pre-registered clients.** Configured on the server; adding one is a configuration change, not
 a contract change.
@@ -276,8 +279,9 @@ Success, `200`, `Cache-Control: no-store`:
 
 - **Format.** `tmk_` plus 40 random characters, as a hand-minted key; stored only as its hash.
   The refresh token is `tmr_` plus 40 random characters.
-- **Storage.** The refresh token's hash and its expiry are two new hidden fields on the grant's
-  `api_keys` record, never returned to a client. Authorization codes live, as hashes with their
+- **Storage.** The refresh token's hash, its expiry, and the hash of the refresh token it
+  replaced are three new hidden fields on the grant's `api_keys` record, never returned to a
+  client; the third is what recognises a replayed refresh token. Authorization codes live, as hashes with their
   client, redirect URI, code challenge, scope and user, in a new collection no client rule opens.
   Fetched metadata documents are cached in the server's memory only.
 - **Record.** One `api_keys` record per grant: `user` the signed-in user, `name` the client's
@@ -329,7 +333,8 @@ Adds, beside `user`, `workspaces` and `unread_notifications`:
 
 | Status | Body | When |
 | --- | --- | --- |
-| 400 | JSON-RPC error `-32600` | Body is not one JSON-RPC message |
+| 400 | JSON-RPC error `-32600` | Body is not one JSON-RPC message, or `Content-Type` is not `application/json` |
+| 406 | JSON-RPC error `-32600` | `Accept` does not list both `application/json` and `text/event-stream` |
 | 400 | JSON-RPC error `-32020` HeaderMismatch | 2026-07-28 only: a required MCP header missing or disagreeing with `_meta` |
 | 400 | JSON-RPC error, supported versions in `data` | Unsupported protocol version |
 | 401 | error object, `code` `unauthorized` or `invalid_token` | No credential, or one that is not a valid, unrevoked, unexpired `tmk_` key; challenge as above |
@@ -339,6 +344,8 @@ Adds, beside `user`, `workspaces` and `unread_notifications`:
 | 404 | JSON-RPC error `-32601` | 2026-07-28: unknown method |
 | 405 | none | GET or DELETE on `/mcp` |
 | 429 | error object, `code` `rate_limited`; `Retry-After: <seconds>` | Over a limit below |
+| 500 | error object, `code` `server_error` | The service failed |
+| 503 | error object, `code` `unavailable`; `Retry-After: 5` | The API did not confirm or refuse the credential (unreachable, or an answer other than 200 or 401) |
 
 The error object is the tool-failure shape without `fields`:
 `{"error": {"status": <HTTP status>, "code": "<code>", "message": "<text>"}}`, `application/json`.
@@ -411,12 +418,15 @@ origin off the list.
 | MCP service, valid credential | the key | 300 requests per 60 s | 429, `Retry-After` |
 | MCP service, no or refused credential | client address | 30 requests per 60 s | 429, `Retry-After` |
 | API, `/oauth/*` | client address | 30 requests per 60 s | PocketBase's 429 (no `Retry-After`, SH-7) |
-| API, the MCP service's private-network calls | none | exempt from every per-address rule | none |
+| API, the MCP service's calls carrying its private secret | none | exempt from every per-address rule | none |
 | API, everyone else | client address | unchanged | unchanged |
 
-The exemption is granted by the connection's private-network origin, never by a forwarded-address
-header: the API trusts `X-Real-IP` from any peer (decision:rate-limit-counts-x-real-ip), so a
-header-based exemption would be one any caller could claim. Limit values may be tuned without a
+The exemption is granted only to a request carrying a secret shared by the MCP service and the
+API, which the service sends only over the private network; never by a forwarded-address header
+or by the connection's address. The API trusts `X-Real-IP` from any peer
+(decision:rate-limit-counts-x-real-ip), so a header naming an address would be one any caller
+could claim, and Railway does not document the address its public edge connects from, so a
+private-address test could also match public traffic. Limit values may be tuned without a
 contract change; the answers may not.
 
 ## Compatibility
@@ -433,7 +443,7 @@ contract change; the answers may not.
   that treated that 403 as "not for keys" now sees not-found for paths that never existed;
   every existing route answers as before.
 - **`GET /api/tracker/me`.** Gains `key` under a key; nothing removed.
-- **`api_keys`.** Gains `client_id` and two hidden refresh-token fields, and grant-minted
+- **`api_keys`.** Gains `client_id` and three hidden refresh-token fields, and grant-minted
   records appear in the list. The `expires` and `key_hash` help texts change from "set only at
   create" and "a later change is refused" to say the server moves them on a grant's refresh.
   A new collection holds authorization codes. Each carries its `app_docs` record and the schema,
@@ -486,6 +496,18 @@ Fetched 2026-11-10.
   `CLIENT_SECRET` optional.
 - MCP TypeScript SDK v2 (`npm view @modelcontextprotocol/server`): "v2 of the MCP TypeScript SDK,
   the stable release line, implementing the 2026-07-28 MCP spec".
-- Unverified: the URL of Anthropic's metadata document for the hosted Claude apps; which protocol
-  revision each milestone client sends; whether any of them sends `Origin`; the CIMD draft, RFC
-  8707 and RFC 9207 themselves (only the MCP pages' restatement was read).
+- Claude's hosted-app metadata document, fetched: `{"client_id":"https://claude.ai/oauth/mcp-oauth-client-metadata","client_name":"Claude",...,"redirect_uris":["https://claude.ai/api/mcp/auth_callback"],...,"token_endpoint_auth_method":"none"}`;
+  its URL is named in Claude's enterprise-managed-auth page as the base of
+  "`https://claude.ai/oauth/mcp-oauth-client-metadata/confidential_client`".
+- OAuth Client ID Metadata Document draft
+  (https://datatracker.ietf.org/doc/draft-ietf-oauth-client-id-metadata-document/, -03): "MUST NOT
+  automatically follow HTTP redirects"; "The recommended maximum size to read is 5 kilobytes";
+  "MUST NOT fetch [...] URLs [...] that resolve to special-use IP addresses as defined in
+  [RFC6890]". RFC 8707 (https://www.rfc-editor.org/rfc/rfc8707) §2; RFC 9207
+  (https://www.rfc-editor.org/rfc/rfc9207) §2.
+- Railway (https://docs.railway.com/networking/public-networking/specs-and-limits): the edge
+  sets "`X-Real-IP` for identifying client's remote IP"; the source address of its connection
+  to a service is not documented.
+- Unverified: which protocol revision Claude on the web sends, and whether Claude on the web or
+  Cursor sends `Origin` (Claude Code 2.1.322 sends none and speaks 2025-11-25 by `initialize`;
+  Cursor states it "speaks the 2025-11-25 revision and earlier").
