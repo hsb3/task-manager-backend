@@ -24,6 +24,7 @@ Laws briefs most often drop (restated because being wrong is expensive):
 
 Clean room — every probe/test boots its own server; 8090 is off-limits:
 
+    find pb_migrations pb_hooks -type l   # must print nothing
     cp -R pb_migrations <scratch>/mig && rm <scratch>/mig/*superuser_mfa.js
     cp -R pb_hooks <scratch>/hooks
     ./pocketbase serve --http=127.0.0.1:<port> --dir <scratch>/pb_data \

@@ -16,8 +16,7 @@ commit, push, merge and tag, and the final gates. A **manager** leads one lane; 
 - Rule files (Claude Code loads each when you touch its `paths:`; other harnesses read it first):
   `.agents/rules/pocketbase.md` PB gotchas + test-suite house style · `.agents/rules/ports.md` port
   bands, `PB_PORT_OFFSET`, `PB_BIN`, legacy-suite recipe · `.agents/rules/deploy.md` Railway.
-- `.agents/memory/MEMORY.md` indexes project memory (owner rulings, burns, gotchas). It is not
-  auto-loaded; follow the link before relying on a fact.
+- `.agents/memory/MEMORY.md`: project-memory index, empty (entries became gates, rules, decisions).
 - `.env` (gitignored; `make env` writes one with a fictitious superuser) is read by the Makefile,
   `scripts/seed.ts` and the suites needing `PB_*` vars. Templates: `.env.example` (deployment
   variables), `.env.local.example` (local testing knobs you export yourself).
@@ -54,9 +53,9 @@ stale edit as a mid-run restart (suites get the copy from `tests/roomkit.ts`'s `
 plain superuser API auth, delete `*superuser_mfa.js` from the migrations copy (a migration, not a
 hook). Before `serve`, run `./pocketbase superuser upsert probe@example.com probe123456 --dir
 <scratch>/pb_data --migrationsDir <copy>` (`scripts/check_superuser_before_serve.ts` gates the
-order). Never hand-pick a port: use your **band**'s default port plus `PB_PORT_OFFSET` (100 or more;
-concurrent consumers at least 200 apart). **A collision is SILENT**: a suite treats any healthy
-server on its port as its own and passes green against a stranger's database.
+order). Never hand-pick a port: use your **band**'s default plus `PB_PORT_OFFSET` (200 or more;
+concurrent ones at least 200 apart; `check_port_collisions.ts` gates it). **A collision is SILENT**:
+a suite treats any healthy server on its port as its own, passing green on a stranger's database.
 
 ## Migration + schema laws
 

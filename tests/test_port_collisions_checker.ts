@@ -369,6 +369,54 @@ await once(listener, "close");
 const r8g = run_checker([...live_args, "--offset", live_offset]);
 check("the same --offset once the listener is closed is GREEN", r8g.returncode === 0);
 
+console.log("── 9. an offset landing one default on another → RED; stated minimums are checked ──");
+const [repo9, doc9] = make_repo(
+  "self-collision",
+  {
+    "tests/test_u.ts": suite(9000),
+    "tests/test_v.ts": suite(9001),
+    "tests/test_w.ts": suite(9002),
+    "tests/test_x.ts": suite(9500),
+  },
+  "Use 3 or more; concurrent consumers at least 3 apart.\n",
+);
+const r9_args = ["--repo", repo9, "--ports-doc", doc9];
+const r9a = run_checker([...r9_args, "--offset", "2"]);
+echo(r9a.stdout);
+check(
+  "--offset 2 exits 1 naming the default it lands on",
+  r9a.returncode === 1 && r9a.stdout.includes("9000") && r9a.stdout.includes("9002"),
+);
+const r9b = run_checker(r9_args, undefined, "499");
+check("PB_PORT_OFFSET=499 (9001 onto 9500) exits 1", r9b.returncode === 1);
+const r9c = run_checker(r9_args, undefined, "3");
+echo(r9c.stdout);
+check("PB_PORT_OFFSET=3 is GREEN", r9c.returncode === 0);
+check("the green run prints the lowest safe minimum", r9c.stdout.includes("lowest safe offset 3"));
+const [, doc9d] = make_repo(
+  "self-collision-low-doc",
+  { "tests/test_u.ts": suite(9000), "tests/test_w.ts": suite(9002) },
+  "Use 2 or more.\n",
+);
+const r9d = run(path.dirname(doc9d), doc9d);
+echo(r9d.stdout);
+check(
+  "a doc minimum the layout no longer supports exits 1 naming the doc",
+  r9d.returncode === 1 && r9d.stdout.includes("ports.md") && r9d.stdout.includes("2 or more"),
+);
+fs.writeFileSync(path.join(repo9, "AGENTS.md"), "offsets at least 2 apart\n", "utf-8");
+const r9e = run(repo9, doc9);
+echo(r9e.stdout);
+check(
+  "AGENTS.md is held to the same minimum",
+  r9e.returncode === 1 && r9e.stdout.includes("AGENTS.md") && r9e.stdout.includes("2 apart"),
+);
+const r9f = run_checker([], REPO_ROOT, "100");
+check(
+  "the shipped tree refuses PB_PORT_OFFSET=100 (8093 onto 8193)",
+  r9f.returncode === 1 && r9f.stdout.includes("8193"),
+);
+
 console.log("── 6. the shipped tree passes with no arguments ──");
 const r6 = run_checker([], REPO_ROOT);
 echo(r6.stdout);
