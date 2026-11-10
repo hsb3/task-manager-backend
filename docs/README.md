@@ -1,8 +1,8 @@
 ---
 title: docs/
 status: current
-version: 12
-updated: 2026-11-05
+version: 13
+updated: 2026-11-10
 ---
 
 # docs/
@@ -32,8 +32,10 @@ one by hand fails the build rather than silently diverging.
 | --- | --- | --- |
 | [`generated/decisions.md`](generated/decisions.md) | the `decision:*` `app_docs` seed records | `bun scripts/gen_decisions.ts` |
 
-Generated artifacts outside this directory follow the same rule: `openapi.json` (`gen_openapi.ts`),
-`schema/` (`gen_schema.ts`), and `scripts/model/current/` (the model tree).
+Generated artifacts outside this directory follow the same rule: every
+`scripts/gen_*.ts` writes one (`openapi.json`, `schema/`, the app_docs seed,
+`clients/tm/src/api.generated.ts`, `.gitattributes`) and `make check-static` runs each with
+`--check`; `scripts/model/extract_current.ts` writes `scripts/model/current/`.
 
 `make openapi` regenerates decisions and openapi together.
 
@@ -46,4 +48,5 @@ edit) and `updated` (the ISO `YYYY-MM-DD` date of that edit). Nothing checks tha
 
 ## Assets
 
-`assets/` holds the architecture diagram (`overview.dot` to `overview.svg`).
+`assets/` holds the architecture diagram: `overview.svg`, drawn from `overview.dot` by
+hand (no generator or gate).

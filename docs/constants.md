@@ -1,8 +1,8 @@
 ---
 title: Shared constants (mirror-site registry)
 status: current
-version: 18
-updated: 2026-11-05
+version: 19
+updated: 2026-11-10
 ---
 
 # Shared constants (mirror-site registry)
@@ -31,7 +31,7 @@ Sites:
 - `schema/statuses.json` — the `category` select field's `values` (full 6)
 - `schema/project_stats.view.json` — `project_stats` view SQL, `s.category='<v>'` (full 6)
 - `pb_hooks/main.pb.js` — workspace-provision default-statuses seed, **5 of 6 only**
-  (no `triage` row — app_docs: "seeded with five default statuses covering the
+  (no `triage` row — app_docs: "seeded with five statuses covering the
   non-triage categories"; `triage` is reachable but not a bootstrap default). This is
   an intentional partial mirror, not drift.
 - `pb_hooks/cycles.pb.js` — cron cycle-rollover sweep, the resolved-half predicate deciding
@@ -66,10 +66,7 @@ Sites:
 Values: assigned, commented, status_done, mentioned, ownership_transferred
 
 The canonical list is READ, not restated: the gate takes it from the `kind` select in the
-generated `schema/notifications.json` (`values_from`), because whichever migration last set
-that select is historical the moment the next one changes it — anchored on the migration
-that added `mentioned`, the gate went on asserting four values while the collection carried
-five and passed green.
+generated `schema/notifications.json` (`values_from`).
 
 Sites:
 - `pb_hooks/notify.pb.js` — gated as TWO copies: the header comment's list (the file's
@@ -98,7 +95,7 @@ Values: gray, red, orange, yellow, green, teal, blue, indigo, purple, pink
 
 Sites:
 - `schema/labels.json` — the `color` select field's `values` (generated from the migrations; the gate reads this, never a historical migration)
-- `schema/statuses.json` — `statuses.color` offers the same 10-tone palette
+- `schema/statuses.json` — `statuses.color` offers the same palette
 
 ## 6. TEMPLATE_TYPES
 
@@ -154,8 +151,7 @@ Sites:
 
 The three trash states `tasks.listRule` hides from a reader. The cycle-rollover sweep has
 to hide exactly the same three: work a person cannot see must not be moved by a background
-job, and a cycle inside a hidden workspace must not mint a successor. The rollover sweep
-once carried only two of them, which is the drift this entry exists to catch.
+job, and a cycle inside a hidden workspace must not mint a successor.
 
 ### TRASH_VISIBILITY_PREDICATES
 Values: trashed, project.trashed, workspace.trashed

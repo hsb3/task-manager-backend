@@ -1,8 +1,8 @@
 ---
 title: Design patterns
 status: current
-version: 4
-updated: 2026-11-05
+version: 5
+updated: 2026-11-10
 ---
 
 # Design patterns
@@ -71,8 +71,8 @@ them to the after-write work. Anything that must also fire for writes that never
 a request (background jobs, migrations, internal saves) belongs on the universal hook
 tier instead, with the identity treated as absent rather than assumed.
 
-**Here:** `.agents/rules/pocketbase.md` records that `e.auth` is undefined in
-`After*Success` hooks and that request-tier hooks never fire for programmatic writes;
+**Here:** `.agents/rules/pocketbase.md` records where this repo captures the actor (in the
+`*Request` hook) and that a universal-tier hook also fires for every programmatic save;
 the fan-out record (`decision:notification-fanout-semantics`) names that constraint as the
 load-bearing one for actor attribution and exactly-once delivery.
 
@@ -182,9 +182,7 @@ tenant-specific is not enforcement either; a subscriber can ask for any name, so
 subscribe path needs its own authorization.
 
 **Here:** the search record (`decision:search-scoping-standard`) self-scopes every query
-by the caller's own membership and states list-rule parity as the standard;
-`.agents/rules/pocketbase.md` records a real cross-tenant leak from a per-tenant channel
-name that nothing authorized.
+by the caller's own membership and states list-rule parity as the standard.
 
 ### Admit inline content by a per-request token
 
@@ -325,8 +323,7 @@ markup terms belong in comments and change descriptions. When a specification st
 fact a label should convey, translate it into a user's words instead of pasting the
 specification's own phrasing, which is written for implementers.
 
-**Here:** `AGENTS.md` carries this as a conduct rule, born of an incident: a specification line
-describing a mechanism shipped verbatim as the helper text under a settings control.
+**Here:** `AGENTS.md` carries this as a conduct rule.
 
 ### Mount shared context over the subtree that uses it
 
@@ -403,7 +400,7 @@ deterministic test, record a dated disposition naming how it is verified instead
 open task that implies future coverage.
 
 **Here:** the test-suite house style in `.agents/rules/pocketbase.md` carries this repo's
-version, written after consecutive waves shipped green proofs of untrue things.
+version.
 
 ### Invariants belong in the gate
 
@@ -417,8 +414,7 @@ entry carrying its reason rather than an unwritten habit.
 
 **Here:** `scripts/check_app_docs_quotes.ts` holds every quoted rule to byte equality with the
 generated schema unless its registry pins the quote as prose; decision:notification-kinds-ship-with-producer re-points a vocabulary check
-at the generated schema after it reported green over a four-value claim while the live
-value held five.
+at the generated schema.
 
 ### Every run owns its environment
 
@@ -480,8 +476,7 @@ gap is deliberate, in which case the outcome is a ruling that closes it, not a t
 rebuilds it. A limitation that is being accepted is recorded with its escalation path, and
 the assertions around it are left honest rather than strengthened into flakes.
 
-**Here:** the rule came from an incident where a stale task
-premise was acted on.
+**Here:** `AGENTS.md` (Kata Workflow) carries the rule: re-validate a stale card's premise before starting.
 
 ### State the enforcement honestly
 
@@ -492,8 +487,8 @@ proven. The same applies to a claim inside a record: a citation that does not su
 checking is corrected in place, with the replacement named, so the next reader does not
 either re-derive it or trust it.
 
-**Here:** decision:project-workspace-immutable keeps a deliberate exemption and corrects the acceptance criterion
-that had claimed unqualified enforcement, naming the remaining bypass as a standing hazard.
+**Here:** decision:project-workspace-immutable keeps a deliberate exemption and names the remaining
+bypass as a standing hazard.
 
 ### Fix the class, not the site
 

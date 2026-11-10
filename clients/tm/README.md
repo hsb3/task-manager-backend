@@ -1,7 +1,7 @@
-# tm — the task tracker from your terminal
+# tm — the task tracker from the terminal
 
 `tm` lists, shows, searches, creates, edits and comments on the tasks, documents, decisions and
-milestones you can see, using an API key. Every verb takes `--json` for machine-readable output,
+milestones the key's user can see, using an API key. Every verb takes `--json` for machine-readable output,
 so it works as well inside a script or an agent as it does by hand.
 
 ## Set up once
@@ -11,19 +11,18 @@ needs. Then create an API key in the app (a read key can only read; a write key 
 edit and comment) and paste it:
 
 ```bash
-bun clients/tm/tm.ts login --url https://your-server.example
+bun clients/tm/tm.ts login --url https://tm.example.com
 ```
 
-To call it as plain `tm`, link it onto your PATH once, for example
-`ln -s "$PWD/clients/tm/tm.ts" ~/.local/bin/tm`.
+To call it as plain `tm`, link `clients/tm/tm.ts` into a directory on `PATH` once.
 
-The key is saved to a file only you can read, and the command prints where. To skip the file,
+The key is saved to a file only its owner can read, and the command prints where. To skip the file,
 set `TM_URL` and `TM_API_KEY` in the environment instead; they win over the saved login. `TM_API_KEY` holds an API key (`tmk_...`), not a login token; any other value is refused.
 
 ## Use it
 
 ```bash
-tm list                                  # newest items you can see
+tm list                                  # newest items visible to the key
 tm list --project <id> --kind task       # one project, one kind
 tm list --limit 20 --page 2              # the second page of 20
 tm show <id>
@@ -37,8 +36,7 @@ tm comment <id> "Done, see the attached draft"
 
 Kinds are `task` (the default), `document`, `decision` and `milestone`. `--set field=value` sets
 any other field the server accepts for that kind: a yes/no field takes `true` or `false` (for
-example `--set draft=true`), a number field takes a number, and anything else is any text you
-like. The server's own validation applies.
+example `--set draft=true`), a number field takes a number, and anything else is free text. The server's own validation applies.
 
 Add `--json` to any verb to get the server's answer as JSON with the field names the API uses,
 plus a `kind` naming the kind (a `search` hit on a project is kind `project`). `list` and
@@ -48,17 +46,17 @@ plus a `kind` naming the kind (a `search` hit on a project is kind `project`). `
 
 `tm mcp` offers the same verbs to an AI agent as tools (`tm_list`, `tm_show`, `tm_search`,
 `tm_create`, `tm_edit`, `tm_comment`), over the agent's standard input and output. It uses the key
-`tm login` saved, or `TM_URL` and `TM_API_KEY` when set. Add this server entry, with your own paths
+`tm login` saved, or `TM_URL` and `TM_API_KEY` when set. Add this server entry, with absolute paths
 and key, to Claude Code's `.mcp.json` (or pass the same to `claude mcp add-json tm '...'`) or to
 Claude Desktop's `claude_desktop_config.json` under `mcpServers`. Write `bun` as the full path
-`which bun` prints: a desktop app does not search your shell's PATH.
+`which bun` prints: a desktop app does not search the shell's PATH.
 
 ```json
 {
   "tm": {
     "command": "/opt/homebrew/bin/bun",
     "args": ["/absolute/path/to/clients/tm/tm.ts", "mcp"],
-    "env": { "TM_URL": "https://your-server.example", "TM_API_KEY": "tmk_..." }
+    "env": { "TM_URL": "https://tm.example.com", "TM_API_KEY": "tmk_..." }
   }
 }
 ```
@@ -69,7 +67,8 @@ comment. A refused action comes back to the agent as the server's own message.
 ## When something goes wrong
 
 - Exit code 0: it worked.
-- Exit code 1: the server refused. Its message is on stderr, and with details when it named the
+- Exit code 1: the server refused, or no usable key is configured (none saved or set, or one not
+  starting with `tmk_`). The message is on stderr, with details when the server named the
   offending fields. A read-only key that tries to write exits this way.
 - Exit code 2: the command line was wrong; the usage text follows the message.
 
@@ -77,5 +76,5 @@ Nothing is printed on stdout when a command fails, so `--json` output is either 
 
 ## Rate limits
 
-The server allows about 300 requests per minute per client address; past that it answers with a
-"Too Many Requests" error. Wait a minute and retry.
+The server limits requests per client address; past a limit it answers "Too Many Requests". Wait a
+minute and retry. The limits: [`e2e/README.md`](../../e2e/README.md#rate-limits).
