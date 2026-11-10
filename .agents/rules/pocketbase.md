@@ -19,7 +19,9 @@ pocketbase plugin's field notes; what follows is what this repo's hooks add.
   a hook-filled relation needs a dual path (see tasks createRule). `field = ""` IS
   valid empty-relation syntax in rules.
 - Pooled JSVM: hooks cannot share top-level functions/constants across callbacks —
-  INLINE per site with `// KEEP IN SYNC:` comments (check_constants gates drift).
+  INLINE per site with `// KEEP IN SYNC:` comments (check_constants gates drift). A fact inlined
+  at several sites of ONE file marks each site `// KEEP IN SYNC (below):`, so check_keep_in_sync
+  reads that file's side from the lines under the marker, not from any other site.
 - Repo pointers for the generic traps: never subscribe to `project_stats` (a view: no realtime
   events; clients recompute on `tasks` events); `users.email` is hidden on others' records, so
   fixtures resolve users by `name`; the atomic `UPDATE … RETURNING` counter is `projects.item_seq`
@@ -32,11 +34,23 @@ pocketbase plugin's field notes; what follows is what this repo's hooks add.
 - A migration citation is written `v1:FILE` (checked against the vendored
   v1 name list `scripts/migrations-v1.txt`, since the v1 tag lives only in `hsb3/task-manager`) or
   `v2:FILE` (the current tree).
+- The newest app_docs seed (`gen_app_docs_seed.ts` `DEFAULT_OUTPUT`) is the corpus's only
+  source, so replay gates compare it to itself; its prose is pinned by
+  `scripts/app_docs_seed.sha256`, which `gen_app_docs_seed.ts --check` (check-static) verifies.
+  After any intended seed change, including a new seed (move `DEFAULT_OUTPUT` to it first), run
+  `bun scripts/gen_app_docs_seed.ts`: it rewrites the seed and its digest together.
 - A UNIVERSAL `onRecord*` hook DOES fire for a migration's own
   `e.app.save()` on the `serve` boot path, and throwing there aborts the whole boot
   (`failed to apply migration …`). A strict validation/lock that must never refuse a
   backfill's writes belongs on the `*Request` tier (see `pb_hooks/keys.pb.js`
   `refuseSubmittedItemKey` — the universal placement cost a full build cycle).
+- A universal-tier guard also fires for every programmatic save, so it must throw only when the
+  save touches the fields it guards (`touchesScope`, `pb_hooks/scope.pb.js`, reading
+  `.original()`). Without that predicate it throws on rows that were already incoherent, and
+  main.pb.js's leaver-unassign sweep (one `try/catch` around the whole loop) strands every
+  remaining assignee: a mixed batch stranded 0 with the predicate, 5 without (TASK-055). Prove a
+  new universal guard against a batch mixing bad and good rows; `scripts/check_universal_touches.ts`
+  refuses a model-tier update guard that throws without reading `.original()`.
 - The handler-object registration FORM `$app.onRecordCreateRequest().bind({ id, priority, func })`
   panics PB 0.39.9 under concurrent creates (not re-measured on 0.40.4): the callback is invoked with NO event (`e` is
   undefined), the panic lands mid-create, and items commit unkeyed. Proven with a body that

@@ -135,7 +135,7 @@ onRecordUpdateExecute((e) => {
       }
     });
   } catch (err) {
-    // KEEP IN SYNC: routes.pb.js `typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
+    // KEEP IN SYNC (below): routes.pb.js `v.status || typeof v.marshalJSON === "function"` — a refusal (status) or field validation error keeps its own answer.
     const v = err.value || err;
     if (v && (v.status || typeof v.marshalJSON === "function")) throw err;
     e.app

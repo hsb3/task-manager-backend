@@ -26,7 +26,9 @@
  *      file (or files) plus the marker's own file. Present everywhere is a live mirror; present
  *      in some and not others is exactly one side of a pair having moved. A body is the file
  *      with every KEEP IN SYNC comment run masked out, so no marker can satisfy another
- *      marker's claim with its own prose.
+ *      marker's claim with its own prose. A `KEEP IN SYNC (below)` marker narrows its own
+ *      file's side to the BELOW_LINES code lines under its comment run, for a fact inlined at
+ *      several sites of one file, where any other site would otherwise stand in for a moved one.
  *
  * FREE-FORM PROSE to this gate is a marker naming no file at all, and a literal on such a
  * marker. Those are counted and printed on every run (--table names them), never silently
@@ -67,6 +69,8 @@ export const REPO = repo_root(import.meta.path);
 export const SELF = path.basename(import.meta.path);
 
 export const MARKER = "KEEP IN SYNC";
+export const BELOW = `${MARKER} (below)`;
+export const BELOW_LINES = 6;
 
 export const PRUNE_DIR_NAMES = new Set([
   ".git",
@@ -308,6 +312,16 @@ export function audit(root: string): Report {
       }
 
       const mirror = [rel, ...targets.filter((t) => t !== rel)];
+      // `(below)`: the own-file side is the code under the marker run, so a twin elsewhere in
+      // the same file cannot stand in for this site.
+      let below: string | null = null;
+      if (line.includes(BELOW)) {
+        const prefix = comment_prefix(line);
+        let j = i + 1;
+        while (prefix !== null && j < lines.length && comment_prefix(lines[j]!) === prefix) j += 1;
+        below = lines.slice(j, j + BELOW_LINES).join("\n");
+      }
+      const side = (m: string): string => (m === rel && below !== null ? below : body_of(m));
       const enforced_literals: string[] = [];
       const unmirrored: string[] = [];
       for (const literal of literals_of(line)) {
@@ -315,7 +329,7 @@ export function audit(root: string): Report {
           report.prose_literals += 1;
           continue;
         }
-        const present = mirror.filter((m) => occurrence(literal).test(body_of(m)));
+        const present = mirror.filter((m) => occurrence(literal).test(side(m)));
         if (!present.length) {
           report.prose_literals += 1;
           unmirrored.push(literal);
