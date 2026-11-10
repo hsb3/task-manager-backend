@@ -1,0 +1,39 @@
+name: contract-first
+version: 1
+description: proposal -> spec deltas -> contract -> design; implementation runs as kata cards, so no tasks artifact
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Why the change is needed and what it changes
+    template: proposal.md
+    instruction: |
+      State the problem and the change. List the readiness criterion ids the change moves in
+      .openspec.yaml under x-criteria. Leave design choices to design.md; list open questions.
+    requires: []
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Requirement deltas, one spec.md per capability
+    template: spec.md
+    instruction: |
+      One specs/<capability>/spec.md per capability the proposal names, using delta headers
+      (## ADDED/MODIFIED/REMOVED/RENAMED Requirements), each requirement with a #### Scenario.
+      Observable behaviour only, never implementation.
+    requires: [proposal]
+  - id: contract
+    generates: contract.md
+    description: The externally visible surface a client relies on
+    template: contract.md
+    instruction: |
+      Routes, request and response shapes, error codes, auth, and compatibility for existing
+      clients. Settle this before the design: the design must satisfy it unchanged.
+    requires: [specs]
+  - id: design
+    generates: design.md
+    description: How the contract is met
+    template: design.md
+    requires: [contract]
+apply:
+  requires: [design]
+  instruction: |
+    Implementation runs as kata cards carrying this change id as metadata (--meta change=<id>).
+    Archive the change once those cards are closed.

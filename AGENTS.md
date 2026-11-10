@@ -13,6 +13,8 @@ commit, push, merge and tag, and the final gates. A **manager** leads one lane; 
 - **The kata board is the single authoritative task system** (project `task-manager-backend`, bound
   by `.kata.toml`). A main session reads its handoff card first (`kata list --label handoff`); there
   is no in-repo handoff file.
+- Designs live in OpenSpec (`openspec/`, schema `contract-first`, `docs/openspec.md`): a card names its
+  change with `--meta change=<id>`, a change never lists cards; `make change ID=<id>` resolves one.
 - Rule files (Claude Code loads each when you touch its `paths:`; other harnesses read it first):
   `.agents/rules/pocketbase.md` PB gotchas + test-suite house style · `.agents/rules/ports.md` port
   bands, `PB_PORT_OFFSET`, `PB_BIN`, legacy-suite recipe · `.agents/rules/deploy.md` Railway.

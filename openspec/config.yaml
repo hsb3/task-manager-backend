@@ -1,0 +1,2 @@
+# Default schema for `openspec new change`; docs/openspec.md states the workflow.
+schema: contract-first

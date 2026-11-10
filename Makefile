@@ -10,6 +10,9 @@ PB_PORT    := 8090
 # cannot defeat that: this `:=` re-wins in the sub-make `dev` hands the seed to (measured).
 PB_URL     := http://127.0.0.1:$(PB_PORT)
 export PB_URL
+# The pinned OpenSpec CLI (scripts/check_openspec.ts) runs with telemetry and its update check off.
+export OPENSPEC_TELEMETRY := 0
+export OPENSPEC_NO_UPDATE_CHECK := 1
 # The address `make env` writes into a local .env — `dev` compares against it, so the
 # fictitious-credentials line is only claimed for the account this Makefile invented.
 DEV_SUPERUSER_EMAIL := admin@example.com
@@ -30,7 +33,7 @@ command -v sqlite3 >/dev/null || { echo "$@: needs sqlite3 to tell whether pb_da
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help dev backend seed seed-if-fresh superuser superuser-password superuser-if-missing reset clean setup stop status env pocketbase next-migration-slot check check-static battery ci-battery-verify openapi local-up local-down local-logs smoke
+.PHONY: help dev backend seed seed-if-fresh superuser superuser-password superuser-if-missing reset clean setup stop status env pocketbase next-migration-slot check check-static battery ci-battery-verify openapi local-up local-down local-logs smoke change
 
 help: ## list targets
 	@grep -E '^[a-z][a-zA-Z0-9_-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -183,6 +186,9 @@ check-static: pocketbase ## format, typecheck, every generator --check, every sc
 
 battery: ## the whole suite battery; BATTERY_SHARD=i/N runs one shard of scripts/battery_shards.tsv
 	bash scripts/run_suite_battery.sh
+
+change: ## print the directory of OpenSpec change ID=<id>, active or archived; fails when unknown
+	@bun scripts/openspec_change.ts '$(subst ','\'',$(ID))'
 
 ci-battery-verify: ## fail unless CI's shard manifests ran every battery suite exactly once
 	bun scripts/check_battery_suites.ts --manifests battery-manifests/*.txt
