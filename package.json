@@ -11,6 +11,7 @@
     "format": "prettier --write \"clients/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\""
   },
   "devDependencies": {
+    "@fission-ai/openspec": "1.16.1",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@types/bun": "1.4.3",
     "prettier": "3.9.6",
