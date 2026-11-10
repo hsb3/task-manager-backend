@@ -123,4 +123,4 @@ the contract states the result.
 7. **Read-only surface.** Ruled (hfrk 7): one URL; a read-scoped credential sees only read tools, and consent chooses read or write.
 8. **Rate limiting under shared egress.** Ruled (hfrk 8): per credential at the MCP service plus a per-address cap on missing or bad credentials; PocketBase exempts the MCP service's private-network calls.
 
-The questions the rulings leave open are in `contract.md`, Open Questions.
+The questions these rulings left open are in `contract.md`, Open Questions, each ruled 2026-11-10.

@@ -8,7 +8,7 @@ The rulings this contract implements are the decision record "Hosted MCP endpoin
 - `{MCP}`: the MCP service's public origin, a separate Bun service on its own domain (ruling 5).
   *(Q5)* An `mcp.` subdomain of the API's custom domain.
 
-Every value marked *(Q n)* holds under the recommended answer to that open question.
+A value marked *(Q n)* is set by that ruling in Open Questions.
 
 ## Routes
 
@@ -174,8 +174,7 @@ for both and the person choose at consent *(Q2)*.
 `none` in `token_endpoint_auth_methods_supported` is what Claude requires before it uses its
 metadata document. `offline_access` is not listed: a refresh token is issued with every
 authorization code grant, and an `offline_access` in a request is accepted and ignored.
-*(Q4)* Every client is public; a confidential client would add `client_secret_basic` to both
-auth-method lists.
+*(Q4)* Every client is public, so both auth-method lists hold `none` alone.
 
 ### Scopes
 
@@ -445,32 +444,13 @@ contract change; the answers may not.
 
 ## Open Questions
 
-Each lists its options, the recommended one first.
+Each was ruled on 2026-11-10; the contract states the ruling where it applies (marked *(Q n)*).
 
-1. **Key lifetime and refresh.** (a) The minted key lasts 24 hours and a refresh token 30 days,
-   rotated on each use, as Linear does (recommended: a leaked key dies within a day while a
-   connected client stays connected for a month of disuse); (b) 1 hour and 30 days (a shorter
-   leak window, more refresh traffic, and a client that refreshes late meets more 401s); (c) a key
-   that lasts until revoked and no refresh token (simplest, and revocation still works
-   immediately, but a leaked key never dies by itself).
-2. **What consent preselects.** (a) The scope the client asked for, with the other one choosable
-   (recommended: matches what the person set up in the client; the person still sees and can
-   lower it); (b) Read always, with write a deliberate choice (least privilege, but a client
-   configured for writing gets a read key unless the person changes it).
-3. **Which metadata-document clients may sign in.** (a) Any HTTPS document, with the consent page
-   naming its host (recommended: the specification's default, and it keeps a later client such as
-   ChatGPT working with no server change); (b) only documents on hosts the server lists (`claude.ai`
-   to start), refusing others (smaller phishing surface, a configuration change for each new
-   client).
-4. **Whether the pre-registered Cursor client has a secret.** (a) No secret: a public client
-   protected by PKCE (recommended: a secret in a local `mcp.json` is not secret, and Cursor marks
-   it optional); (b) A secret, Cursor configured with it (stops another app from using the
-   `cursor` id with Cursor's registered redirects, but the secret has to be handed to every
-   Cursor install).
-5. **The MCP service's domain.** (a) An `mcp.` subdomain of the API's custom domain, as Linear
-   serves `mcp.linear.app` (recommended: a stable, readable URL that survives a change of host);
-   (b) the platform-generated domain (no DNS change, but the URL every client stores changes if
-   the service is ever recreated).
+1. **Key lifetime and refresh.** Ruled: the minted key lasts 24 hours and a refresh token 30 days, rotated on each use, as Linear does.
+2. **What consent preselects.** Ruled: the scope the client asked for, with the other one choosable.
+3. **Which metadata-document clients may sign in.** Ruled: any HTTPS document, with the consent page naming its host.
+4. **Whether the pre-registered Cursor client has a secret.** Ruled: no secret; a public client protected by PKCE.
+5. **The MCP service's domain.** Ruled: an `mcp.` subdomain of the API's custom domain, as Linear serves `mcp.linear.app`.
 
 ## Sources
 
