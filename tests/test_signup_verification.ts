@@ -282,7 +282,7 @@ try {
   );
 
   // pp2j: the send must not hold the signup. Each signup below has its own client address
-  // (X-Forwarded-For is trusted) so the per-address signup rate limit never answers 429.
+  // (X-Real-IP is trusted) so the per-address signup rate limit never answers 429.
   console.log("\n── (e) signup answers within 2 s while SMTP is unreachable ──");
   const BOUND_MS = 2000;
   const timed = async (email: string, ip: string): Promise<[number, any, number]> => {
@@ -293,7 +293,7 @@ try {
       null,
       signup_body(email, "Timed Signup"),
       {
-        "X-Forwarded-For": ip,
+        "X-Real-IP": ip,
       },
     );
     return [st, rec, performance.now() - t0];
@@ -350,7 +350,7 @@ try {
         },
       ],
     },
-    { "X-Forwarded-For": "203.0.113.13" },
+    { "X-Real-IP": "203.0.113.13" },
   );
   check(
     "anonymous batch signup is refused: the batch 400s, no account is created",
@@ -382,7 +382,7 @@ try {
   );
 
   console.log("\n── (e2) batch signups share the signup allowance of direct ones ──");
-  const RL = { "X-Forwarded-For": "203.0.113.40" };
+  const RL = { "X-Real-IP": "203.0.113.40" };
   const rl_email = (i: number) => `rl-${i}@example.com`;
   let direct_ok = 0;
   let n = 0;
@@ -447,7 +447,7 @@ try {
         },
       ],
     },
-    { "X-Forwarded-For": "203.0.113.41" },
+    { "X-Real-IP": "203.0.113.41" },
   );
   console.log(`  ·  anonymous batch PUT upsert of a new user → ${s} ${JSON.stringify(r)}`);
   const upserted = (
@@ -470,7 +470,7 @@ try {
   let limited = 0;
   for (let i = 0; i < 310; i++) {
     const h = await fetch(BASE_URL + "/api/health", {
-      headers: { "X-Forwarded-For": "127.0.0.1" },
+      headers: { "X-Real-IP": "127.0.0.1" },
     });
     await h.body?.cancel();
     if (h.status === 429) limited++;
@@ -482,7 +482,7 @@ try {
     "/api/collections/users/records",
     null,
     signup_body(AFTER_BURST, "After Burst"),
-    { "X-Forwarded-For": "203.0.113.14" },
+    { "X-Real-IP": "203.0.113.14" },
   );
   check("anonymous signup after the burst → 200", s, 200);
   check(
@@ -508,7 +508,7 @@ try {
     "/api/collections/users/records",
     null,
     { email: VICTIM, password: "attacker123456", passwordConfirm: "attacker123456" },
-    { "X-Forwarded-For": "203.0.113.20" },
+    { "X-Real-IP": "203.0.113.20" },
   );
   check(
     "signup at victim@ with a known password → 400 naming password",
@@ -521,7 +521,7 @@ try {
     "/api/collections/users/records",
     null,
     { email: "half@example.com", passwordConfirm: "attacker123456" },
-    { "X-Forwarded-For": "203.0.113.20" },
+    { "X-Real-IP": "203.0.113.20" },
   );
   check("a signup sending only passwordConfirm → 400", s, 400);
 
@@ -579,7 +579,7 @@ try {
     "/api/collections/users/records",
     null,
     signup_body(HONEST, "Honest"),
-    { "X-Forwarded-For": "203.0.113.21" },
+    { "X-Real-IP": "203.0.113.21" },
   );
   check("signup with no password → 200, unverified", tup(s, r?.verified), tup(200, false));
   const honest_id = r.id;
@@ -617,7 +617,7 @@ try {
   console.log("\n── (i) a resend reads as signup while unverified, as a reset once verified ──");
   const RESEND = "resend@example.com";
   [s] = await api("POST", "/api/collections/users/records", null, signup_body(RESEND, "Resend"), {
-    "X-Forwarded-For": "203.0.113.22",
+    "X-Real-IP": "203.0.113.22",
   });
   check("signup → 200", s, 200);
   await wait_for_mail(MAIL_DIR_2, RESEND);

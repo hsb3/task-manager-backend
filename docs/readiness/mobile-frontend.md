@@ -145,7 +145,7 @@ newer change, on every collection a user edits.
   provider's app registration, is not tested.
 - Whether App Review would accept the server's own email sign-in as the 4.8-equivalent login
   for an iOS app: a review judgement, not testable here.
-- How the deployed proxy sets `X-Forwarded-For` (SH-6 rests on a room).
+- How the deployed proxy sets `X-Real-IP` (SH-6 rests on a room).
 - Realtime events for stock collections on soft-trash, and comment deletion semantics.
 
 ## Out of scope

@@ -259,10 +259,10 @@ decision:refused-migration-fails-the-deploy); it does not gate a deploy.
   cannot RECEIVE its own OTP is a permanent lockout.**
 - Impersonation is `POST /api/collections/users/impersonate/{id}` — NOT `.../records/{id}/...`.
 - **`statuses.color` is a NAMED-PALETTE select** (`gray`/`red`/…/`pink`); a hex value 400s.
-- **Railway's `X-Forwarded-For` chain is `[real-client, edge-node]` and the RIGHTMOST hop is a
-  VARYING edge IP** — trusting rightmost splits rate-limit buckets per request and silently
-  disables the limiter. `trustedProxy` needs `useLeftmostIP: true`; Railway strips inbound XFF,
-  so leftmost is the real client and is not spoofable (proven with a forged header).
+- **The rate limiter counts Railway's `X-Real-IP`, rightmost entry, never `X-Forwarded-For`**
+  (decision:rate-limit-counts-x-real-ip). The rightmost `X-Forwarded-For` hop is a varying edge
+  IP, which would split buckets per request, and Railway documents nothing about an inbound
+  `X-Forwarded-For`, so its leftmost entry may be client-supplied.
 - **Settings secrets are PLAINTEXT at rest in `pb_data/data.db`** — the S3 secret, the SMTP
   password and any OAuth secret, unless the boot CMD passes `--encryptionEnv`. It does not.
 - **Proving transactional/alert mail was DELIVERED needs no inbox access** — Resend's
