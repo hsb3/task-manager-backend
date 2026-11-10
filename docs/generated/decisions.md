@@ -418,6 +418,8 @@ The record id is the only real key; `key` on tasks, decisions, documents and mil
 - **The key follows the item.** An item key is minted once after create and is immutable afterwards; moving the item to another project keeps its key even though the prefix then differs from the new project, so no link or spoken name ever breaks or gets reused.
 - **Shadow project items stay keyless**, because the shadow project takes no prefix (decision:shadow-project).
 
+**Superseded in part:** Linear does not keep an identifier with its issue: moving an issue to another team gives it a new identifier, and the old one keeps resolving to it (decision:item-key-kept-on-move). This app keeps the key through a move, as stated above; the rest of this record is unchanged.
+
 ## item-filter-by-name
 
 - **Slug:** `decision:item-filter-by-name`
@@ -429,6 +431,17 @@ A caller filtering collection:project_items by status or label used to need the 
 - **Prior art.** The Linear issue filter takes a workflow state or a label by name (`state: { name: { eq } }`, `labels: { some: { name: { eq } } }`) and matches every state or label carrying that name, across teams. Here a status name is unique only inside a workspace and a label name only inside a workspace or a project, and every workspace starts with the same default statuses, so matching every record with the name would quietly mix workspaces. The call made here differs: the name must resolve to exactly one record.
 - **What a name resolves to.** The candidates are the statuses or labels with that exact name that the caller can read. A top-level `workspace =` clause narrows them to that workspace, and a `project =` clause to the workspace of that project, which need not be readable itself, so the shadow project scopes too, with labels limited to the ones of that project and the ones of its workspace that belong to no project.
 - **None or several is a 400.** No candidate answers 400 `value_not_found` and more than one answers 400 `value_ambiguous`, under `status` or `labels` in data, so a list never silently picks one. A record the caller cannot read is never a candidate, so neither answer reveals it.
+
+## item-key-kept-on-move
+
+- **Slug:** `decision:item-key-kept-on-move`
+- **Title:** An item keeps its display key when it moves to another project, where Linear gives a moved issue a new identifier.
+- **Ref:** `projects`
+
+Supersedes the prior-art statements in decision:item-display-keys and decision:names-display-only, which said Linear mints an issue identifier once and the identifier follows its issue. It does not: when an issue moves to another team, Linear generates a new identifier and URL for it, and the old identifier and URL keep resolving to the issue by redirect and search.
+
+- **What this app does.** A task, decision, document or milestone moves to another project of its own workspace by changing `project`; a project of another workspace is refused with a 400. The move leaves `key` unchanged: the item keeps its old prefix and number and takes no number from the new project, so the next item created there gets that project's next number. An item with no key arrives keyless and stays keyless. A client cannot change `key` at all. `tests/test_item_keys.ts` proves the move on a task and the key lock on all four types; `tests/test_scope.ts` proves the refusal of another workspace's project on all four types.
+- **Why not re-key as Linear does.** A re-key leaves the old label in every link, comment and note that already used it, and Linear keeps those working by resolving the old identifier to the issue. This app stores no former key, so a re-keyed item's old label would find nothing. Keeping the key gives each item one label for life, at the cost of a prefix that may not match the project the item now sits in.
 
 ## landing-and-switch-check
 
@@ -487,6 +500,8 @@ Owner ruling 2026-08-07, after the shell addressed one account at another accoun
 - **Before adding a lookup** keyed on something a user typed, check whether the opaque id would do.
 
 Prior art: Linear mints an issue identifier once and keeps the identifier through a rename of the title. It rules out a link that breaks on rename, two records colliding on one derived key, and a second reader assuming the label is a lookup.
+
+**Superseded in part:** Linear does not mint an issue identifier once: moving an issue to another team gives it a new identifier (decision:item-key-kept-on-move); the rest of this record is unchanged.
 
 ## notification-fanout-semantics
 
