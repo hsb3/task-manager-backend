@@ -14,14 +14,11 @@ accept through `/api/tracker/invitations/{id}/accept`. Authors write their own i
 
 ## Seed a room
 
-Boot a clean room first (the repo's clean-room law, `AGENTS.md`): copies of `pb_migrations`
-and `pb_hooks`, the `*superuser_mfa.js` migration removed from the copy, and a port of
-`<default> + PB_PORT_OFFSET` (`.agents/rules/ports.md`).
+Boot a clean room with the solo-run recipe in [`.agents/rules/ports.md`](../.agents/rules/ports.md)
+(it follows the clean-room law in `AGENTS.md`), skipping its last line (the sample seed and
+suite), then seed the world:
 
 ```bash
-S=$(mktemp -d); cp -R pb_migrations "$S/mig"; rm -f "$S/mig/"*superuser_mfa.js; cp -R pb_hooks "$S/hooks"
-./pocketbase superuser upsert probe@example.com probe123456 --dir "$S/pb_data" --migrationsDir "$S/mig"
-./pocketbase serve --http=127.0.0.1:8091 --dir "$S/pb_data" --migrationsDir "$S/mig" --hooksDir "$S/hooks" &
 PB_SUPERUSER_EMAIL=probe@example.com PB_SUPERUSER_PASSWORD=probe123456 \
   bun e2e/seed.ts --seed 22 --url http://127.0.0.1:8091
 ```
@@ -43,7 +40,7 @@ create, because a world is seeded into a fresh room only.
   rows without hitting seeded ones.
 - `bun tests/test_agent_probe.ts --world N` runs the agent probe against world N instead of
   `scripts/seed.ts`. Every world gives each probe filter a seeded row to match in the persona's
-  workspace; the battery runs seed 22.
+  workspace; the battery runs one world.
 
 ## Rate limits
 

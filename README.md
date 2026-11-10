@@ -64,7 +64,7 @@ number shared by every item in the project. PocketBase takes the sign-in token i
 with no `Bearer` prefix.
 
 `tm` also shows, searches, edits and comments, and `tm mcp` offers the same verbs to an AI agent as
-MCP tools: see the how-to [tm, the task tracker from your terminal](clients/tm/README.md).
+MCP tools: see the how-to [tm, the task tracker from the terminal](clients/tm/README.md).
 
 ## What's in it
 
@@ -75,7 +75,7 @@ MCP tools: see the how-to [tm, the task tracker from your terminal](clients/tm/R
   creates the user's first workspace and project.
 - **Collaboration.** Threaded comments with reactions, a field-by-field activity history on
   tasks, task subscriptions, and notifications with an email digest of unread ones.
-- **Your own vocabulary.** Labels and statuses are records in each workspace, created with
+- **Per-workspace vocabulary.** Labels and statuses are records in each workspace, created with
   defaults, so a team renames and extends them without a schema change.
 - **One access policy.** Who can read and write what is PocketBase API rules, so it holds the same
   for every client. A delete moves an item to a trash, restorable for 30 days by default.
