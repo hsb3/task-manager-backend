@@ -2,8 +2,8 @@
 
 The surface here is a published package and a command line, not HTTP routes. The rulings it
 implements are this change's proposal, Open Questions 1 to 4 (ruled 2026-11-10): public npm,
-Node with Bun optional, no standalone binaries this milestone, the name `@hsb3/tm`. A value
-marked *(Q n)* rests on this change's own open question n (design.md, Open Questions).
+Node with Bun optional, no standalone binaries this milestone, the name `@hsb3/tm`. Its own
+open question, the package's license, was ruled MIT on 2026-11-10.
 
 ## Routes
 
@@ -15,10 +15,10 @@ marked *(Q n)* rests on this change's own open question n (design.md, Open Quest
 | Name | `@hsb3/tm` (scope `@hsb3`, owned by the npm account `hsb3`) |
 | Access | public: installing needs no credential |
 | Command | `tm` (the package's one `bin` entry) |
-| Contents | `package.json`, `README.md`, `LICENSE` *(Q1)*, `dist/tm.js`, and nothing else |
+| Contents | `package.json`, `README.md`, `LICENSE`, `dist/tm.js`, and nothing else |
 | Runtime dependencies | none: `dist/tm.js` is self-contained, the MCP SDK inside it |
 | Runtime | Node `>=22.18.0` (`engines.node`); Bun through `bunx --bun` |
-| License | `MIT` *(Q1)* |
+| License | `MIT` |
 | Provenance | every version published with an npm provenance attestation |
 | Version | semver, from `0.1.0`; the manifest's `version` is the only source |
 
@@ -51,7 +51,8 @@ npx` prints. On a Bun-only machine `command` is `bunx` and `args` is `["--bun", 
 
 ### `tm --version`
 
-The format is api-versioning-policy's (its contract, "`tm --version`"); this change owns line 1.
+This change defines the flag (root ruling 3, 2026-11-10); api-versioning-policy, built later,
+owns only the value of line 2.
 
 ```
 $ tm --version
@@ -68,7 +69,10 @@ api 0.1.0
   or `TM_API_KEY`.
 - No short form: `-v` stays an unknown option (exit 2, usage text).
 - The usage text gains the line `  --version prints the versions of tm and of the API it was
-  built for.` after the `--json` line.
+  built for.` after the `--json` line, or as its last line if that line is no longer there.
+- The values in the example are illustrative: line 2 is whatever `openapi.json`
+  `info.version` says when the client is built (`1.0.0` until api-versioning-policy renumbers
+  the contract).
 
 ## Requests and Responses
 

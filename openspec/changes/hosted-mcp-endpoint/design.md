@@ -277,8 +277,8 @@ resource_metadata="<MCP_PUBLIC_URL>/.well-known/oauth-protected-resource/mcp", s
 write"` (plus `, error="invalid_token"` when a credential was sent); every 429 and 503 carries
 `Retry-After` (429: the seconds `hit`/`over` returned; 503: `5`). Any response to a request whose
 `Origin` is listed also carries `Access-Control-Allow-Origin: <origin>`,
-`Access-Control-Expose-Headers: WWW-Authenticate, Retry-After, Api-Version` (D18) and `Vary:
-Origin`. A request
+`Access-Control-Expose-Headers: WWW-Authenticate, Retry-After` and `Vary: Origin`
+(api-versioning-policy later adds `Api-Version`, D18). A request
 body has no size cap of its own beyond Bun's `Bun.serve` default. An exception
 anywhere answers 500 `server_error`, "The service failed; try again.", and logs the error
 without the `Authorization` value. The service never reads a credential from the query string.
@@ -620,19 +620,18 @@ service's `domains[0]`, its `MCP_PUBLIC_URL`, and pocketbase's `MCP_PUBLIC_URL`.
 The api-versioning-policy contract (`lane/d-versioning` `8e3ada5`, "`Api-Version` header")
 requires the hosted endpoint to send `Api-Version: <API_VERSION>` on every response, any method
 and path, 200, 202, 400, 401, 403, 404, 405, 406, 429, 500 and 503 included. `make_app`'s
-`fetch` wraps its whole pipeline (the `catch` that answers 500 included) and sets the header on
-the `Response` it returns, so no branch can miss it; `Access-Control-Expose-Headers` (D9) lists
-`Api-Version` too. `API_VERSION` is imported from `clients/tm/src/api.generated.ts`, where that
-change's generator writes `export const API_VERSION = "<openapi.json info.version>"`.
+`fetch` wraps its whole pipeline (the `catch` that answers 500 included) in one function, so a
+header set on the `Response` it returns reaches every branch.
 
-**If `API_VERSION` is absent.** The two changes may be built in either order. The builder of
-Phase 6 runs `grep -c '^export const API_VERSION' clients/tm/src/api.generated.ts` and `test -f
-scripts/_api_contract.ts`. Output `1` and the file present: build the header and its five
-assertions (Phase 6, marked "(D18)"). Output `0`: build neither,
-leave the import out, and report "Api-Version header deferred: API_VERSION absent" so root files
-the follow-up against this change; api-versioning-policy then adds the header in
-`services/mcp/src/app.ts` and the four cases in `tests/test_mcp_service.ts` exactly as written
-here.
+**Deferred to api-versioning-policy.** By the final build order that change is built last, after
+this one, so this change builds no `Api-Version` header, imports no `API_VERSION`, and lists no
+`Api-Version` in `Access-Control-Expose-Headers`. api-versioning-policy adds, in
+`services/mcp/src/app.ts`, the header set in that one wrapping function from `API_VERSION` of
+`clients/tm/src/api.generated.ts` plus `Api-Version` in D9's expose list, and in
+`tests/test_mcp_service.ts` the cases `version_on_200`, `version_on_405`, `version_on_401`,
+`version_on_404` (a W `tools/list` 200, a GET `/mcp` 405, a no-credential POST 401 and a `GET
+/nope` 404, each header equal to `read_api_version(REPO_ROOT)` from `scripts/_api_contract.ts`)
+and the same assertion in `api_down_503`.
 
 ### D19. Names later changes build on (extension points)
 
@@ -670,8 +669,16 @@ contract does not, and D15 implements the stricter rule.
 
 ## Depends on
 
-- Nothing earlier in the milestone order: this change is first. It builds on `origin/main` at
-  `d1b5cf3` as read in this design.
+- Build order (root ruling, final): hosted-mcp-endpoint (Phases 1-9, then its root-run Phase
+  10 runbook) -> key-scoping Phase 1, then Phases 2-6 as one PR, then Phase 7 as the next PR, all
+  before key-minting-cli starts -> key-minting-cli -> tm-distribution -> agent-verb-coverage ->
+  api-versioning-policy last, and in any case before the hosted MCP address is given to any
+  outside user (release 1.0.0 is cut then). Phase 10's sign-in check (step 10) is the owner's
+  own; the address goes to no outside user until api-versioning-policy is built. Nothing comes before this change: it
+  builds on `origin/main` at `d1b5cf3` as read in this design.
+- This change is built before api-versioning-policy, so it cuts no API release and edits no
+  `api/` file or `mcp-tools.json`. If `scripts/release_api.ts` exists when a phase starts, the
+  build order was changed: stop and report.
 - Later changes edit files this plan touches (sibling commits read: `lane/d-minting` `9f99806`
   and `0128dfe`, `lane/d-verbs` `9433c0f`, `lane/d-versioning` `86b0dcb` and `8e3ada5`,
   `lane/d-dist` `202703b`, `lane/d-scoping` `f1cabe1`):
@@ -685,10 +692,8 @@ contract does not, and D15 implements the stricter rule.
   - `clients/tm/src/mcp.ts`: agent-verb-coverage adds tools to `TOOLS`.
   - `clients/tm/package.json`, `bun.lock`, `clients/tm/README.md`: tm-distribution renames and
     versions the package; `VERSION` (D11) follows whatever version it sets.
-  - `services/mcp/src/app.ts` and `tests/test_mcp_service.ts`: the `Api-Version` header and its
-    four cases are built here when api-versioning-policy's `API_VERSION` already exists, and by
-    that change otherwise (D18; sibling commit `lane/d-versioning` `8e3ada5`). Integrator check:
-    `grep -c '^export const API_VERSION' clients/tm/src/api.generated.ts`.
+  - `services/mcp/src/app.ts` and `tests/test_mcp_service.ts`: api-versioning-policy, built
+    last, adds the `Api-Version` header and its cases there (D18).
   - The newest `pb_migrations/*_seed_app_docs.js`, `scripts/gen_app_docs_seed.ts`
     `DEFAULT_OUTPUT`, `scripts/app_docs_seed.sha256`, `.gitattributes`: every collection change
     re-seeds.
@@ -704,10 +709,12 @@ order: `bun scripts/gen_schema.ts`, `bun scripts/model/extract_current.ts`,
 `bun scripts/gen_openapi.ts`, `bun scripts/gen_tm_client.ts` (each without `--check`), which
 rewrite `schema/`, `pb_hooks/field_patterns.json`, `scripts/model/current/`, `openapi.json` and
 `clients/tm/src/api.generated.ts`. A new suite is registered by a `run_suite "<label>" bun
-tests/<file>.ts` line after `run_suite "test_tm_client_gen"` in `scripts/run_suite_battery.sh`
-and a row `<shard><TAB>30<TAB><label>` in `scripts/battery_shards.tsv`, where `<shard>` is the
-shard whose seconds sum lowest (ties: the lower number), inserted where it keeps the rows sorted
-by seconds descending as `scripts/check_battery_suites.ts` requires (re-measured by the next CI
+tests/<file>.ts` line appended after the last `run_suite` line of `scripts/run_suite_battery.sh`
+and a row `<shard><TAB><seconds><TAB><label>` in `scripts/battery_shards.tsv`, where
+`<seconds>` is the suite's own measured wall time (`time bun tests/<file>.ts`, rounded up to a
+whole second) as the file's header asks, `<shard>` is the shard whose seconds sum lowest (ties:
+the lower number), inserted after the last row with equal or greater seconds so the rows stay
+sorted by seconds descending as `scripts/check_battery_suites.ts` requires (re-measured by the next CI
 run). New suites follow `tests/test_tm_mcp.ts`'s skeleton: port `<default> +
 PB_PORT_OFFSET`, scratch copies, `pocketbase superuser upsert` before `roomkit.serve`, a local
 `check(label, got, expected)` counter, `finally` that stops every process it started by handle
@@ -832,8 +839,7 @@ and removes scratch, exit 1 on any failure.
     `h.values("X-Real-IP")`, split on `,` and trimmed, equals `SENTINEL`: `h.del("X-Real-IP")`;
     `return e.next()`. (The `Middleware` constructor order is `(fn, priority, id)`; the spike saw
     the priority silently become 0 with the arguments swapped.)
-  - `.agents/rules/ports.md`: append ` · 8200 = test_internal_caller` after `8195 =
-    test_route_errors` in the defaults list.
+  - `.agents/rules/ports.md`: insert ` · 8200 = test_internal_caller` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`).
 - **Tests** (`tests/test_internal_caller.ts`, port 8200; boot with `MCP_INTERNAL_SECRET=s3cret`
   in `process.env` before `roomkit.serve`; as superuser PATCH `/api/settings` `rateLimits.rules`
   to the current `rateLimits.rules` (read back first) plus `{label: "/api/health", maxRequests: 3, duration: 60, audience:
@@ -927,7 +933,7 @@ and removes scratch, exit 1 on any failure.
     handler. Code issue (used from Phase 4): not in this phase.
   - `pb_hooks/lib/routes.js`: the three D16 entries for this phase, and D16's new wording of the
     `internal:` comment line.
-  - `.agents/rules/ports.md`: append ` · 8201 = test_oauth_token`.
+  - `.agents/rules/ports.md`: insert ` · 8201 = test_oauth_token` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`).
 - **Tests** (`tests/test_oauth_token.ts`, port 8201; env `MCP_PUBLIC_URL=http://mcp.test` before
   boot; the suite inserts codes as the superuser via `POST /api/collections/oauth_codes/records`
   with `code_hash` = sha256 hex of a known code and `code_challenge` = the RFC 7636 Appendix B
@@ -1041,7 +1047,7 @@ and removes scratch, exit 1 on any failure.
   - `pb_hooks/oauth_server.pb.js`: `GET /oauth/authorize` and `POST /oauth/authorize` per D14
     (POST parses with `parse_form`; parameters from the form).
   - `pb_hooks/lib/routes.js`: the two D16 entries.
-  - `.agents/rules/ports.md`: append ` · 8202/8203 = test_oauth_authorize` (8203 is the suite's
+  - `.agents/rules/ports.md`: insert ` · 8202/8203 = test_oauth_authorize` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`) (8203 is the suite's
     SMTP sink; it stays in the suite's reserved 82xx band rather than the 25xx sink band, which
     belongs to other suites).
   - `docs/readiness/agent-clients.md` AC-7: verdict `partly`; evidence "the API serves RFC 8414
@@ -1216,24 +1222,26 @@ and removes scratch, exit 1 on any failure.
     `Number(process.env.MCP_INTERNAL_PORT || 8081)`) answers 404 to everything in this phase (Phase 7 fills it); log one line per listener: "listening on <host>:<port>".
   - `tsconfig.json` `include`: add `"services/**/*.ts"`. `package.json` `format:check` and
     `format`: add `"services/**/*.ts"` after `"scripts/**/*.ts"`. Run `bun run format`.
-  - `.agents/rules/ports.md`: append ` · 8205/8206/8207 = test_mcp_service`.
-  - `docs/readiness/agent-clients.md` AC-6: verdict `partly`; evidence "`services/mcp/` serves
+  - `.agents/rules/ports.md`: insert ` · 8205 = test_mcp_service · 8206/8207 = test_mcp_service` (the port gate's entry
+    pattern takes at most two ports per entry) in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`).
+  - `docs/readiness/agent-clients.md` (front-matter `updated:` set to the build date) AC-6:
+    verdict `partly`; the Evidence bullet keeps its text and gains as its last sentence "`services/mcp/` serves
     the catalog over Streamable HTTP (`tests/test_mcp_service.ts`)"; gap "not deployed"; AC-7's
     evidence gains the sentence "The MCP service answers 401 with a `WWW-Authenticate` challenge
-    naming its Protected Resource Metadata (`services/mcp/src/app.ts`, case `no_credential_401`)."
-    and AC-7
-    evidence gains the MCP service's challenge and metadata.
+    naming its Protected Resource Metadata (`services/mcp/src/app.ts`, case `no_credential_401`)." appended as its last sentence; no
+    other AC-7 edit in this phase.
 - **Tests** (`tests/test_mcp_service.ts`; room 8205 booted with `MCP_INTERNAL_SECRET=s3cret`;
   then `roomkit.require_free_port` on 8206 and 8207 and `Bun.spawn([process.execPath,
   "services/mcp/main.ts"], { cwd: REPO_ROOT, stdout: <log fd>, stderr: <log fd> })` writing to
   `mcp.log` in the suite's scratch (opened with `fs.openSync`, as `roomkit.serve` does; the
-  `missing_env_exits` case reads that file) with env `MCP_HOST=127.0.0.1`, `PORT=8206+off`,
-  `MCP_INTERNAL_PORT=8207+off`, `PB_INTERNAL_URL` and `PB_PUBLIC_URL` the room URL,
-  `MCP_PUBLIC_URL=http://127.0.0.1:<8206+off>`, `MCP_INTERNAL_SECRET=s3cret`, waiting until the
+  `missing_env_exits` case reads that file) with env `MCP_HOST=127.0.0.1`, `PORT=8206 + PORT_OFFSET`,
+  `MCP_INTERNAL_PORT=8207 + PORT_OFFSET`, `PB_INTERNAL_URL` and `PB_PUBLIC_URL` the room URL,
+  `MCP_PUBLIC_URL=http://127.0.0.1:<8206 + PORT_OFFSET>`, `MCP_INTERNAL_SECRET=s3cret`, waiting until the
   PRM URL answers 200; Alice with a read key R and a write key W and a project; each 429 case
   uses its own `X-Real-IP`; write `tools_list_read_key` first and watch it fail with no service):
-  - `missing_env_exits`: spawn with `PB_INTERNAL_URL` unset: exit code 1, stderr names
-    `PB_INTERNAL_URL`.
+  - `missing_env_exits` (runs first, before the main spawn): a separate spawn with
+    `PB_INTERNAL_URL` unset and stderr to its own file `mcp-missing-env.log` in scratch: exit code
+    1, that file names `PB_INTERNAL_URL`.
   - `prm_doc` and `prm_root_doc`: both URLs: 200, body equals D10's document.
   - `no_credential_401`: POST `initialize`, no `Authorization`: 401, `WWW-Authenticate` equals
     `Bearer resource_metadata="<MCP>/.well-known/oauth-protected-resource/mcp", scope="read
@@ -1241,7 +1249,8 @@ and removes scratch, exit 1 on any failure.
   - `query_key_401`: `?api_key=<W>` and no header: same as above.
   - `bad_key_401`: `tmk_` + 40 `x`: 401 with `error="invalid_token"`.
   - `user_token_401`: Alice's PocketBase token as Bearer: 401 `invalid_token`.
-  - `revoked_key_401`: revoke a third key K after one successful call with it: 401.
+  - `revoked_key_401`: one successful `tools/list` with a third key K; Alice's session PATCHes
+    `/api/collections/api_keys/records/<K id>` `{revoked: true}`; the next call with K: 401.
   - `initialize_2025`: SDK 1.32.2 `StreamableHTTPClientTransport` with `requestInit.headers`
     `Authorization: Bearer W`: connects; no `Mcp-Session-Id` response header (raw fetch check);
     `serverInfo.name` `tm`.
@@ -1272,8 +1281,9 @@ and removes scratch, exit 1 on any failure.
   - `stray_path_404`: W, `GET /api/tracker/me` on the service: 404 `not_found`.
   - `origin_refused`: W, `Origin: https://attacker.example`: 403 `origin_not_allowed`, no
     `Access-Control-Allow-Origin`.
-  - `origin_allowed`: W, `Origin: https://claude.ai`: 200 and `Access-Control-Allow-Origin:
-    https://claude.ai`.
+  - `origin_allowed`: W, `Origin: https://claude.ai`: 200, `Access-Control-Allow-Origin:
+    https://claude.ai`, `Access-Control-Expose-Headers: WWW-Authenticate, Retry-After`, `Vary:
+    Origin`; and a no-credential POST with that `Origin`: 401 carrying the same three headers.
   - `no_origin_served`: W, no `Origin`: 200.
   - `anon_limit_429`: 31 POSTs without credential from `X-Real-IP: 198.51.100.1`: 30 × 401, then
     429 with `Retry-After` an integer 1-60.
@@ -1284,9 +1294,10 @@ and removes scratch, exit 1 on any failure.
   - `flooded_address_valid_key`: 31 POSTs with `tmk_` + 40 `v` from `198.51.100.5` (the address
     is now over: the 31st answers 429); then a fresh valid key M from `198.51.100.5`: 200 (a
     valid key is counted by its key alone); a 32nd invented key from `198.51.100.5`: 429.
-  - `pb_exempt_via_service`: superuser PATCHes the room's `/api/` rule to 5 per 60; 10
+  - `pb_exempt_via_service`: superuser reads `GET /api/settings` `rateLimits.rules`, then PATCHes the room's `/api/` rule to 5 per 60; 10
     `tools/list` with a fresh key F over the service: all 200; 10 direct `GET
-    /api/tracker/me` with F from `X-Real-IP: 198.51.100.4`: 429 by the 6th. Restore the rule.
+    /api/tracker/me` with F from `X-Real-IP: 198.51.100.4`: 429 by the 6th. Then PATCH `rateLimits.rules` back to the value read before
+    the change.
   - `options_preflight`: OPTIONS `/mcp` with `Origin: https://claude.ai`: 204, `Allow: POST`,
     `Access-Control-Allow-Origin: https://claude.ai`, `Access-Control-Allow-Methods: POST`;
     without `Origin`: 204 and no `Access-Control-Allow-Origin`.
@@ -1300,11 +1311,6 @@ and removes scratch, exit 1 on any failure.
   - The 500 path has no trigger without fault injection and is covered by reading the `catch`
     (bounded coverage, stated in the phase report).
   - `api_down_503` runs last (it stops the room): stop the room; W `tools/list`: 503 `unavailable`, `Retry-After: 5`.
-  - (D18, only when `API_VERSION` exists) `version_on_200`, `version_on_405`,
-    `version_on_401`, `version_on_404`: the `Api-Version` header of a W `tools/list` 200, a GET
-    `/mcp` 405, a no-credential POST 401 and a `GET /nope` 404 each equals
-    `read_api_version(REPO_ROOT)` from `scripts/_api_contract.ts`; and `api_down_503` also
-    asserts it.
 - **Gate:** `bun tests/test_mcp_service.ts`, `bun tests/test_tm_mcp.ts`, `make check-static`.
 
 ### Phase 7. Metadata-document clients
@@ -1322,8 +1328,8 @@ and removes scratch, exit 1 on any failure.
   - modify `scripts/battery_shards.tsv`
   - modify `.agents/rules/ports.md`
 - **Steps:**
-  - `.agents/rules/ports.md`: change ` · 8202/8203 = test_oauth_authorize` to ` ·
-    8202/8203/8204 = test_oauth_authorize`.
+  - `.agents/rules/ports.md`: insert ` · 8204 = test_oauth_authorize` immediately after
+    ` · 8202/8203 = test_oauth_authorize` (two ports per entry at most, as in Phase 6).
   - `services/mcp/src/cimd.ts`: `export function check_client_id_url(s: string): string | null`,
     `export function is_public_address(ip: string): boolean`, `export function
     max_age(cache_control: string | null): number`, `export async function
@@ -1366,7 +1372,7 @@ and removes scratch, exit 1 on any failure.
   - `internal_secret`: `internal_handler` without the header: 404; wrong secret: 404; GET: 404.
 - **Tests** (`tests/test_oauth_authorize.ts` additions; a stub `Bun.serve` on 8204 stands in for
   the MCP service's private listener, answering by `client_id`, and the room boots with
-  `MCP_INTERNAL_URL=http://127.0.0.1:<8204+off>`, `MCP_INTERNAL_SECRET=s3cret`):
+  `MCP_INTERNAL_URL=http://127.0.0.1:<8204 + PORT_OFFSET>`, `MCP_INTERNAL_SECRET=s3cret`):
   - `cimd_claude_code`: `client_id=https://claude.ai/oauth/claude-code-client-metadata` (stub
     answers 200 with `{"client": {"client_id": <that URL>, "client_name": "Claude Code",
     "redirect_uris": ["http://localhost/callback", "http://127.0.0.1/callback"]}, "max_age":

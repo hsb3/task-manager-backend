@@ -109,8 +109,9 @@ As ruled on 2026-11-10 (Open Questions below):
   `clients/tm/src/verbs.ts` that both front ends call.
 - Permanent deletion is never a tool. `tm_delete` refuses an item that is already in the trash
   instead of sending the `DELETE` that would purge it, so a retried call has no further effect. The
-  check and the `DELETE` are two requests, so two concurrent calls can still purge; only the server
-  can close that, by refusing a purge to a key (AC-4's territory).
+  check and the `DELETE` are two requests, so two concurrent calls can still purge under a key
+  allowed to purge; change `key-scoping` (AC-4, built before this change) refuses a `write` key's
+  purge with 403 `api_key_scope`, leaving the race to `manage` and `own` keys.
 - Every tool states every annotation explicitly: `readOnlyHint`; for a write, `destructiveHint`
   and `idempotentHint`; `openWorldHint: false` on all, since no tool reaches outside the tracker.
   `destructiveHint` keeps the specification's meaning, false only for a purely additive write:
@@ -136,10 +137,9 @@ As ruled on 2026-11-10 (Open Questions below):
   list varies by the credential presented, which the specification allows, and never within one
   connection.
 - **Ruling 6 and AC-4.** A grant's credential is a key, so the read or write choice at consent is
-  the key's scope. Until AC-4 lets a write key be denied destructive routes, a write grant
-  includes `tm_delete`, and the plain API lets that key purge with a second `DELETE`.
-  `tm_delete` never sends the purging call, and `destructiveHint: true` lets a client ask first;
-  denying a key the purge outright belongs to AC-4.
+  the key's scope. A write grant includes `tm_delete`; `key-scoping` (AC-4) refuses that key's
+  purge on the plain API, and `tm_delete` never sends the purging call anyway, while
+  `destructiveHint: true` lets a client ask first.
 
 ## Capabilities
 

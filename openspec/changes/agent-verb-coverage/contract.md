@@ -75,8 +75,8 @@ failure returns the AC-13 shape of `hosted-mcp-endpoint`'s contract (`isError: t
 Field names are the API's. A `Record` is the server's record verbatim.
 
 - **`tm_me`**: `GET /api/tracker/me` verbatim:
-  `{user: {id, name}, unread_notifications: integer, workspaces: [{id, name, role, status, counts, capabilities}], key: {id, scope, expires, client_id}}`.
-  Fields a later server change adds are passed through.
+  `{user: {id, name}, unread_notifications: integer, workspaces: [{id, name, role, status, counts, capabilities}], key: {id, scope, expires, client_id, reach, workspace, projects}}` (`reach`, `workspace` and
+  `projects` from change `key-scoping`). Fields a later server change adds are passed through.
 - **`tm_workspace`**:
   ```json
   {
@@ -177,8 +177,9 @@ does today. A read key is offered the seven read tools only; a write tool reache
 an old client) is refused by the server with 403 `api_key_scope`. A key's other limits (change
 `key-scoping`) apply server-side and reach every verb unchanged. No verb sends the second `DELETE`
 that purges a trashed item; the check and the delete are two requests, so two concurrent
-`tm_delete` calls on one live item can still purge it, until a key can be denied the purge
-(AC-4).
+`tm_delete` calls on one live item can still purge it under a `manage` or `own` key of the
+workspace owner or an admin (`key-scoping` refuses a `write` key's purge with 403
+`api_key_scope`).
 
 ## Compatibility
 

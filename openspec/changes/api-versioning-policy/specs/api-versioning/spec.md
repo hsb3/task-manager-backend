@@ -51,14 +51,13 @@ catalog SHALL be published beside it as `mcp-tools.json`, generated from the sam
 ### Requirement: The hosted MCP endpoint and the tm client name the contract version
 
 Every HTTP response of the hosted MCP endpoint SHALL carry `Api-Version` with the contract
-version its tool catalog was released under. `tm --version` SHALL print the client's own version
-alone on its first line and `api <contract version>`, the version it was built against, on its
-second.
+version its tool catalog was released under. The second line of `tm --version` (a command tm-distribution
+defines) SHALL be `api <contract version>`, the version the client was built against.
 
 #### Scenario: tm --version
 
 - **WHEN** a person runs `tm --version`
-- **THEN** it prints the client version on line 1 and `api <contract version>` on line 2, and exits 0
+- **THEN** its second line is `api <contract version>`, equal to `info.version` of the `openapi.json` the client was generated from
 
 #### Scenario: A hosted MCP request
 

@@ -13,7 +13,7 @@ No route is added. The version rides on every existing response (ruling 1):
 | Every PocketBase response (`{API}`), any method and path | `Api-Version` response header | The contract version |
 | Every hosted MCP endpoint response (`{MCP}`), any method and path | `Api-Version` response header | The contract version of the catalog it serves |
 | `openapi.json` | `info.version` | The contract version |
-| `tm --version` | second output line | The contract version the client was built against |
+| `tm --version` | second output line, `api <version>` | The contract version the client was built against |
 | MCP `serverInfo` (`tm mcp` and hosted) | `version` | The `tm` client version, not the contract version (hosted-mcp-endpoint contract, "Protocol revisions and transport") |
 
 `{API}` and `{MCP}` are the two origins of the hosted-mcp-endpoint contract.
@@ -82,17 +82,23 @@ list). Not contract: `description`, `annotations`, `title` (ruling 5). A depreca
 
 ### `tm --version`
 
+tm-distribution owns the command and its format (its contract, "`tm --version`"; root ruling
+2026-11-10). This contract owns only the value of line 2; the block below restates the format
+for reading convenience and adds nothing.
+
 ```
 $ tm --version
-0.1.0
+tm 0.1.0
 api 0.1.0
 ```
 
-Line 1 is exactly what the tm-distribution contract defines ("`tm --version`": the package
-version alone). This change adds line 2: `api ` plus the contract version of the `openapi.json`
-the client was generated from. Everything else tm-distribution states holds: stdout only, exit 0,
-no network call, no saved login needed, `--version` wins over every other argument. A script
-wanting only the client version reads the first line.
+- Line 1 is `tm ` plus the package version (tm-distribution). Line 2 is `api ` plus the contract
+  version of the `openapi.json` the client was generated from (`info.version`). Stdout only,
+  nothing on stderr, exit 0, no network call, no saved login needed.
+- Wins over every other valid argument (`tm --version list`, `tm --help --version`). A command
+  line `parseArgs` rejects (an unknown option, a missing option value) still exits 2 with the
+  usage text. `-v` stays an unknown option.
+- The usage line is `  --version prints the versions of tm and of the API it was built for.`
 
 ### The API changelog, `api/CHANGELOG.md`
 
@@ -182,7 +188,9 @@ needs no credential.
   value was never a release (proposal, Why); no client outside the repository reads it.
 - **Responses gain** `Api-Version` and an `Access-Control-Expose-Headers` entry; nothing else in a
   response changes.
-- **`tm`** gains `--version`; every verb is unchanged.
+- **`tm`**: line 2 of `tm --version` (added by tm-distribution) moves from `api 1.0.0` to
+  `api 0.1.0`; every verb is unchanged.
 - **Contributors**: a commit that changes the contract structurally must cut a release in the
   same commit (`bun scripts/release_api.ts`), or `make check-static` fails. This binds every
-  change built after this one, the other milestone changes included.
+  change built after this one; the milestone's other changes are built before it, so the first
+  release (`0.1.0`) records all of them.

@@ -66,6 +66,12 @@ SHALL carry `User-Agent: tm/<version>`.
 - **WHEN** an operator runs `tm --version`, with or without a saved login
 - **THEN** stdout's first line is `tm <version>` and the command exits 0
 
+#### Scenario: Both versions, and a usage error
+
+- **WHEN** an operator runs `tm --version`
+- **THEN** stdout is two lines, `tm <version>` and `api <contract version>`, where the contract version is the `info.version` of the `openapi.json` the client was built from
+- **AND** `tm --version --bogus` exits 2 with the usage text, because an unknown option is a usage error whatever else is given
+
 #### Scenario: Version on the wire
 
 - **WHEN** `tm` sends any request to the server

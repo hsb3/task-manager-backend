@@ -56,18 +56,24 @@ only the user can open. `TM_URL` and `TM_API_KEY` SHALL keep overriding the save
 ### Requirement: The login key may manage keys and never mint
 
 The key `tm login` saves SHALL carry a manage-keys permission when the person grants it on the
-consent page. A key with that permission SHALL list the user's keys and revoke any of them,
-whatever its read or write scope, and SHALL never create a key. A key without it SHALL be refused
-both. A permission sent by a client when creating a key SHALL be ignored, except from a superuser.
+consent page. A key with reach all and that permission SHALL list the user's keys and revoke any
+of them, whatever its level, and SHALL never create a key. A key with reach all and without it
+SHALL be refused both. A key
+limited to part of the tracker SHALL list and revoke only itself, whatever its permission. A permission sent by a client when creating a key SHALL be ignored, except from a superuser.
 
 #### Scenario: A manage-keys key lists keys
 
 - **WHEN** a key carrying the permission calls the key list
 - **THEN** it receives every key of its user, without any secret, its own marked as current
 
+#### Scenario: A key limited to one workspace
+
+- **WHEN** a key limited to one workspace calls the key list, or revokes another key of its user
+- **THEN** the list holds only that key, and the revoke answers 404
+
 #### Scenario: A key without the permission
 
-- **WHEN** a key without the permission calls the key list or the revoke route
+- **WHEN** a key with reach all and without the permission calls the key list or the revoke route
 - **THEN** the server answers 403 `api_key_manage`
 
 #### Scenario: A manage-keys key tries to mint

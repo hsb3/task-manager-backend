@@ -1,8 +1,9 @@
 # Design
 
-How the contract is met. Build order: this change follows `hosted-mcp-endpoint` and `key-scoping`
-and precedes `tm-distribution`; Depends on lists what each earlier change must already have put on
-main. Steps marked *(assumes Q n)* follow the recommended answer to Open Question n.
+How the contract is met. Build order (root ruling 2026-11-10): hosted-mcp-endpoint, then every
+key-scoping phase (Phase 7 included), then this change, then tm-distribution,
+agent-verb-coverage and api-versioning-policy; Depends on lists what each earlier change must
+already have put on main.
 
 ## Decisions
 
@@ -30,19 +31,27 @@ main. Steps marked *(assumes Q n)* follow the recommended answer to Open Questio
    GitHub's and Linear's key lists live in the signed-in web app (proposal, Prior art); no
    surveyed product exposes key management to a key, which is why this needs a new decision
    record (Depends on).
-4. **How a handler knows the key.** The hosted-mcp-endpoint build's `tmkApiKeyAuth` stores
-   `e.set("tmApiKey", { id, scope, expires, client_id })`, a plain object that `GET
-   /api/tracker/me` returns as `key` (its design D19: "a later change adds its own properties to
-   that object in the same `e.set` call"). This change adds `manage_keys:
-   key.getBool("manage_keys")` to that call, so `/me` reports it with no `me.pb.js` change, and
-   handlers read `e.get("tmApiKey")`, which is `null` under a session (truth review's room
-   probe), testing it for truthiness and reading `.id` and `.manage_keys`. The `e.set`/`e.get`
-   pair was proven in a room on PocketBase 0.40.4 (2026-11-10), inside the real `tmkApiKeyAuth`
-   (priority -1030).
-5. **Revoke under a read-scoped key.** The middleware's read list gains
-   `POST /api/tracker/keys/{id}/revoke` (route pattern), because the permission, not the scope,
-   governs it (proposal, ruling 2: "lists and revokes"). The handler refuses a key without
-   `manage_keys`. `scripts/gen_openapi.ts` `key_access` mirrors it (KEEP IN SYNC marker on both).
+4. **How a handler knows the key.** After key-scoping, `tmkApiKeyAuth` stores
+   `e.set("tmApiKey", lib.keyInfo(key))`, where `keyInfo` in `pb_hooks/lib/api_keys.js` builds
+   `{ id, scope, expires, client_id, reach, workspace, projects }` and `GET /api/tracker/me`
+   returns that object as `key` (hosted-mcp-endpoint D19, key-scoping Phase 2). This change adds
+   `manage_keys: key.getBool("manage_keys")` to the object `keyInfo` returns, so `/me` reports it
+   with no `me.pb.js` edit, and handlers read `e.get("tmApiKey")` (`null` under a session, truth
+   review's room probe), testing it for truthiness and reading `.id`, `.reach` and
+   `.manage_keys`. The `e.set`/`e.get` pair was proven in a room on PocketBase 0.40.4
+   (2026-11-10), inside the real `tmkApiKeyAuth` (priority -1030).
+5. **Revoke under a read-scoped key.** key-scoping's `requiredLevel` answers `"own"` for a non-GET
+   route missing from `ROUTE_LEVELS`; this change adds `"POST /api/tracker/keys/{id}/revoke":
+   null` there (`null` = no level check, as `POST /api/tracker/trash/purge`), because the
+   permission, not the level, governs it (proposal, ruling 2: "lists and revokes"); the handler
+   refuses a key with reach `all` and without `manage_keys` (a limited key: Decision 5a). `GET /api/tracker/keys` already resolves to `read`.
+   `scripts/gen_openapi.ts` `key_access` returns `"manage_keys"` for both routes, a value apart
+   from key-scoping's level `"manage"` (root ruling 4).
+5a. **A limited key on the key routes (root ruling 5).** A key whose `reach` is not `all` lists
+   and revokes only itself, whatever its `manage_keys`: the list holds one item, and any other id
+   answers the same 404 as an unknown id. A key with reach `all` and `manage_keys` true lists and
+   revokes every key of its user. So `tm logout` always works, and a workspace-limited key cannot
+   reach keys wider than itself. The two routes are not in key-scoping's `ACCOUNT_WIDE`.
 6. **Refusal code `api_key_manage`.** New, beside `api_key_path`, `api_key_scope` and
    `api_key_invalid`, so a client can tell "this key may not manage keys" from "keys never reach
    this route". Message: `This API key cannot list or revoke keys.`
@@ -76,11 +85,11 @@ main. Steps marked *(assumes Q n)* follow the recommended answer to Open Questio
 12. **`key_name` and `key_expires` parameters** carry `tm keys create`'s name and expiry. Ignored
     for other clients (RFC 6749 §3.1, "The authorization server MUST ignore unrecognized request
     parameters").
-13. **A `tm` grant has no refresh token and, without `key_expires`, no expiry** *(assumes Q1)*.
+13. **A `tm` grant has no refresh token and, without `key_expires`, no expiry**.
     Prior art: `gh auth login` stores a non-expiring token unless `--expiring` is asked for
     ("A host without support issues a non-expiring token instead", https://cli.github.com/manual/gh_auth_login,
-    fetched 2026-11-10); a pasted key today has no expiry unless one was chosen. Q1 asks the owner
-    because the hosted-mcp-endpoint ruling gives every other grant 24 hours plus refresh.
+    fetched 2026-11-10); a pasted key today has no expiry unless one was chosen. Ruled (Open Question 1): no expiry, no
+    refresh, though the hosted-mcp-endpoint ruling gives every other grant 24 hours plus refresh.
 
 ### Client `tm`
 
@@ -98,7 +107,7 @@ main. Steps marked *(assumes Q n)* follow the recommended answer to Open Questio
     without a machine-id ..."). Any rejection with that code means "no store": `tm` falls back to
     the file and says so. Bun's page calls the API "new and experimental"
     (https://bun.com/docs/runtime/secrets, fetched 2026-11-10); see Risks. Under Node
-    (`globalThis.Bun` undefined) the file is used *(assumes Q2)*.
+    (`globalThis.Bun` undefined) the file is used.
 16. **`TM_CREDENTIAL_STORE`** (`os` default, `file`) lets suites and operators keep the key out
     of the store. Suites set `file`, so no suite writes a developer's keychain.
 17. **Module layout.** `clients/tm/src/store.ts` (where the key lives), `clients/tm/src/keys.ts`
@@ -108,7 +117,8 @@ main. Steps marked *(assumes Q n)* follow the recommended answer to Open Questio
 18. **Replacing and ending a login.** On a successful `tm login` or `tm login --with-key`, the
     previously saved key (if any, and not the same key) is revoked through itself when its
     `GET /api/tracker/me` answer has `key.manage_keys` true; a 401 or network failure is ignored
-    (it is being replaced). `tm logout` revokes the saved key the same way, then deletes the store
+    (it is being replaced). `tm logout` revokes the saved key the same way, and also when its `key.reach` is not `all`
+    (a limited key may always revoke itself, root ruling 5), then deletes the store
     entry and the configuration file whatever the revoke answered, because the intent is to leave
     this machine; an unrevoked key is named on standard output with the reason, and exit is 0
     when the key was revoked or already invalid (401), 1 when the server refused otherwise or did
@@ -127,37 +137,37 @@ main. Steps marked *(assumes Q n)* follow the recommended answer to Open Questio
 
 ## Depends on
 
-- **hosted-mcp-endpoint, built** (read on `lane/d-mcp` at `a631d7c`: design from `20568aa`, contract follow-up `a631d7c` changes nothing used here). Names
-  this design uses, from that design's D13, D14, D15 and D19: hook files
-  `pb_hooks/oauth_server.pb.js` (routes: `GET`/`POST /oauth/authorize`, `POST /oauth/token`,
-  `POST /oauth/revoke`, metadata), `pb_hooks/lib/oauth.js` (`CLIENTS`, `parse_scope`,
-  `scope_text`, `validate_request`, `issue_code`, `token_error`, the flow token's `q`),
-  `pb_hooks/views/oauth_authorize.html` (the one page; radio `access` on consent, `Params` of
-  eight parameters); collection `oauth_codes` (id `oauthcodes00001`, field ids `43001000xx` up
-  to `autodate4300100009`, app_docs record `oauthcodesdoc01`); `api_keys` fields `client_id`,
-  `refresh_hash`, `refresh_expires`, `refresh_prev_hash` (ids `4200600009`-`4200600012`; this
-  change's `4200609001`/`4200609002` do not collide); the matched key as the plain object
-  `e.get("tmApiKey")` `{ id, scope, expires, client_id }`, returned by `pb_hooks/me.pb.js` as
-  `key`; under a key an unmatched route answers 404 (its D12); suite helpers
-  `tests/oauthkit.ts` `PKCE`, `authorize_params`, `sign_in_and_approve`, `exchange`; suites
-  `tests/test_oauth_token.ts` and `tests/test_oauth_authorize.ts`; pre-registered client
-  `cursor`; every authorization response carries `iss`. If its follow-up contract commit renames
-  any of these, the new name is used.
-- **The `tmApiKey` check, before Phase 1.** Run `grep -n 'e.set("tmApiKey"\|e.set("apiKey"'
-  pb_hooks/api_keys.pb.js`. If `tmApiKey` is set to an object literal, build as written. If it is
-  set to the key record itself (key-scoping's Depends on lets its Phase 1 reuse that name): Phase 1
-  adds no property to the `e.set` call; `pb_hooks/me.pb.js` joins Phase 1's file list and adds
-  `manage_keys: k.getBool("manage_keys")` to the `key` object it builds; Phase 2's handlers test
-  `via && !via.getBool("manage_keys")` and `keyItem` compares `current.id` (a record has `.id`
-  too). If neither name is set, stop: the hosted build is not on main.
-- **key-scoping, built** (its contract read on `lane/d-scoping` at `f1cabe1` and its design at
-  `a0c8349`, Phase 7: consent radio `level`, `oauth_codes` gains `reach` and `workspace`, suite
-  `tests/test_oauth_key_limits.ts`): levels `read`, `write`, `manage`, `own` stored in `scope` and requested as
-  scope tokens, a requested scope read as the highest level it names and granted as the ladder up
-  to the chosen level; key fields `reach` (`all`, `workspace`, `projects`), `workspace` (id or
-  `""`) and `projects` (ids or `[]`). The workspace is chosen on the consent page, with no
-  authorize parameter, so `tm` offers no `--workspace` flag. If a later key-scoping commit renames these,
-  its names are used in Phases 2, 3b, 5 and 6.
+- **Build order and sibling commits.** hosted-mcp-endpoint (all phases) and every key-scoping
+  phase, Phase 7 included, are on main before Phase 1 starts. Read: hosted-mcp-endpoint at
+  `lane/d-mcp` `9d4b060`, key-scoping at `lane/d-scoping` `0d3232c`. Check before Phase 1: `grep -c
+  offered_levels pb_hooks/lib/oauth.js` prints 1 or more (key-scoping Phase 7 merged) and `grep -c
+  keyInfo pb_hooks/lib/api_keys.js` prints 1 or more (key-scoping Phase 2 merged); otherwise stop
+  and report.
+- **Node 22.18.0 or later on `PATH`** is a prerequisite of `make check` from Phase 4 on (the
+  `under Node` cases); CI gets it from the `setup-node` step Phase 4 adds.
+- **This change is built before api-versioning-policy, so it cuts no API release and edits no
+  `api/` file or `mcp-tools.json`. If `scripts/release_api.ts` exists when a phase starts, the
+  build order was changed: stop and report.**
+- **Names from hosted-mcp-endpoint** (D13, D14, D15, D19): `pb_hooks/oauth_server.pb.js` (`GET`/`POST
+  /oauth/authorize`, `POST /oauth/token`, `POST /oauth/revoke`, metadata), `pb_hooks/lib/oauth.js`
+  (`CLIENTS`, `parse_scope`, `scope_text`, `validate_request`, `issue_code`, `token_error`, the
+  flow token's `q`), `pb_hooks/views/oauth_authorize.html` (`Params` of eight parameters);
+  collection `oauth_codes` (id `oauthcodes00001`, field ids `43001000xx`, app_docs record
+  `oauthcodesdoc01`); `api_keys` fields `client_id`, `refresh_hash`, `refresh_expires`,
+  `refresh_prev_hash` (ids `4200600009`-`4200600012`); under a key an unmatched route answers
+  404 (D12); `tests/oauthkit.ts` `PKCE`, `authorize_params`, `sign_in_and_approve`, `exchange`;
+  suites `tests/test_oauth_token.ts`, `tests/test_oauth_authorize.ts`; client `cursor`; every
+  authorization response carries `iss`.
+- **Names from key-scoping**: `pb_hooks/lib/api_keys.js` `keyInfo` (Phase 2), `LEVELS`,
+  `ROUTE_LEVELS`, `requiredLevel` (Phase 3), `ACCOUNT_WIDE` (Phase 4); `scripts/gen_openapi.ts`
+  `KEY_LIB`, `key_access` returning `KEY_LIB.requiredLevel(method, p, "") ?? "read"` and
+  `KEY_TEXT` with level keys (Phase 3); key fields `reach`, `workspace`, `projects`; levels
+  `read`, `write`, `manage`, `own` requested as scope tokens and granted as the ladder; consent
+  radios `access` (the level, root ruling 6) and `workspace`, `offered_levels`,
+  `consent_workspaces`, `issue_code(..., access, reach, workspace)`, the token exchange's
+  workspace check (Phase 7); `tests/oauthkit.ts` `sign_in_to_consent` and `post_consent`; suite
+  `tests/test_oauth_key_limits.ts`. The workspace is chosen on the consent page, with no
+  authorize parameter, so `tm` offers no `--workspace` flag.
 - **A decision record** (kata, root's to file before Phase 2): "a key minted by `tm login` may
   carry a manage-keys permission that lists and revokes its user's keys and never mints",
   superseding decision:api-key-reads-refused in part. Its `app_docs` twin is written in Phase 2.
@@ -191,11 +201,11 @@ new files gets two slots), set `DEFAULT_OUTPUT` in `scripts/gen_app_docs_seed.ts
 make the record edits the phase lists in the new file, then run `bun scripts/gen_app_docs_seed.ts`
 (it rewrites the seed and `scripts/app_docs_seed.sha256`) and the regen (`.agents/rules/pocketbase.md`).
 A new suite is registered in three places: `run_suite "<label>" bun tests/<file>` in
-`scripts/run_suite_battery.sh` after the `test_tm_client_gen` line; a row
+`scripts/run_suite_battery.sh` after the last `run_suite "` line of the file; a row
 `<shard>\t<seconds>\t<label>` in `scripts/battery_shards.tsv` with its measured seconds on the
 shard whose seconds column sums lowest, inserted where it keeps the file sorted by seconds
-descending, after the last row with equal seconds; and its port in `.agents/rules/ports.md`'s default list
-after `8195 = test_route_errors`, in ascending port order. The lines this change adds: `8220 = test_key_management`,
+descending, after the last row with equal seconds; and its port in `.agents/rules/ports.md`'s default list,
+in ascending port order, before `9700 = test_script_help`. The lines this change adds: `8220 = test_key_management`,
 `8221 = test_tm_oauth_client`, `8222 = test_tm_keys`, `8223/8224 = test_tm_login_browser` (the
 form `8112/8113 = test_file_storage` uses).
 
@@ -207,7 +217,7 @@ form `8112/8113 = test_file_storage` uses).
   - create `pb_migrations/<slot>_api_keys_manage_and_last_used.js`
   - create `pb_migrations/<slot2>_seed_app_docs.js` (re-seed)
   - modify `scripts/gen_app_docs_seed.ts`, `scripts/app_docs_seed.sha256`
-  - modify `pb_hooks/api_keys.pb.js`, `pb_hooks/me.pb.js`, `pb_hooks/lib/routes.js` (the `/api/tracker/me` schema only)
+  - modify `pb_hooks/api_keys.pb.js`, `pb_hooks/lib/api_keys.js` (`keyInfo` only), `pb_hooks/lib/routes.js` (the `/api/tracker/me` schema only)
   - create `tests/test_key_management.ts`
   - modify `scripts/run_suite_battery.sh`, `scripts/battery_shards.tsv`, `.agents/rules/ports.md`
   - regen outputs
@@ -234,9 +244,10 @@ form `8112/8113 = test_file_storage` uses).
     dashboard save that resends unchanged values passes), throw `new BadRequestError("manage_keys and last_used are set
     only at create or by the server.")`; else `e.next()`. Sessions never reach it with those
     fields: the update rule answers 404 first.
-  - `pb_hooks/api_keys.pb.js` `tmkApiKeyAuth`: in the hosted build's `e.set("tmApiKey", { id,
-    scope, expires, client_id })` call add `manage_keys: key.getBool("manage_keys")`; after it,
-    before `e.auth = owner;`, add the `last_used` write of Decision 8 (read the field only through `getDateTime`, because `new
+  - `pb_hooks/lib/api_keys.js` `keyInfo(key)`: its returned object gains `manage_keys:
+    key.getBool("manage_keys")`.
+  - `pb_hooks/api_keys.pb.js` `tmkApiKeyAuth`: after the `e.set("tmApiKey", ...keyInfo(key))`
+    call and before `e.auth = owner;`, add the `last_used` write of Decision 8 (read the field only through `getDateTime`, because `new
     DateTime("")` is now, not zero: `const last = key.getDateTime("last_used"); if (last.isZero() || last.unix() < new DateTime().unix() - 60)
     { try { ... } catch (err) { ... } }`).
   - `pb_hooks/me.pb.js` is not edited: it returns the `tmApiKey` object as `key`. In
@@ -268,78 +279,79 @@ form `8112/8113 = test_file_storage` uses).
   - `revoked key leaves last_used`: revoke, key request → 401 `api_key_invalid`, `last_used` unchanged.
   - `me reports manage_keys`: the superuser-made key's `GET /api/tracker/me` → `key.manage_keys` true; Alice's own key → false.
   Register the suite (label `test_key_management`, port line `8220 = test_key_management`).
-- **Gate:** `PB_PORT_OFFSET=<n> bun tests/test_key_management.ts` exits 0; `make check-static` exits 0.
+- **Gate:** `PB_PORT_OFFSET=<n> bun tests/test_key_management.ts`, `bun tests/test_api_keys.ts` and `bun tests/test_me_route.ts` exit 0; `make check-static` exits 0.
 
 ### Phase 2: the key routes
 
 - **Goal:** `GET /api/tracker/keys` and `POST /api/tracker/keys/{id}/revoke` as the contract states (contract, both route sections and API errors).
 - **Files:**
   - create `pb_hooks/api_key_manage.pb.js`
-  - modify `pb_hooks/lib/routes.js`, `pb_hooks/lib/api_keys.js`, `pb_hooks/api_keys.pb.js`, `scripts/gen_openapi.ts`, `scripts/check_app_docs_history.ts`
+  - modify `pb_hooks/lib/routes.js`, `pb_hooks/lib/api_keys.js`, `scripts/gen_openapi.ts`, `scripts/check_app_docs_history.ts`
   - create `pb_migrations/<slot>_seed_app_docs.js` (re-seed); modify `scripts/gen_app_docs_seed.ts`, `scripts/app_docs_seed.sha256`
   - modify `tests/test_key_management.ts`
   - regen outputs
 - **Steps:**
   - `pb_hooks/lib/routes.js` entries (after `GET /api/tracker/invitations/mine`):
     `"GET /api/tracker/keys"`: summary `Lists the caller's API keys, newest first, without
-    secrets; a key needs the manage-keys permission.`, `auth: "users"`, `docs:
-    "route:tracker-keys"`, `responses: { 403: "An API key without the manage-keys permission." }`,
+    secrets; a key with reach all needs the manage-keys permission, and a limited key sees only itself.`, `auth: "users"`, `docs:
+    "route:tracker-keys"`, `responses: { 403: "An API key with reach all and without the manage-keys permission." }`,
     `response: { status: 200, schema: { type: "object", properties: { items: { type: "array",
     items: <item> } }, required: ["items"] } }`. `"POST /api/tracker/keys/{id}/revoke"`: summary
     `Revokes one of the caller's API keys; revoking a revoked key changes nothing.`, `auth:
-    "users"`, `docs: "route:tracker-keys"`, `responses: { 403: "An API key without the
+    "users"`, `docs: "route:tracker-keys"`, `responses: { 403: "An API key with reach all and without the
     manage-keys permission.", 404: "No key with that id among the caller's." }`, `response: {
     status: 200, schema: <item> }`. `<item>` is written out in full in both entries (the registry
     holds literals only): `{ type: "object", properties: { id, name, scope, client_id, created,
     expires, last_used: each { type: "string" }; manage_keys, revoked, current: each { type:
     "boolean" } }, required: [those ten names] }`.
-  - `pb_hooks/lib/api_keys.js`: its one-line header becomes `// API key helpers: namesApiKeys (decision:api-key-reads-refused) and keyItem, the key list's item shape.`; add and export `keyItem(r, current)` (beside `namesApiKeys`;
-    handlers `require` it inside their body, as `pb_hooks/api_keys.pb.js` requires
-    `namesApiKeys`) returning the ten fields below plus key-scoping's `reach` (string), `workspace` (string, `""`
-    for every workspace) and `projects` (array of strings) (Depends on), which the
-    `<item>` schema and its `required` list also carry: `id: r.id`, `name: r.getString("name")`, `scope:
-    r.getString("scope")`, `client_id: r.getString("client_id")`, `manage_keys:
-    r.getBool("manage_keys")`, `created`, `expires`, `last_used`: `r.getString(<field>)`,
-    `revoked: r.getBool("revoked")`, `current: !!current && current.id === r.id`.
+  - `pb_hooks/lib/api_keys.js`: its one-line header (line 2), whatever it reads after
+    key-scoping, becomes `// API key helpers: api_keys path refusal (decision:api-key-reads-refused), key levels and reach, keyInfo, and keyItem, the key list's item shape.`;
+    `ROUTE_LEVELS` gains `"POST /api/tracker/keys/{id}/revoke": null`; add and export
+    `keyItem(r, current)` = `Object.assign({}, keyInfo(r), { name: r.getString("name"),
+    created: r.getString("created"), last_used: r.getString("last_used"), revoked:
+    r.getBool("revoked"), current: !!current && current.id === r.id })` (handlers `require` it
+    inside their body). So `reach`, `workspace` and `projects` read exactly as `/me` reads them;
+    the `<item>` schema lists the ten fields above plus `reach` (string), `workspace` (string)
+    and `projects` (array of string), all in `required`.
   - `pb_hooks/api_key_manage.pb.js`, header `// The caller's API keys: list and revoke (decision:{M}).`
     Two registrations through `pb_hooks/lib/routes.js` `add`, as `pb_hooks/me.pb.js` registers its route. Each handler
-    first does `const via = e.get("tmApiKey"); if (via && !via.manage_keys) throw new
+    first does `const via = e.get("tmApiKey"); const self = !!via && via.reach !== "all"; if (via && !self && !via.manage_keys) throw new
     ApiError(403, "This API key cannot list or revoke keys.", { api_key: new
     ValidationError("api_key_manage", "This API key cannot list or revoke keys.") });`.
-    List: `$app.findRecordsByFilter("api_keys", "user = {:u}", "-created,id", 0, 0, { u:
-    e.auth.id })` mapped through `keyItem(r, via)` (`keyItem` is `require`d from `pb_hooks/lib/api_keys.js` inside the handler), `e.json(200, { items })`. Revoke: `let r; try { r =
+    A limited key (root ruling 5, `self` true) is let through whatever its `manage_keys`. List: when `self`,
+    `[ $app.findRecordById("api_keys", via.id) ]`, else `$app.findRecordsByFilter("api_keys",
+    "user = {:u}", "-created,id", 0, 0, { u: e.auth.id })`, mapped through `keyItem(r, via)` (`keyItem` is `require`d from `pb_hooks/lib/api_keys.js` inside the handler), `e.json(200, { items })`. Revoke: `let r; try { r =
     $app.findRecordById("api_keys", e.request.pathValue("id")) } catch (_) { r = null }`; if `!r
-    || r.getString("user") !== e.auth.id` throw `new ApiError(404, "No key with that id among
+    || r.getString("user") !== e.auth.id || (self && r.id !== via.id)` throw `new ApiError(404, "No key with that id among
     yours.", {})`; if not revoked, `r.set("revoked", true); $app.save(r)`; `e.json(200, keyItem(r,
     via))`. `$app.save` (not a raw update) so the revocation runs record hooks and realtime as a
     session PATCH does, and the hosted-mcp-endpoint grant end applies.
-  - `pb_hooks/api_keys.pb.js` `reads`: add `|| (method === "POST" && route ===
-    "/api/tracker/keys/{id}/revoke")` with the comment `// the route checks manage_keys itself`;
-    extend the KEEP IN SYNC comment to name `/api/tracker/keys/{id}/revoke`.
-  - `scripts/gen_openapi.ts` `key_access`: its return type gains `"manage"`, returned for `GET
-    /api/tracker/keys` and `POST /api/tracker/keys/{id}/revoke` before the other tests; `KEY_TEXT`
-    gains `manage: "An API key needs the manage-keys permission here, whatever its scope; any
-    other key gets 403."`; the KEEP IN SYNC comment names the revoke route.
+  - `scripts/gen_openapi.ts` `key_access`: before its `return KEY_LIB.requiredLevel(...)` line,
+    `if (p === "/api/tracker/keys" || p === "/api/tracker/keys/{id}/revoke") return
+    "manage_keys";`; its return type gains `"manage_keys"`; `KEY_TEXT` gains `manage_keys: "An API
+    key with reach all needs the manage-keys permission here, whatever its level, else 403; a
+    key limited to part of the tracker sees and revokes only itself."`.
+    key-scoping's `KEEP IN SYNC` lines are left as they are.
   - `scripts/check_app_docs_history.ts` `ALLOWLIST`: one entry keyed `["<the new seed's file
     name>", "collection:api_keys", "<the first 60 characters of the replaced paragraph>"]` (the
     form of the existing entries) with reason `A key with manage_keys now lists and revokes
     keys (decision:{M}); the sentence saying no key can read or revoke keys became false.`
   - Re-seed edits: new record `{ "id": "routetrkeys0001", "slug": "route:tracker-keys",
     "refName": "api_keys", "title": "GET /api/tracker/keys and POST /api/tracker/keys/{id}/revoke
-    — list and revoke the caller's keys", "body": "A signed-in user, or an API key whose
+    — list and revoke the caller's keys", "body": "A signed-in user, or an API key with reach all whose
     manage_keys is true, lists every key of its user (revoked and expired included, newest first,
-    never a secret) and revokes one by id. current marks the key making the request. A key
-    without manage_keys answers 403 with code api_key_manage, whatever its scope; a read-scoped
-    key with manage_keys may revoke. An id that is not one of the caller's keys answers 404.
+    never a secret) and revokes one by id. current marks the key making the request. An API key with reach all and
+    without manage_keys answers 403 with code api_key_manage, whatever its level; a read-level
+    key with manage_keys may revoke. A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5). An id that is not one of the caller's keys answers 404.
     Revoking is one-way and revoking a revoked key changes nothing. No key can create a key. See
     collection:api_keys and decision:{M}." }` and record `{ "id":
     "deckeymanages01", "slug": "decision:{M}", "refName": "api_keys", "title":
     "A key minted by tm login may carry a manage-keys permission that lists and revokes its
     user's keys and never mints.", "body": "This supersedes decision:api-key-reads-refused in
-    part: a key whose manage_keys is true reads its user's key records, through GET
+    part: a key with reach all whose manage_keys is true reads its user's key records, through GET
     /api/tracker/keys only, and revokes them through POST /api/tracker/keys/{id}/revoke. Prior
     art: GitHub and Linear manage tokens only in the signed-in web app; this server has no web
-    app, and tm holds only a key after browser sign-in.\n\n- **Granted at consent.** Only the tm
+    app, and tm holds only a key after browser sign-in. A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5).\n\n- **Granted at consent.** Only the tm
     client may ask for it, as the scope value keys; the person can untick it. A create request
     from anyone but a superuser cannot set it.\n- **Never mints.** Every api_keys collection
     route still answers 403 api_key_path to every key, and a query string or realtime
@@ -349,14 +361,14 @@ form `8112/8113 = test_file_storage` uses).
     `tests/test_key_management.ts` proves it. See route:tracker-keys and collection:api_keys." }`.
     `concept:api-keys` body: append to the Scope paragraph ` A key with manage_keys may also POST
     /api/tracker/keys/{id}/revoke, whatever its scope (decision:{M}).` and to the Allowed routes
-    paragraph ` The two key routes (route:tracker-keys) further refuse a key without manage_keys
-    with 403 api_key_manage.` (both append-only).
+    paragraph ` The two key routes (route:tracker-keys) further refuse an API key with reach all and
+    without manage_keys with 403 api_key_manage; a key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5).` (both append-only).
     `decision:api-key-reads-refused` is not edited: a decision record is immutable, and when it
     superseded part of `decision:api-keys` nothing was appended there; the new record names it.
     `collection:api_keys` body: replace the paragraph starting `A key cannot reach this
     collection` with `A key cannot reach this collection: every api_keys route answers 403 to a
-    key, so a key can never mint keys. A key whose manage_keys is true lists and revokes its
-    user's keys through route:tracker-keys (decision:{M}). An expand, filter,
+    key, so a key can never mint keys. A key with reach all whose manage_keys is true lists and revokes its
+    user's keys through route:tracker-keys (decision:{M}). A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5). An expand, filter,
     sort or realtime subscription that names api_keys from another collection is refused to a
     key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.`
 - **Tests** (`tests/test_key_management.ts`; manage keys made by the superuser as in Phase 1):
@@ -370,6 +382,12 @@ form `8112/8113 = test_file_storage` uses).
     `revoked` true; the write key's next request → 401 `api_key_invalid`.
   - `read key without permission revokes`: a read key without `manage_keys` revokes → 403
     `api_key_manage` (not `api_key_scope`).
+  - `limited key sees only itself`: superuser makes Alice a key with `reach` `workspace`,
+    `workspace` her first workspace, `manage_keys` true → `GET /api/tracker/keys` 200 with
+    exactly one item, its own, `current` true; revoking Alice's write key's id → 404 and that key
+    still answers 200; revoking itself → 200, then 401.
+  - `limited key without manage_keys`: same but `manage_keys` false → list 200 with exactly its
+    own item; revoking Alice's write key → 404.
   - `revoke idempotent`: revoke the same id again → 200, `revoked` true.
   - `revoke self`: the manage key revokes itself → 200; its next request → 401.
   - `revoke other user's key`: Alice's session revokes Bob's key id → 404; Bob's key still works.
@@ -377,7 +395,7 @@ form `8112/8113 = test_file_storage` uses).
   - `anonymous`: both routes with no credential → 401. `superuser`: both → 403.
   - `manage key still cannot mint`: manage key `POST /api/collections/api_keys/records` → 403 `api_key_path`.
   - `manage key still cannot name api_keys`: manage key `GET /api/collections/users/records?expand=api_keys_via_user` → 403 `api_key_path`.
-- **Gate:** the suite exits 0; `bun scripts/gen_openapi.ts --check` and `make check-static` exit 0.
+- **Gate:** the suite, `bun tests/test_key_levels.ts` and `bun tests/test_api_keys.ts` exit 0; `bun scripts/gen_openapi.ts --check` and `make check-static` exit 0.
 
 ### Phase 3a: `tm` grants at the token endpoint
 
@@ -423,13 +441,13 @@ form `8112/8113 = test_file_storage` uses).
   - `pb_hooks/oauth_server.pb.js`, `POST /oauth/token`:
     - `grant_type=refresh_token`: right after the known-client check, `client_id === "tm"` →
       `token_error(e, "invalid_grant", "tm grants are not refreshed.")`.
-    - `grant_type=authorization_code`, inside the transaction, after the PKCE check and before
-      the mint: when the code row's `client_id` is `tm` and its `key_expires` is set
+    - `grant_type=authorization_code`, inside the transaction, after key-scoping's workspace
+      check and before the mint: when the code row's `client_id` is `tm` and its `key_expires` is set
       (`row.getDateTime("key_expires")`, not `isZero()`) and not after now, return `{ error:
       ["invalid_grant", "The requested key expiry has passed."] }` (the code is consumed, as
       every failed exchange). The mint for a `tm` row differs only in: `name` =
       `row.getString("key_name") || "tm"`, `expires` =
-      `row.getString("key_expires")` (`""` for none, *(assumes Q1)*), `refresh_hash`,
+      `row.getString("key_expires")` (`""` for none), `refresh_hash`,
       `refresh_expires` and `refresh_prev_hash` `""` (the unique index on `refresh_hash` skips
       `''`), `manage_keys` = `row.getBool("manage_keys")`. Answer 200 `{ access_token,
       token_type: "Bearer", scope }` with `scope` = the hosted build's granted-scope text plus
@@ -465,7 +483,7 @@ form `8112/8113 = test_file_storage` uses).
   - `tm key revoked at /oauth/revoke`: the minted key with `client_id=tm` → 200; the key then
     answers 401 `api_key_invalid`.
   Register the suite (port line `8221 = test_tm_oauth_client`).
-- **Gate:** `PB_PORT_OFFSET=<n> bun tests/test_tm_oauth_client.ts`, `bun tests/test_oauth_token.ts`
+- **Gate:** `PB_PORT_OFFSET=<n> bun tests/test_tm_oauth_client.ts`, `bun tests/test_oauth_key_limits.ts`, `bun tests/test_oauth_token.ts`
   and `make check-static` exit 0.
 
 ### Phase 3b: the `tm` client on the authorization page
@@ -483,8 +501,8 @@ form `8112/8113 = test_file_storage` uses).
   - `pb_hooks/lib/oauth.js`:
     - Every `parse_scope` call on the request's `scope` in `pb_hooks/lib/oauth.js` and
       `pb_hooks/oauth_server.pb.js` (the D14 step 5 check in `validate_request`, the consent
-      render's preselection, key-scoping's approve-branch level ceiling, and the scope passed to
-      `issue_code`) reads `parse_scope(split_keys(params.scope).scope)`.
+      render's `offered_levels(parse_scope(...))` and its `Checked` comparison, and the
+      approve-branch ceiling) reads `parse_scope(split_keys(params.scope).scope)`.
     - `validate_request(app, params)`: the scope check of D14 step 5 reads
       `split_keys(params.scope)`: `keys` with a client other than `tm` → `{ redirect:
       "invalid_scope" }`; `parse_scope` is applied to the returned `scope`. After step 5, for
@@ -494,9 +512,9 @@ form `8112/8113 = test_file_storage` uses).
       `pb_hooks/lib/oauth.js`, if it builds one) that builds that array for `sign_flow` or checks
       it after `read_flow` (the GET render and the POST check), append `params.key_name || ""`
       and `params.key_expires || ""`, so the page cannot change them between stages.
-    - `issue_code` gains a last parameter `tm`, appended after any parameter key-scoping added
-      (`{ key_name, key_expires, manage_keys }`, or `null` for other clients); when not null it
-      sets the three values on the row.
+    - `issue_code` becomes `issue_code(app, user, client, params, scope, reach, workspace, tm)`:
+      the last parameter `tm` (`{ key_name, key_expires, manage_keys }`, or `null` for other
+      clients) sets the three values on the row when not null.
   - `pb_hooks/views/oauth_authorize.html`: `Params` holds ten parameters (the eight plus
     `key_name`, `key_expires`), each echoed as a hidden input in every form. Data gains `Tm`
     (bool), `KeyName`, `KeyExpires` (`ok.key_expires.slice(0, 16) + " UTC"` from `tm_params`, or
@@ -507,17 +525,20 @@ form `8112/8113 = test_file_storage` uses).
     keys</label>`.
   - `pb_hooks/oauth_server.pb.js`, the `approve` branch: `manage_keys = client.client_id ===
     "tm" && split_keys(params.scope).keys && f.manage_keys === "1"`, where `f` is the object
-    `parse_form` returned for the POST body (the one `level` is read from); for `tm`, pass `{
+    `parse_form` returned for the POST body (the one `access` is read from); for `tm`, pass `{
     key_name, key_expires, manage_keys }` from `tm_params(params).ok` to `issue_code`, else
     `null`. Rendering `consent` sets `Tm`, `KeyName`, `KeyExpires`, `AskKeys` from the same.
-  - `tests/oauthkit.ts`: add and export `approve_with(base: string, params: Record<string,
-    string>, who: { email: string; password: string }, form: Record<string, string>):
-    Promise<{ code: string; location: string }>`: the steps of `sign_in_and_approve`, but the
-    approve post carries `flow`, the ten parameters and `form`'s fields instead of `access`;
-    also export `consent_html(base, params, who): Promise<string>` (the page after the
-    password step). Callers pass the level radio key-scoping's consent uses (`level`, read at
-    `lane/d-scoping` `a0c8349`) and `workspace: ""` (All workspaces), so key-scoping's
-    "not in that list" check cannot fire.
+  - `tests/oauthkit.ts`: `sign_in_to_consent`, `post_consent` and `sign_in_and_approve` post
+    every entry of `params`, not only the eight hosted parameters, so `key_name` and
+    `key_expires` go with every stage and the flow token's `q` matches. Add and export `approve_with(base: string, params: Record<string,
+    string>, who: { email: string; password: string }, fields: Record<string, string>):
+    Promise<{ code: string; location: string }>`: `const c = await sign_in_to_consent(base,
+    params, who)`; `const r = await post_consent(base, params, c.flow, { action: "approve",
+    ...fields })`; a
+    status other than 302 or a `Location` without `code` throws `Error("approve_with: no code")`;
+    returns `{ code, location }`. Page assertions use `(await sign_in_to_consent(base, params,
+    who)).html`. Callers pass `access` (the level radio, root ruling 6) and `workspace: ""` (All
+    workspaces).
 - **Tests** (`tests/test_tm_oauth_client.ts`, Alice verified and approved with a password;
   base request `authorize_params({ client_id: "tm", redirect_uri:
   "http://127.0.0.1:53123/callback", scope: "write keys" })`; the same `/oauth/` rate-limit
@@ -525,15 +546,15 @@ form `8112/8113 = test_file_storage` uses).
   - `tm page shown`: `GET /oauth/authorize` → 200 HTML containing `tm (command line)`,
     `registered with Task Tracker as tm`, the loopback warning, `Key name: tm`, `Expires:
     never`, and a checked `manage_keys` checkbox.
-  - `tm approve with keys`: `approve_with(..., { level: "write", workspace: "", manage_keys: "1" })` → 302 with
+  - `tm approve with keys`: `approve_with(..., { access: "write", workspace: "", manage_keys: "1" })` → 302 with
     `code`, `state`, `iss`; `exchange` → `scope` `read write keys`; record `manage_keys` true.
-  - `tm approve box unticked`: `{ level: "write", workspace: "" }` → `scope` `read write`, `manage_keys` false.
+  - `tm approve box unticked`: `{ access: "write", workspace: "" }` → `scope` `read write`, `manage_keys` false.
   - `tm key_name and key_expires on the page`: `key_name=ci bot`, `key_expires=<now + 2 days,
     UTC, seconds precision, Z>` → page shows `Key name: ci bot` and `Expires: <YYYY-MM-DD HH:MM> UTC` of that instant; exchanged record
     `name` `ci bot`, `expires` that instant.
   - `key_expires in the past` → 302 `error=invalid_request`; `key_name` of 201 characters →
     `invalid_request`; `key_name=%20%20` (only spaces) → `invalid_request`; `key_expires=tomorrow` → `invalid_request`.
-  - `tm at manage`: `scope=manage keys`, `approve_with(..., { level: "manage", workspace: "",
+  - `tm at manage`: `scope=manage keys`, `approve_with(..., { access: "manage", workspace: "",
     manage_keys: "1" })` → token `scope` `read write manage keys`; record `scope` `manage`.
   - `keys from another client`: `client_id=cursor`, `redirect_uri=http://localhost:5555/callback`,
     `scope=read keys` → 302 `error=invalid_scope`.
@@ -547,19 +568,19 @@ form `8112/8113 = test_file_storage` uses).
 ### Phase 4: where `tm` keeps its login; `login --with-key`; `logout`
 
 - **Goal:** the contract's Configuration, `login --with-key` and `logout` rows; directory 0700.
-- **Files:** create `clients/tm/src/store.ts`; modify `clients/tm/src/api.ts`, `clients/tm/tm.ts`,
+- **Files:** modify `.github/workflows/ci.yml` (battery job: after its `oven-sh/setup-bun` step add `- uses: actions/setup-node@v6` with `node-version: "22.18.0"`; tm-distribution adds it only if not already present); create `clients/tm/src/store.ts`; modify `clients/tm/src/api.ts`, `clients/tm/tm.ts`,
   `tests/test_tm_cli.ts`; create `tests/test_tm_store.ts`; suite registration files.
 - **Steps:**
   - No new code under `clients/tm/` names `Bun` except `store.ts`'s guarded
     `(globalThis as any).Bun?.secrets`; under Node that is `undefined` and the file is used
-    *(assumes Q2)*. `oauth.ts` and `keys.ts` use only `node:` modules and `fetch`.
+   . `oauth.ts` and `keys.ts` use only `node:` modules and `fetch`.
   - `clients/tm/src/store.ts` exports:
     - `type Store = "os" | "file"`.
     - `store_mode(): Store`: `TM_CREDENTIAL_STORE` unset or `os` → `os`, `file` → `file`, else
       throw `ConfigError("TM_CREDENTIAL_STORE must be os or file")`.
     - `async function os_get(url): Promise<string | null | undefined>`, `os_set(url, key):
       Promise<boolean>`, `os_delete(url): Promise<void>`: `undefined`/`false` when
-      `globalThis.Bun?.secrets` is absent *(assumes Q2)* or a call rejects with `code ===
+      `globalThis.Bun?.secrets` is absent or a call rejects with `code ===
       "ERR_SECRETS_PLATFORM_ERROR"`; any other rejection: see below. Service `"tm"`, name `url` (the URL with trailing slashes removed). Every `os_*`
       call is made only when `store_mode() === "os"`; in `file` mode they are not called at all.
       A rejection with any other code is wrapped as `ConfigError("the credential store refused:
@@ -603,8 +624,9 @@ form `8112/8113 = test_file_storage` uses).
       /api/tracker/me` with `previous`; if `key.manage_keys`, `POST
       /api/tracker/keys/<key.id>/revoke` with `previous`; any `ApiError` is ignored.
     - `logout`: `saved = await saved_login(true)`; none → `ConfigError("no saved login to log out
-      of")`. Try `me` then revoke as in `retire`, recording `{ key_id, revoked, reason }`:
-      reason `this key cannot revoke keys` when `manage_keys` is false (exit 0); 401 from `me` or
+      of")`. Try `me` then revoke as in `retire`, except that it revokes when `key.manage_keys ||
+      key.reach !== "all"` (root ruling 5: a limited key may revoke itself), recording `{ key_id, revoked, reason }`:
+      reason `this key cannot revoke keys (reach all, no manage-keys permission)` when neither holds (exit 0); 401 from `me` or
       a saved key of `""` → `{ key_id: "", revoked: false }`, human `logged out of <url>; the
       saved key was already invalid` (exit 0); any other `ApiError` → reason = its
       message, exit 1 after cleanup. `/oauth/revoke` is not used: ruling 2 makes the manage-keys
@@ -627,14 +649,17 @@ form `8112/8113 = test_file_storage` uses).
     undefined → `file`); `under Node` (the suite runs `bun build --target=node
     clients/tm/src/api.ts --outfile <tmp>/api.mjs`, then `node -e` importing it with
     `TM_CREDENTIAL_STORE` unset and calling `save_config({url, key})` → prints store `file`,
-    the file holds the key; `node` (22.18 or later) missing from `PATH` fails the case). Each case runs in its own `XDG_CONFIG_HOME` under a temp dir.
+    the file holds the key; the case first runs `node --version` and fails, naming what it
+    found, unless `node` is on `PATH` and `Bun.semver.satisfies(<version without the v>,
+    ">=22.18.0")`). Each case runs in its own `XDG_CONFIG_HOME` under a temp dir.
   - `tests/test_tm_cli.ts` additions (watched failing first): `login --with-key mixed flags` →
     exit 2; `logout pasted key` (key without `manage_keys`) → exit 0, stdout says `was not
     revoked`, config file gone, the key still answers 200; `logout manage key` (superuser-made
     manage key saved by `--with-key`) → exit 0, the key answers 401, file gone; `logout with
     nothing saved` → exit 1 `no saved login to log out of`; `login replaces manage key`: save
     manage key A, then `--with-key` key B → A answers 401, B saved; `login keeps pasted key`:
-    save plain key C then B → C still answers 200; `logout --json` (manage key) → `{"url",
+    save plain key C then B → C still answers 200; `logout limited key` (superuser-made key with
+    reach `workspace` and `manage_keys` false, saved by `--with-key`) → exit 0, the key answers 401; `logout --json` (manage key) → `{"url",
     "key_id", "revoked": true}`.
   Register `test_tm_store` (no port line).
 - **Gate:** `bun tests/test_tm_store.ts`, `PB_PORT_OFFSET=<n> bun tests/test_tm_cli.ts`, `bun
@@ -767,10 +792,13 @@ form `8112/8113 = test_file_storage` uses).
     and `tm list` lines; the intro sentence says Alice signs in to `tm` through the browser; the captured-run
     sentence becomes "A captured run (record ids differ every run; the sign-in happens in the
     browser)". Recapture the output against `make dev`; the recapture needs a person at the browser.
-  - `clients/tm/README.md` "Set up once": `tm login --url <url>` signs in through the browser;
+  - `clients/tm/README.md` "Set up once": the sentence holding "a read key can only read; a write
+    key can also create, edit and comment" stays word for word; only the paste instructions and
+    the `login --url` command block around it are replaced. `tm login --url <url>` signs in through the browser;
     `tm login --with-key` for a machine with no browser; where the key is kept (credential store,
     else the 0600 file); `TM_CREDENTIAL_STORE`; `tm logout`. New section "Keys" after "Use it":
-    `tm keys list [--all]`, `tm keys create --name NAME --scope read|write [--expires DATE]`, `tm
+    `tm keys list [--all]`, `tm keys create --name NAME --scope LEVEL [--expires DATE]` (LEVEL `read`, `write`, `manage`
+    or `own`), `tm
     keys revoke <id>`, each with one example line.
   - `clients/tm/tm.ts` HELP: lines for `login [--url URL] [--scope LEVEL] [--no-browser]`, `login
     --with-key [--url URL]`, `logout`, `keys list [--all]`, `keys create --name NAME --scope
@@ -778,7 +806,8 @@ form `8112/8113 = test_file_storage` uses).
   - `e2e/smoke.ts`: `async function probe_key_routes_need_sign_in()`: `GET /api/tracker/keys`
     and `POST /api/tracker/keys/x/revoke` without a credential → 401 each; `async function
     probe_tm_client_registered()`: `GET /oauth/authorize?response_type=code&client_id=tm&redirect_uri=http%3A%2F%2F127.0.0.1%3A53123%2Fcallback&code_challenge=<43 chars>&code_challenge_method=S256&state=s`
-    → 200 `text/html`. Both added to `PROBES` before `probe_signup_rate_limit` (which stays last).
+    → 200 `text/html`. Both added to `PROBES` after the last probe that precedes the rate-limit probes
+    (`probe_signup_rate_limit` stays last).
   - `docs/readiness/agent-clients.md` AC-9: verdict `met`; evidence `tm login`, `tm keys
     create|list|revoke` (`clients/tm/tm.ts`), `tests/test_tm_keys.ts`,
     `tests/test_tm_login_browser.ts`, `tests/test_key_management.ts`; gap removed.
@@ -787,12 +816,9 @@ form `8112/8113 = test_file_storage` uses).
 
 ## Risks
 
-- **Siblings change under this design.** Phases 1, 3a, 3b and 6 rest on names from the
-  hosted-mcp-endpoint design (`20568aa`) and Phases 2, 3b, 5 and 6 on key-scoping's (`a0c8349`).
-  The two designs disagree on how the matched key reaches a handler: hosted-mcp-endpoint stores a
-  plain object as `tmApiKey`, key-scoping stores the record as `apiKey`; this design reads
-  `tmApiKey`. Caught by the `tmApiKey` check in Depends on, run before Phase 1, which also says
-  how to build either way.
+- **Siblings change under this design.** Phases 1-3b and 6 rest on hosted-mcp-endpoint and
+  key-scoping names listed in Depends on. Caught by the two `grep -c` checks there before Phase 1
+  and by each phase's gate, which runs the sibling suites it touches.
 - **`Bun.secrets` is experimental.** Its shape could change in a Bun upgrade. Caught by
   `tests/test_tm_store.ts` only through the seam; the real store is exercised by hand on macOS in
   Phase 6's gate (`TM_CREDENTIAL_STORE` unset, `tm login`, then `security find-generic-password
@@ -811,11 +837,11 @@ form `8112/8113 = test_file_storage` uses).
 
 ## Open Questions
 
-1. **How long `tm login`'s key lives.** Recommended: no expiry and no refresh token, until `tm
-   logout` or revocation (as `gh auth login`'s default token and today's pasted key). Other
-   options: 24 hours with a refresh token kept in the credential store and used automatically
-   (as `gh --expiring` and the Stripe CLI, and as every hosted grant); or 24 hours with `tm
-   login` again each day.
-2. **Where `tm` keeps the key when it runs under Node.** The published client runs on Node, where
-   `Bun.secrets` does not exist. Recommended: the 0600 file, as on a machine with no store. Other
-   option: add a native keyring package to the published client.
+None open. Ruled by the owner on 2026-11-10:
+
+1. **How long `tm login`'s key lives.** Ruled: valid until `tm logout` or revocation, no expiry
+   and no refresh token (as `gh auth login`'s default token and today's pasted key). Rejected:
+   24 hours with an automatic refresh token; 24 hours with a daily sign-in.
+2. **Where `tm` keeps the key when it runs under Node.** Ruled: the private 0600 file, as on a
+   machine with no credential store; no native keyring package. Rejected: a native keyring
+   package in the published client.

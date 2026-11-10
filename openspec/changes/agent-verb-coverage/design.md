@@ -20,7 +20,8 @@ Every verb uses `request` and `api` (`clients/tm/src/api.ts`), the generated typ
 `@modelcontextprotocol/server` 2.4.0 after `hosted-mcp-endpoint` Phase 5 (it replaces
 `@modelcontextprotocol/sdk` 1.32.2 there; the root `devDependencies` keep 1.32.2 for the
 suites' client transports). No Bun-only API is used in `clients/tm/src/` (change
-`tm-distribution` runs the client on Node): only `fetch` and `JSON`.
+`tm-distribution` runs the client on Node): only `fetch` and `JSON`. Phases 1 to 3 add the new
+verbs to `tests/test_tm_package.ts`'s per-runtime case `12e`, so a Bun-only call fails under Node.
 
 ### D3. Annotations
 
@@ -184,7 +185,8 @@ the edits to `tests/test_tm_cli.ts` and `tests/test_tm_mcp.ts`, which `hosted-mc
 
 ### D13. Smoke
 
-`e2e/smoke.ts` gains `probe_tm_verbs`, run right after `probe_health`. The production image
+`e2e/smoke.ts` gains `probe_tm_verbs`, placed in `PROBES` immediately before
+`probe_forged_client_address` (the first of the rate-limit probes). The production image
 enables superuser MFA (`v2:1785185400_superuser_mfa.js`); a spike on 2026-11-10
 (`docker compose ... exec -T pocketbase /pb/pocketbase superuser create ...`, then
 `auth-with-password` → 401 `{mfaId}`, then `superuser otp` printing `Id:` and `Pass:`, then
@@ -220,8 +222,18 @@ exemption for that rule.
 - Its smoke text: Phase 8 there makes `e2e/README.md` say a key cannot be minted against the
   production image, so keyed paths stay battery-only. This change's smoke spike minted one
   (superuser `otp` from the CLI, D13), so Phase 4 here corrects that sentence.
-- `key-scoping`: nothing required; its narrower `/me` and server-side limits pass through.
-- `key-minting-cli` and `tm-distribution` edit the same CLI files; nothing of theirs is required.
+- `key-scoping` (read at `lane/d-scoping` 0d3232c): its narrower `/me` and server-side limits
+  pass through. Its key levels `read` < `write` < `manage` < `own` (stored in `scope`) mean a
+  `write` key's second `DELETE` answers 403 `api_key_scope`, so only a `manage` or `own` key
+  can purge; Phase 3's purge check uses a `manage` key. Check:
+  `grep -n '"manage"' schema/api_keys.json` finds the level.
+- `key-minting-cli` (read at `lane/d-minting` b205abc): edits the same CLI files; nothing of
+  its is required.
+- `tm-distribution` (read at `lane/d-dist` c5c62d5): `tests/test_tm_package.ts` (runs the packed
+  client under Node and Bun, per-runtime cases numbered 6 to 14 with 12a to 12d). Phases 1 to 3
+  add per-runtime case `12e` to that suite. The package version is not changed here; root files
+  a follow-up card to version and publish `@hsb3/tm` with these verbs after tm-distribution's
+  first release. Check: `ls tests/test_tm_package.ts clients/tm/build.ts`.
 - Shared files also edited by earlier changes in the build order: `clients/tm/tm.ts`
   (`key-minting-cli`: `login`, `logout`, `keys`; `tm-distribution`: `read_secret`, version),
   `clients/tm/src/mcp.ts` and `tests/test_tm_mcp.ts` (`hosted-mcp-endpoint`),
@@ -230,16 +242,14 @@ exemption for that rule.
   `scripts/run_suite_battery.sh`, `scripts/battery_shards.tsv`, `.agents/rules/ports.md` and
   `docs/readiness/agent-clients.md` (any change adding a suite, probe or verdict). Edits below are
   stated by symbol and anchor text, not line number, so they apply over those changes.
-- `api-versioning-policy` (contract at commit 86b0dcb on `lane/d-versioning`, not yet on main, so
-  `mcp-tools.json` cannot be checked in this tree) mirrors the catalog in a
-  generated root file `mcp-tools.json` ("generated from the catalog `tm mcp` serves") whose
-  `--check` runs in `make check-static`. Every phase that changes `TOOLS` therefore reruns that
-  generator without `--check`. Check and command: `ls mcp-tools.json` on main; the generator is
-  the one script `grep -l "mcp-tools.json" scripts/gen_*.ts` prints, run as
-  `bun <that script>`. If `mcp-tools.json` does not exist, the regen line is skipped. This change
-  adds no entry to that change's `api/CHANGELOG.md`: a changelog section is written by the
-  release commit (its contract, "Released contract"); root files a follow-up card naming the
-  eight added tools for the next release.
+- Build order (root ruling 1, 2026-11-10): hosted-mcp-endpoint (Phases 1-9, then its root-run
+  runbook) -> key-scoping Phase 1, then Phases 2-6 as one PR, then Phase 7 as the next PR, all
+  before key-minting-cli starts -> key-minting-cli -> tm-distribution -> agent-verb-coverage ->
+  api-versioning-policy last (slot 6).
+  Every change named above is on main before Phase 1 starts.
+- `api-versioning-policy`: This change is built before api-versioning-policy, so it cuts no API
+  release and edits no `api/` file or `mcp-tools.json`. If `scripts/release_api.ts` exists when
+  a phase starts, the build order was changed: stop and report.
 
 ## Implementation Plan
 
@@ -282,7 +292,7 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
   - modify `scripts/run_suite_battery.sh`
   - modify `scripts/battery_shards.tsv`
   - modify `.agents/rules/ports.md`
-  - regen: `mcp-tools.json` via `bun <the script grep -l "mcp-tools.json" scripts/gen_*.ts prints>`, only when `mcp-tools.json` exists (Depends on)
+  - modify `tests/test_tm_package.ts`
 - **Steps**:
   - `verbs.ts` (in every phase: each new function's `cfg` is `cfg: Config` and each id or
     workspace parameter `string`; each generated type is added as `type X` inside the existing
@@ -363,14 +373,21 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
       hints"; the section title "tools/list: six tools, read tools readOnlyHint, write tools not
       destructive" becomes "tools/list: the original six present, read tools readOnlyHint".
   - `scripts/run_suite_battery.sh`: add `run_suite "test_tm_verbs"           bun tests/test_tm_verbs.ts`
-    after the `test_tm_mcp` line.
+    as a new line directly after the last line of the file that begins `run_suite "`.
   - `scripts/battery_shards.tsv`: add `<shard>\t<seconds>\ttest_tm_verbs` where `<seconds>` is
     the suite's measured wall time (`time bun tests/test_tm_verbs.ts`, rounded up) and
     `<shard>` the shard whose seconds total is lowest at build time, the row placed in the
     file's seconds-descending order (the file's header rule).
-  - `.agents/rules/ports.md`: in the Defaults paragraph, the text `8195 =
-    test_route_errors` is wrapped across two lines; directly after `test_route_errors` insert
-    ` · 8240 = test_tm_verbs`, keeping ` · 9700 = test_script_help ...` after it.
+  - `.agents/rules/ports.md`: in the Defaults paragraph's suite list, insert ` · 8240 =
+    test_tm_verbs` immediately before ` · 9700 = test_script_help` (no earlier change edits that
+    entry; `scripts/check_port_collisions.ts` does not check order).
+  - `tests/test_tm_package.ts` (tm-distribution's suite; the bundle runs under Node, so a
+    Bun-only call in the new code fails here): after per-runtime case `12d`, add
+    `12e. <label>: me and workspace under the runtime` (write key, room URL): `me --json` →
+    exit 0, JSON `key.scope` `write`; with `WSID` the `id` of its `workspaces` entry whose
+    `role` is `owner`, `workspace WSID --json` → exit 0, JSON `id` `WSID` and `statuses` a
+    non-empty array. Case 14 already derives its names from `tools_for("write")` and is left as
+    it is. The bundle is rebuilt by the suite itself, as its earlier cases need.
 - **Tests** (`tests/test_tm_verbs.ts`, each a `check` with this label; watched failing before
   `verbs.ts` and `mcp.ts` change: the catalog, annotation, `tm_me` and `tm_workspace` checks):
   - "catalog names in order": `aw.listTools()` names equal
@@ -416,7 +433,9 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
 - **Gate**: with `OFFSET` the builder's assigned `PB_PORT_OFFSET` (200 or more, AGENTS.md
   clean-room law): `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_verbs.ts`,
   `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_mcp.ts`, `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_cli.ts`,
-  `PB_PORT_OFFSET=$OFFSET bun tests/test_mcp_service.ts` and `PB_PORT_OFFSET=$OFFSET make
+  `PB_PORT_OFFSET=$OFFSET bun tests/test_mcp_service.ts`,
+  `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_package.ts` (needs `node` 22.18 or later on `PATH`,
+  as that suite does; it prints the Node version it ran) and `PB_PORT_OFFSET=$OFFSET make
   check-static`, each run alone, one after another, exit 0.
 
 ### Phase 2: inbox, follow, comments on show
@@ -429,7 +448,7 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
   - modify `clients/tm/src/mcp.ts`
   - modify `clients/tm/tm.ts`
   - modify `tests/test_tm_verbs.ts`
-  - regen: `mcp-tools.json` via `bun <the script grep -l "mcp-tools.json" scripts/gen_*.ts prints>`, only when `mcp-tools.json` exists (Depends on)
+  - modify `tests/test_tm_package.ts`
 - **Steps**:
   - `api.ts`: in `request`, immediately after `const text = await r.text();` add
     `if (r.status === 204) return undefined as T;`. In `api`, delete the line beginning
@@ -489,6 +508,11 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
     - `print_human`: `notifications`, `subscribe`, `mark-read` per contract; `show` prints the
       record without `comments` through the existing default branch, then one
       `comment <created> <author>: <body>` line per comment.
+  - `tests/test_tm_package.ts`: per-runtime case `12e` gains, after its workspace call:
+    `notifications --json` → exit 0, stdout parses to an array; `subscribe <a task id from
+    create "pkg <label> follow" --project <PROJECT> --json> --off --json` → exit 0, JSON
+    `following` `false` (the creator was subscribed, so this sends the `DELETE` whose empty 204
+    must parse under Node).
 - **Tests** (`tests/test_tm_verbs.ts`, run in the order listed, since later checks build on
   earlier state; watched failing before code: every check below):
   - Fixture: with `alice`, `api("POST", ...)` creates T1 `tasks {title: "t1", project: P}`, D1
@@ -553,7 +577,9 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
 - **Gate**: with `OFFSET` the builder's assigned `PB_PORT_OFFSET` (200 or more, AGENTS.md
   clean-room law): `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_verbs.ts`,
   `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_mcp.ts`, `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_cli.ts`,
-  `PB_PORT_OFFSET=$OFFSET bun tests/test_mcp_service.ts` and `PB_PORT_OFFSET=$OFFSET make
+  `PB_PORT_OFFSET=$OFFSET bun tests/test_mcp_service.ts`,
+  `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_package.ts` (needs `node` 22.18 or later on `PATH`,
+  as that suite does; it prints the Node version it ran) and `PB_PORT_OFFSET=$OFFSET make
   check-static`, each run alone, one after another, exit 0.
 
 ### Phase 3: trash, delete, restore
@@ -565,7 +591,7 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
   - modify `clients/tm/src/mcp.ts`
   - modify `clients/tm/tm.ts`
   - modify `tests/test_tm_verbs.ts`
-  - regen: `mcp-tools.json` via `bun <the script grep -l "mcp-tools.json" scripts/gen_*.ts prints>`, only when `mcp-tools.json` exists (Depends on)
+  - modify `tests/test_tm_package.ts`
 - **Steps**:
   - `verbs.ts`:
     - `export type TrashRow = { id: string; kind: Kind; key: string; title: string; project: string; trashed: string; trashed_by: string; purge_at: string; purge_days: number };`
@@ -606,9 +632,15 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
     `switch`: `trash` → `verbs.trash(cfg, rest[0], { limit, page })`, `delete` →
     `verbs.delete_item(cfg, rest[0])`, `restore` → `verbs.restore(cfg, rest[0])`;
     `print_human`: `trash` and `delete` per contract; `restore` uses the default branch.
+  - `tests/test_tm_package.ts`: per-runtime case `12e` gains, after Phase 2's calls: `create "pkg <label> trash" --project
+    <PROJECT> --json` → exit 0, its `id` as `TID`; `delete TID --json` → exit 0, JSON `trashed`
+    `true`; `restore TID --json` → exit 0, JSON `trashed` `""`.
 - **Tests** (`tests/test_tm_verbs.ts`; watched failing before code: every check below; the
   "never purges" check is also watched failing once against a `delete_item` without the
-  `trashed` guard, then the guard restored):
+  `trashed` guard, run with the `manage` key `am` so the unguarded call really purges and the
+  superuser read answers 404, then the guard restored):
+  - Fixture: `AM`, an Alice key `{name: "manage", scope: "manage"}` (key-scoping level),
+    minted as `AW` is; MCP client `am` connected and closed as `aw` is.
   - Fixture, with `alice` through `api("POST", ...)`: T2 `tasks {title: "t2", project: P}`, D2
     `documents {title: "d2", workspace: WS}`, X2 `decisions {title: "x2", project: P}`, M2
     `milestones {name: "m2", project: P}`, P2 `projects {name: "p2", workspace: WS}`, T3
@@ -618,8 +650,9 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
     "task", title: <T2's title>, trashed: true}`; then `tm_show T2` → `sc.status` 404.
   - "tm_trash lists it": `call(ar,"tm_trash",{workspace: WS})` → `json.items` has an entry with
     `id` T2, `kind` `task`, `trashed` non-empty, `purge_days` 30; `json.count` ≥ 1.
-  - "tm_delete never purges": `call(aw,"tm_delete",{id: T2})` again (Alice owns WS, so a second
-    `DELETE` would purge) → `isError` true, `sc.code` `invalid_arguments`, `sc.message`
+  - "tm_delete never purges": with the `manage` key (a `write` key's purge is refused by the
+    server anyway): `call(am,"tm_delete",{id: T2})` again (a second
+    `DELETE` under a `manage` key on Alice's workspace would purge) → `isError` true, `sc.code` `invalid_arguments`, `sc.message`
     includes `already in the trash`; superuser `GET /api/collections/tasks/records/${T2}` →
     200 with `trashed` non-empty.
   - "tm_restore brings it back": `call(aw,"tm_restore",{id: T2})` → `json.trashed` `""`,
@@ -657,7 +690,9 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
 - **Gate**: with `OFFSET` the builder's assigned `PB_PORT_OFFSET` (200 or more, AGENTS.md
   clean-room law): `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_verbs.ts`,
   `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_mcp.ts`, `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_cli.ts`,
-  `PB_PORT_OFFSET=$OFFSET bun tests/test_mcp_service.ts` and `PB_PORT_OFFSET=$OFFSET make
+  `PB_PORT_OFFSET=$OFFSET bun tests/test_mcp_service.ts`,
+  `PB_PORT_OFFSET=$OFFSET bun tests/test_tm_package.ts` (needs `node` 22.18 or later on `PATH`,
+  as that suite does; it prints the Node version it ran) and `PB_PORT_OFFSET=$OFFSET make
   check-static`, each run alone, one after another, exit 0.
 
 ### Phase 4: smoke probe, docs and readiness
@@ -672,7 +707,8 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
   - modify `docs/readiness/agent-clients.md`
 - **Steps**:
   - `e2e/smoke.ts`: add `async function probe_tm_verbs(): Promise<void>` and put it in
-    `PROBES` right after `probe_health`. Steps (each a `check` with the label in quotes):
+    `PROBES` immediately before `probe_forged_client_address` (after every probe earlier changes
+    placed ahead of the rate-limit probes). Steps (each a `check` with the label in quotes):
     1. `run([...COMPOSE, "exec", "-T", "pocketbase", "/pb/pocketbase", "superuser", "create", "smoke@example.com", "smoke-pass-123456", "--dir", "/pb/pb_data", "--migrationsDir", "/pb/pb_migrations"])`
        → "superuser created" code 0.
     2. `post("/api/collections/_superusers/auth-with-password", {identity, password})` →
@@ -704,7 +740,9 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
     "`probe_tm_verbs` mints a key against the production image: it creates a superuser in the
     container, completes its MFA with a code from `pocketbase superuser otp`, creates an approved
     user and signs in as that user by impersonation, then runs the `tm` verbs with the user's
-    write key." Its probe list gains `probe_tm_verbs`.
+    write key." If that sentence is absent, the same text is appended at the end of the file
+    under a new heading `## Smoke probe with a key`. In the probe list hosted-mcp-endpoint
+    Phase 8 added, append `probe_tm_verbs` as its last entry.
   - `clients/tm/README.md`: first paragraph's verb list becomes "lists, shows, searches,
     creates, edits and comments on ..., trashes and restores them, follows tasks, reads and
     clears the inbox, and describes the key's workspaces"; "Use it" block gains, after the
@@ -722,18 +760,23 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
     ```
     "As an MCP server": its tool list in parentheses becomes "(`tm_list`, `tm_show`, `tm_search`,
     `tm_create`, `tm_edit`, `tm_comment`, `tm_me`, `tm_workspace`, `tm_notifications`,
-    `tm_trash`, `tm_delete`, `tm_restore`, `tm_subscribe`, `tm_mark_read`)", and its last
-    paragraph becomes "A read key lets the agent
-    use the read tools (list, show, search, me, workspace, notifications, trash) and is offered
-    only those; a write key also lets it create, edit, comment, follow, mark read, delete to
-    the trash and restore. No tool deletes anything for good."; in "Set up once", "a write key can also create,
-    edit and comment" becomes "a write key can also create, edit, comment, follow, mark read,
-    trash and restore"; "that id is what `show`, `edit` and `comment` take" becomes "that id is
+    `tm_trash`, `tm_delete`, `tm_restore`, `tm_subscribe`, `tm_mark_read`)", and in its last
+    paragraph only the first sentence (the one beginning "A read key lists only the read
+    tools") is replaced, by "A read key lists only the read tools (`tm_list`, `tm_show`,
+    `tm_search`, `tm_me`, `tm_workspace`, `tm_notifications`, `tm_trash`); every other key also
+    lists `tm_create`, `tm_edit`, `tm_comment`, `tm_subscribe`, `tm_mark_read`, `tm_delete` and
+    `tm_restore`. No tool deletes anything for good."; the paragraph's later sentences (the
+    failed-call JSON shape) stay. If no sentence begins "A read key lists only the read tools",
+    that new text is appended as the section's last paragraph. In "Set up once", the phrase "a
+    write key can also create, edit and comment" becomes "a write key can also create, edit,
+    comment, follow, mark read, trash and restore" if present; otherwise the sentence "A read key
+    can only read; a write key can also create, edit, comment, follow, mark read, trash and
+    restore." is appended at the end of that section; "that id is what `show`, `edit` and `comment` take" becomes "that id is
     what `show`, `edit`, `comment`, `subscribe`, `delete` and `restore` take"; and a paragraph
     directly after the closing fence of the "Use it" code block:
     "`delete` moves an item to the trash and refuses one already there, so it never removes
     anything for good; `restore` brings it back."
-  - `clients/tm/package.json` `description`: "Command-line client and MCP server for the task
+  - `clients/tm/package.json` `description` (the `version` stays as it is): "Command-line client and MCP server for the task
     tracker: find, read, create, edit, comment on, trash and restore items, follow tasks and
     clear the inbox, with an API key."
   - `docs/readiness/agent-clients.md` AC-10: `Verdict: met.`; Evidence: "`bun
@@ -753,8 +796,9 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
 ## Risks
 
 - **R1. Concurrent purge.** Two `tm_delete` calls on one live item can both pass the check and
-  the second `DELETE` purges (owner or admin key). Caught by nothing in the client; stated in the
-  contract's Auth section and left to AC-4 (`key-scoping`'s `write` tier excludes purge).
+  the second `DELETE` purges, under a `manage` or `own` key of the workspace owner or an admin
+  (key-scoping refuses a `write` key's purge with 403). Caught by nothing in the client; stated
+  in the contract's Auth section.
 - **R2. The view rule changes.** D4 rests on `project_items` showing trashed rows with
   `trashed`. If a later change hides them, `tm_delete` on a trashed item would answer 404 (still
   never purging) and `tm_restore` would always 404. Caught by "tm_restore brings it back" and

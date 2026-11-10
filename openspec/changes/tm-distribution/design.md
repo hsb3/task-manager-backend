@@ -39,9 +39,9 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
    with the repository's `tsconfig.json` (`module: Preserve`, `moduleResolution: bundler`)
    accepts the import (probe: `tsc --noEmit` exit 0). `tm --version` line 1,
    `serverInfo.version` and `User-Agent` all read `VERSION` from it.
-   - `tm --version` prints two lines, `tm <VERSION>` and `api <API_VERSION>`, the format
-     api-versioning-policy's contract fixes ("`tm --version`", lane/d-versioning commit
-     `86b0dcb`). `API_VERSION` is a constant `scripts/gen_tm_client.ts` writes into
+   - `tm --version` prints two lines, `tm <VERSION>` and `api <API_VERSION>`. This change
+     defines the flag (root ruling 3, 2026-11-10); api-versioning-policy, built last, adopts it
+     and owns only the value of line 2. `API_VERSION` is a constant `scripts/gen_tm_client.ts` writes into
      `clients/tm/src/api.generated.ts` from `openapi.json` `info.version`, so it is the version of
      the contract the client's types were generated from, and `gen_tm_client.ts --check` (already
      in `make check-static`) keeps it in step.
@@ -111,7 +111,7 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
      the oldest Node the bundle was proven on. CI runs the package suite on exactly that version
      (Phase 2), so the floor stays proven. The SDK itself asks `>=20` (`engines` of
      `@modelcontextprotocol/server` 2.4.0).
-   - `license` `MIT` and a `clients/tm/LICENSE` file *(assumes Q1)*.
+   - `license` `MIT` and a `clients/tm/LICENSE` file.
    - No `publishConfig`: the release workflow passes `--provenance --access public`, and a
      scoped package without `--access public` is published restricted
      (https://docs.npmjs.com/creating-and-publishing-scoped-public-packages: "By default, scoped
@@ -170,8 +170,13 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
 
 ## Depends on
 
+- Build order (root ruling 1, 2026-11-10): hosted-mcp-endpoint (Phases 1-9 and its runbook),
+  then key-scoping (every phase), then key-minting-cli, then **this change**, then
+  agent-verb-coverage, then api-versioning-policy. Every change before this one is on `main`
+  when Phase 1 starts.
+
 - Changes earlier in the build order, on `main` before this one is built:
-  - `hosted-mcp-endpoint` (contract `c89336a`, design `a631d7c` on lane/d-mcp). What this design
+  - `hosted-mcp-endpoint` (contract `c89336a`, design read at lane/d-mcp `9d4b060`). What this design
     builds on, by its decision and phase:
     - D1 and D11, Phase 5: `clients/tm` is on `@modelcontextprotocol/server` 2.4.0 (exact pin);
       `clients/tm/src/mcp.ts` exports `TOOLS`, `tools_for`, `error_result`, `call`,
@@ -195,37 +200,34 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
       22.18.0, Node 26.10.0 and `bun --bun`, `tm mcp` answered `initialize` with
       `{"name":"tm","version":"0.1.0"}`, listed the six tools, ran `tm_list` (`isError` false)
       and `tm_show` of a missing id (`isError` true), and exited 0 at end of input.
-    - **Defect in D11 as written, for root:** `serve(cfg)` as `await serveStdio(...)` returns at
-      once (`serveStdio` returns a handle with only `close()`, not a promise), and `tm.ts` calls
-      `process.exit` when `main` returns, so `tm mcp` exits 0 before reading a message (probe:
-      zero replies, from source under Bun and from the bundle under Node). The probe passed with
-      `const handle = serveStdio(() => make_server(cfg, scope_from_me(cfg))); await new
-      Promise<void>((resolve) => process.stdin.once("end", resolve)); await handle.close();`.
-      Phase 5's own `tests/test_tm_mcp.ts` fails without such a fix, so it is expected on `main`
-      before this change. If it is not (`bun tests/test_tm_mcp.ts` red with no tool replies),
-      Phase 1 stops and reports to root; it does not edit `serve`.
+    - `serve` waits for end of input before it returns (hosted design D1 and Phase 5 at lane/d-mcp
+      `9d4b060`, test `stdio_serves_until_eof`), so `tm mcp` stays up under `tm.ts`'s
+      `process.exit`.
     - Check before Phase 2 changes `clients/tm/package.json`: `git grep -n -e 'from "tm/' -e
       "from 'tm/" -e '--production' -e '--omit=dev' -- ':!clients/tm/' ':!openspec/'`; any hit
       (an import by the old workspace name `tm`, or an install that drops `devDependencies`)
       stops the phase and is reported to root.
-  - `key-minting-cli` (contract read at lane/d-minting commit `9f99806`): today's `tm login`
+  - `key-minting-cli` (contract and design read at lane/d-minting `b205abc`): today's `tm login`
     becomes `tm login --with-key`, still reading a pasted key; `tm login` opens a browser. This
-    design's tests use `login --with-key`. The contract says "Under Node, which has no built-in
-    store, the file is used", so its design is assumed to guard every Bun-only call (such as
-    `Bun.secrets`) with `typeof Bun !== "undefined"` and to serve the sign-in callback with
-    `node:http`, not `Bun.serve`. Phase 1's gate lists every `Bun.` hit. An unguarded hit, or a
+    design's tests use `login --with-key`. Under Node the key is kept in the private file, with
+    no native keyring package (owner ruling, key-minting-cli Q2). Its design reaches the
+    credential store as `(globalThis as any).Bun?.secrets`, which is `undefined` under Node; its
+    sign-in callback must be served with `node:http`, not `Bun.serve`. Phase 1's gate lists every
+    `Bun.` and `Bun?.` hit. An unguarded hit, or a
     `Bun.serve` callback server, is not fixed in this change: the phase stops and the builder
     reports the file and line to root (a Node replacement there is key-minting-cli's design,
     not this one's). Phase 2's cases 12b to 12d run that change's verbs under Node.
-  - `key-scoping` (contract read at lane/d-scoping commit `f1cabe1`): changes what `tools/list`
-    returns per key scope; the package suite's MCP case compares with the catalog filtered for a
-    write key, which is every tool.
-  - `api-versioning-policy` (contract read at lane/d-versioning commit `86b0dcb`): owns
-    `tm --version`'s format and line 2. If it is built first and `api.generated.ts` already
-    exports `API_VERSION` and `tm.ts` already prints the two lines, Phase 1's matching steps are
-    already done and only their tests are checked; otherwise Phase 1 adds them as written.
-  - `agent-verb-coverage` (built after this change) adds verbs; it inherits the Node rule and the
-    package suite.
+  - `key-scoping` (contract read at lane/d-scoping `0d3232c`): `tools/list` lists only read
+    tools for a `read` key and every tool for any other key; the package suite's MCP case uses a
+    `write` key and compares with `tools_for("write")`. A hand-minted key's reach is `all`.
+  - `api-versioning-policy` (lane/d-versioning `47c6452`) is built after this change, last of the
+    milestone (root ruling 1). It finds `API_VERSION`, the two `--version` lines, `VERSION` and
+    the `package.json` import already present and keeps them.
+  - `agent-verb-coverage` (lane/d-verbs `a3f72ee`) is built after this change; it adds verbs and
+    inherits the Node rule and the package suite.
+- This change is built before api-versioning-policy, so it cuts no API release and edits no
+  `api/` file or `mcp-tools.json`. If `scripts/release_api.ts` exists when a phase starts, the
+  build order was changed: stop and report.
 - Shared files this change edits that another milestone change also edits: `clients/tm/tm.ts`,
   `clients/tm/src/api.ts`, `clients/tm/src/mcp.ts`, `clients/tm/package.json`,
   `clients/tm/README.md`, `bun.lock`, `tests/test_tm_cli.ts`,
@@ -280,12 +282,6 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
       }
       ```
 
-      If api-versioning-policy already added `--version`, its two-line output stays and only its
-      line-1 source changes: whatever it prints after `tm ` (a literal or another constant)
-      becomes `VERSION` from `./src/version.ts`; its line-2 source stays whatever symbol and
-      file it uses (do not add `API_VERSION` as a second one, and skip the `gen_tm_client.ts`
-      step and its regeneration); its `OPTIONS` entry and help line stay and no second help line
-      is added. The Phase 1 tests then use its help-line text in place of this design's.
     - In `read_secret`, replace the line
       `if (!process.stdin.isTTY) return (await Bun.stdin.text()).split("\n")[0].trim();` with:
 
@@ -333,10 +329,7 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
     `` `tm ${PKG_VERSION}\napi ${API_VERSION}\n` ``. Every run uses the existing `tm()` helper
     with `NOWHERE` (the suite's env with no key and no URL):
     - `tm(["--version"], NOWHERE)` → `code` 0, `stdout` `WANT`, `stderr` `""`. Watch it fail
-      before the code exists: on the 2026-11-10 tree it exits 2 with `Unknown option
-      '--version'`; if api-versioning-policy already added the flag, set the manifest's
-      `version` to `0.1.1` with the old line-1 source in place and see line 1 not follow it,
-      then restore `0.1.0`.
+      before the code exists: it exits 2 with `Unknown option '--version'`.
     - `tm(["--version", "list"], NOWHERE)` → 0, `WANT`.
     - `tm(["--help", "--version"], NOWHERE)` → 0, `WANT`.
     - `tm(["-v"], NOWHERE)` → 2, `stderr` includes `usage: tm`.
@@ -367,10 +360,11 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
     `fs.copyFileSync(path.join(path.dirname(TM), "package.json"), path.join(NO_RAW,
     "package.json"));`.
 - **Gate:**
-  - `git grep -n -e "Bun\." -e "import.meta.dir" -e "import.meta.path" -e '"bun:' -- clients/tm
-    ':!clients/tm/build.ts'` prints no `Bun.stdin` line, and
-    every line it prints sits inside a `typeof Bun !== "undefined"` branch (on 2026-11-10 it
-    prints nothing once `read_secret` is changed).
+  - `git grep -n -e "Bun\." -e "Bun?\." -e "import.meta.dir" -e "import.meta.path" -e '"bun:' --
+    clients/tm ':!clients/tm/build.ts'` prints no `Bun.stdin` line, and every line it prints is
+    either an optional-chain read `Bun?.` whose `undefined` result the code handles (as
+    key-minting-cli's `Bun?.secrets`) or inside a `typeof Bun !== "undefined"` branch (after key-minting-cli it
+    prints only that change's `Bun?.secrets` reads).
   - `bun scripts/gen_tm_client.ts --check` exit 0.
   - `PB_PORT_OFFSET=<offset> bun tests/test_tm_cli.ts` exit 0.
   - `PB_PORT_OFFSET=<offset> bun tests/test_tm_mcp.ts` exit 0.
@@ -383,7 +377,7 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
   it under Node and Bun (contract: The package; Errors rows 1 to 4; AC-8).
 - **Files:**
   - create `clients/tm/build.ts`
-  - create `clients/tm/LICENSE` *(assumes Q1)*
+  - create `clients/tm/LICENSE`
   - modify `clients/tm/package.json`
   - modify `bun.lock` (regenerated by `bun install`)
   - modify `.gitignore`
@@ -424,7 +418,7 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
     `tm.ts` must not start with a `#!` line (Decision 1); the suite's refusal case catches a
     regression.
   - `clients/tm/LICENSE`: the MIT License text from https://opensource.org/license/mit, with
-    the line `Copyright (c) 2026 hsb3` *(assumes Q1)*.
+    the line `Copyright (c) 2026 hsb3`.
   - `clients/tm/package.json`: replace the whole file with Decision 5's manifest.
   - `bun.lock`: run `bun install` at the repository root; the lockfile's workspace entry
     becomes `@hsb3/tm` with `devDependencies` and `bin` `dist/tm.js`, and the `packages` entry
@@ -433,21 +427,21 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
   - `.gitignore`: in the "Installed and downloaded artifacts" block, add the line
     `clients/tm/dist/` after `battery-manifests/`, and extend that block's comment to end
     "..., CI's battery shard manifests, the tm bundle."
-  - `scripts/run_suite_battery.sh`: after the line `run_suite "test_tm_client_gen"      bun
-    tests/test_tm_client_gen.ts`, add `run_suite "test_tm_package"         bun
-    tests/test_tm_package.ts`.
+  - `scripts/run_suite_battery.sh`: add `run_suite "test_tm_package" bun
+    tests/test_tm_package.ts` as a new line directly after the file's last `run_suite` line.
   - `scripts/battery_shards.tsv`: one row `<shard>\t<seconds>\ttest_tm_package`, with the
     seconds measured locally by `time bun tests/test_tm_package.ts` rounded up (the CI medians
     the file's header names replace it at the next shard rebalance), on the lightest shard by
     the file's own rule (sum of the seconds column per shard; on 2026-11-10 shard 3, 266 s),
     placed in the file's seconds-descending order.
   - `.agents/rules/ports.md` (8230-8239 is the band root reserved for this change's suites in
-    the 2026-11-10 design wave, so sibling changes take other numbers): after the entry `8195 =` / `test_route_errors` (it wraps across a
-    line break), add `· 8230/8231 =
-    test_tm_package` (8230 its room, 8231 its echo server).
+    the 2026-11-10 design wave, so sibling changes take other numbers): insert `· 8230/8231 = test_tm_package` (8230 its room, 8231 its
+    echo server) in ascending port order among the suite defaults: after the last entry whose
+    port is below 8230, before the next entry (at the latest before `9700 = test_script_help`).
   - Run `bunx prettier --write clients/tm/build.ts tests/test_tm_package.ts` before the gate.
-  - `.github/workflows/ci.yml`: in the `battery` job and in the `smoke` job, directly after the
-    `oven-sh/setup-bun@v2` step, add:
+  - `.github/workflows/ci.yml`: in the `battery` job and in the `smoke` job, if the job has no
+    `actions/setup-node` step yet (key-minting-cli may have added one to `battery`), add directly
+    after its `oven-sh/setup-bun@v2` step; if it has one, set its `node-version` to `"22.18.0"`:
 
     ```yaml
           # The oldest Node the tm package supports (clients/tm/package.json engines.node).
@@ -547,12 +541,19 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
     12c. `<label>: keys list with a key that cannot manage keys` → `keys list` with the write key
         and room URL → exit 1, stderr's first line `tm: this key cannot list or revoke keys;
         run tm login to get one that can` (key-minting-cli contract, `tm` refusals, for 403
-        `api_key_manage`).
-    12d. `<label>: logout removes the saved login` → after case 8, with
-        `TM_CREDENTIAL_STORE=file` and the same `XDG_CONFIG_HOME`, `logout --json` → exit 0;
-        stdout JSON has `url` `<room URL>` and `revoked` `false` (the write key has no
-        `manage_keys`, so `tm` may not revoke it); `<xdg>/tm/config.json` is absent or its JSON
-        has no `key`.
+        `api_key_manage`). This pins key-minting-cli's design as read at `b205abc` (its key
+        routes refuse a key whose reach is `all` and whose `manage_keys` is false; root ruling
+        5 changes only limited keys, which may list themselves).
+    12d. `<label>: logout removes the saved login` → mint a fresh key for this case only,
+        `LOGOUT_KEY` (Alice, `POST /api/collections/api_keys/records` with `name` `logout
+        <label>`, `scope` `write`), so `WRITE_KEY` survives whatever logout does; with
+        `TM_CREDENTIAL_STORE=file` and `XDG_CONFIG_HOME` `<S>/xdg-logout-<label>`, run `login
+        --with-key --url <room URL>` with stdin `${LOGOUT_KEY}\n` (exit 0), then `logout --json`
+        → exit 0; stdout JSON has `url` `<room URL>`, `key_id` `LOGOUT_KEY`'s record id and a boolean
+        `revoked` equal to that record's `revoked` field read afterwards by Alice through
+        `GET /api/collections/api_keys/records/<id>` (whether a key without `manage_keys` may
+        revoke itself is key-minting-cli's rule; this case checks only that `tm` reports what the
+        server did); `<xdg>/tm/config.json` is absent or its JSON has no `key`.
     13. `<label>: User-Agent is tm/<version>` → `show abc` with `TM_URL`
         `http://127.0.0.1:<ECHO>` and `TM_API_KEY` `WRITE_KEY`, where the echo server
         (`Bun.serve` on `127.0.0.1:<ECHO>` after `await roomkit.require_free_port(ECHO)`,
@@ -701,7 +702,7 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
       `["--bun", "@hsb3/tm", "mcp"]`. `npx -y @hsb3/tm` runs the newest release; write
       `@hsb3/tm@<version>` to keep one version.
 
-      A read key lists only the read tools (those marked read-only); a write key lists every
+      A read key lists only the read tools (those marked read-only); every other key lists every
       tool. A failed call's text is the JSON object `{"error": {"status", "code", "message",
       "fields"}}`, also returned as `structuredContent`.
       ````
@@ -718,7 +719,7 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
     - "## Use it" and "## When something goes wrong" stay as they are (key-minting-cli's
       changes to them included).
   - `e2e/smoke.ts`:
-    - Add after `probe_health`:
+    - Add as a new function directly before the `const PROBES = [` line:
 
       ```ts
       // The published bundle under Node reaches the image and passes its refusal through.
@@ -747,8 +748,8 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
       `node:path` import. The probe needs `ROOT`'s dependencies installed (`bun install` there),
       as building the image does not; the default `ROOT` is this checkout. Run `bunx prettier
       --write e2e/smoke.ts` before the gate.
-    - In `PROBES`, insert `probe_tm_bundle` after `probe_health` (before the rate-limit
-      probes, which must stay last).
+    - In `PROBES`, insert `probe_tm_bundle` directly before `probe_forged_client_address` (the
+      rate-limit probes stay last).
     - The module comment's "Not covered" paragraph is unchanged.
   - `AGENTS.md`, "Commands": the `make check` line's comment becomes `# THE gate: check-static,
     then the battery (every suite; CI runs it sharded); needs node 22.18+ and npm on PATH`.
@@ -845,10 +846,7 @@ Probes behind every claim below ran on 2026-11-10 with Bun 1.4.3, npm 12.2.1 and
 
 ## Open Questions
 
-1. **The published package's license** *(Q1)*. The repository has no license file, and a public
-   npm package needs one for anyone to have permission to use it. Recommended: MIT for
-   `clients/tm` (a `LICENSE` file there and `"license": "MIT"`), leaving the server's licensing
-   untouched. The design is written under that answer; the steps marked *(assumes Q1)* change if
-   another license is chosen (the `LICENSE` text and the `license` field), and with no license
-   the `LICENSE` file is dropped, the field becomes `"UNLICENSED"`, and suite case 4's expected
-   list loses `package/LICENSE`.
+None open. Ruled by the owner on 2026-11-10:
+
+1. **The published package's license.** MIT for the package only: `clients/tm/LICENSE` and
+   `"license": "MIT"`; the server keeps no stated license.

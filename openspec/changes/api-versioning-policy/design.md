@@ -60,7 +60,13 @@ version it is actually being served by, not a separate call.
 
 ### D4. Versions: `0.MINOR.0` now, `1.0.0` at the hosted MCP launch, PATCH always 0
 
-- The first recorded version is `0.1.0`. The constant `1.0.0` in `openapi.json` was never a
+- The first recorded version is `0.1.0`, cut by this change's Phase 4. This change is built
+  last in the milestone (root ruling 2026-11-10: hosted-mcp-endpoint, key-scoping,
+  key-minting-cli, tm-distribution, agent-verb-coverage, then this one), so that first release
+  snapshots the finished milestone: every route, field and tool the five earlier changes add is
+  in `api/openapi.released.json` and `api/mcp-tools.released.json` from the start, and no
+  earlier change cuts a release. Release `1.0.0` follows, before the hosted MCP address is
+  given to any outside user (D13). The constant `1.0.0` in `openapi.json` was never a
   release; semver rule 4: "Major version zero (0.y.z) is for initial development. Anything MAY
   change at any time", which is ruling 6 for the time before the launch.
 - A release exists only to record a structural contract change, so it is MINOR or MAJOR. This
@@ -95,19 +101,19 @@ never differ structurally (D7), so they need no release.
 
 New generator `scripts/gen_mcp_tools.ts` writes `mcp-tools.json` at the repository root from
 `TOOLS` in `clients/tm/src/mcp.ts` (each entry without its `run` function), the exact list
-`tools/list` serves to a write credential. The expression `TOOLS.map(({ run, ...t }) => t)` holds
-whichever of this change and hosted-mcp-endpoint lands first: that design (`lane/d-mcp`
-`a631d7c`, D11) moves the module to MCP SDK v2 `@modelcontextprotocol/server` 2.4.0 but keeps
-`TOOLS` as an exported array with the same content, typed `ToolDef` (`name`, `description`,
-`inputSchema`, `annotations`, `run`), and its `tools_for("write")` returns the same list. The
-generator does not call `tools_for`, so it builds before or after that change unchanged.
-Importing the module has no network effect: today it defines constants and functions and
-compiles one Ajv validator per tool (the `validators` map); after hosted Phase 5 it also reads
-`clients/tm/package.json` for `VERSION` (checked today: a probe script imported it and printed
-only what it asked for: each tool's keys, `name,description,inputSchema,annotations,run`, which
-become `name,description,inputSchema,annotations` once `run` is dropped). The SDK resolves from
-`clients/tm`, where the only manifest declaring it lives (hosted D1), which a script importing
-`../clients/tm/src/mcp.ts` uses as any importer does. Being a
+`tools/list` serves to a write credential. When this change is built, hosted-mcp-endpoint
+(`lane/d-mcp` `9d4b060`, D11) has moved the module to MCP SDK v2 `@modelcontextprotocol/server`
+2.4.0, keeping `TOOLS` an exported array typed `ToolDef` (`name`, `description`, `inputSchema`,
+`annotations`, `run`); key-scoping and agent-verb-coverage have changed its content. The
+generator reads `TOOLS.map(({ run, ...t }) => t)`, the same list `tools_for` returns for a key
+that lists every tool, without depending on `tools_for`'s scope type. Importing the module has
+no network effect: it defines constants and functions, compiles one Ajv validator per tool, and
+imports `VERSION` from `clients/tm/src/version.ts` (tm-distribution), which imports
+`clients/tm/package.json` (checked on the pre-milestone tree: a probe script imported it and
+printed only what it asked for: each tool's keys, `name,description,inputSchema,annotations,run`,
+which become `name,description,inputSchema,annotations` once `run` is dropped). The SDK
+resolves from `clients/tm`, where the only manifest declaring it lives (hosted D1), which a
+script importing `../clients/tm/src/mcp.ts` uses as any importer does. Being a
 `scripts/gen_*.ts` with an `OUTPUT` constant, it joins `make check-static`'s `--check` loop and
 `scripts/gen_gitattributes.ts` picks its output up for `.gitattributes` (the generator derives
 paths from each generator's `OUTPUT`). The gate and the release script then read only JSON files,
@@ -144,7 +150,7 @@ joined with no separator, e.g. `schema LabelsRecord.color`, `tool tm_create inpu
 | parameter | `exists`; `required` when `required: true`; `deprecated`; then its `schema` as a node rooted at the parameter item |
 | request body | `exists`; `required` when `requestBody.required` is true; its schema rooted at the body item |
 | response | `exists`; its schema, when it has `content`, rooted at the response item |
-| every schema node | `exists`; `type <t>` (an array of types sorted and joined with `|`); `format <f>`; `ref <Name>` (the last segment of `$ref`); `enum <JSON value>` (one fact per value); `default <JSON>`; `minimum <n>`; `maximum <n>`; `minProperties <n>`; `nullable` when true; `additionalProperties <true|false>` when boolean; `required` on a property node listed in its parent's `required`; `deprecated` when true |
+| every schema node | `exists`; `type <t>` (an array of types sorted and joined with `|`); `format <f>`; `ref <Name>` (the last segment of `$ref`); `enum <JSON value>` (one fact per value); `default <JSON>`; `minimum <n>`; `maximum <n>`; `minProperties <n>`; and, for each of the JSON Schema validation keywords `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`, `minLength`, `maxLength`, `pattern`, `minItems`, `maxItems`, `uniqueItems`, `maxProperties`, `const`, `<keyword> <JSON value>`; `nullable` when true; `additionalProperties <true|false>` when boolean; `required` on a property node listed in its parent's `required`; `deprecated` when true |
 | security scheme | `<key> <JSON value>` for each key except `description` |
 | MCP tool | `exists`; `deprecated` when `description` starts with `Deprecated:`; `inputSchema` as a node rooted at `tool <name> input` |
 
@@ -166,7 +172,11 @@ called `description` is a property): `description`, `summary`, `title`, `tags`, 
 node, an operation, a parameter, a request body, a response, a path item (other than an HTTP
 method), `components` (other than `schemas` and `securitySchemes`) or a tool throws
 `Error("unhandled contract key \"<key>\" at <item>")`. A new keyword therefore fails the gate
-until this list classifies it, instead of slipping by. A name in a schema's `required` with no
+until this list classifies it, instead of slipping by. The pre-milestone tree uses only a subset
+of the listed keys (census); the validation keywords are listed now so that a route or tool an
+earlier milestone change adds with, for example, `maxLength` is classified, not thrown. A key
+outside every list when Phase 3 runs (Phase 3 test case 1 throws, naming it) means a sibling
+used a keyword this design did not foresee: stop and report it, do not classify it ad hoc. A name in a schema's `required` with no
 matching property throws `Error("required name \"<name>\" has no property at <item>")`. (The current files use exactly the keys
 above: checked with a key census of `openapi.json` and of `TOOLS`.)
 
@@ -175,7 +185,8 @@ above: checked with a key census of `openapi.json` and of `TOOLS`.)
 1. A removed fact (in O, not in N) is **breaking**, unless its aspect is `deprecated`.
 2. An added `required` fact is **breaking** when its item is request-side and the item's owner
    exists in O.
-3. An added `minimum`, `maximum`, `minProperties`, `additionalProperties`, or `format` fact is
+3. An added `minimum`, `maximum`, `minProperties`, `additionalProperties`, `format`, or any of
+   the validation keywords listed in the schema-node row above, fact is
    **breaking** when its item is request-side and the item's own `exists` fact is in O.
 4. An added `enum` fact is **breaking** when its item is request-side, its own `exists` fact is
    in O, and O holds no `enum` fact for that item (a new restriction); otherwise adding an enum
@@ -341,18 +352,19 @@ starts with `- Forced by: TEXT`. A section that would hold no bullet gets `### C
 `- No structural change since <V>.` The author may append prose after a bullet (`` - `<fact>` -
 <prose> ``) and add prose bullets; the gate only requires one bullet per section.
 
-### D11. tm carriers
+### D11. tm carriers: already present, this change sets only the value of line 2
 
-- `scripts/gen_tm_client.ts` `render` adds, after the header comment,
-  `export const API_VERSION = "<spec.info.version>";`.
-- `clients/tm/tm.ts` prints the second `--version` line, `api <API_VERSION>`, imported from
-  `./src/api.generated.ts`. If tm-distribution's `--version` is already on `main`, its first line
-  is kept as written; if not, this change adds `--version` exactly as the tm-distribution contract
-  states ("`tm --version`") with line 1 the `version` of `clients/tm/package.json` (imported as
-  `import pkg from "./package.json"`; the root `tsc --noEmit -p tsconfig.json`, whose `include`
-  covers `clients/**/*.ts`, accepted a probe file in `clients/tm/` with that import, exit 0).
-- MCP `serverInfo` is not touched: it carries the tm version (hosted-mcp-endpoint and
-  tm-distribution contracts).
+tm-distribution (built before this change) adds every tm carrier: `export const API_VERSION =
+<openapi.json info.version>` in `scripts/gen_tm_client.ts` `render`, `clients/tm/src/version.ts`
+(`VERSION` from `clients/tm/package.json`), and `tm --version` printing `tm <VERSION>` and
+`api <API_VERSION>` after `parseArgs` (tm-distribution design Phase 1, `lane/d-dist`
+`c5c62d5`; root ruling 3: its definition wins). This change edits none of those files. It
+changes only what line 2 says: `gen_openapi.ts` now writes `info.version` from D1, so
+regenerating `openapi.json` and `clients/tm/src/api.generated.ts` moves `API_VERSION` from the
+old constant `1.0.0` to `0.1.0`. tm-distribution's `tests/test_tm_cli.ts` cases read the
+expected line 2 from `openapi.json` `info.version`, so they follow without an edit.
+
+- MCP `serverInfo` is not touched: it carries `VERSION` (hosted-mcp-endpoint and tm-distribution).
 - Not in this change: tm comparing the server's `Api-Version` with its own and warning on a
   major mismatch. tm-distribution leaves that comparison to this policy; it is client behaviour
   beyond the carriers and is reported as follow-up work.
@@ -381,34 +393,39 @@ endpoint's URL is given to any outside user; its changelog section gains the pro
 
 ## Depends on
 
-- **hosted-mcp-endpoint** (build order 1; design `lane/d-mcp` `a631d7c`, D18 and Phase 6). The
-  hosted `Api-Version` header ("`Api-Version` header", last bullet) is built by whichever change
-  lands second. If `clients/tm/src/api.generated.ts` already exports `API_VERSION` when hosted
-  Phase 6 is built, that change builds the header in `services/mcp/src/app.ts` (`make_app`'s
-  `fetch` sets it on every `Response`, 500 and 503 included) and its five assertions in
-  `tests/test_mcp_service.ts`. Otherwise it reports "Api-Version header deferred: API_VERSION
-  absent", and this plan's Phase 6 builds both, exactly as hosted D18 states. Integrator check:
-  `grep -c 'Api-Version' services/mcp/src/app.ts` after both have landed prints a non-zero
-  count. If this change lands first, hosted-mcp-endpoint's own contract changes (its `/oauth/*`
-  and `/.well-known/` routes, the `api_keys` fields, the `oauth_codes` collection) need a release
-  (`bun scripts/release_api.ts`) in its build, as for every later change below; its design does
-  not name that step (reported to root).
-- **tm-distribution** (build order 4, branch `lane/d-dist` at `0fc78ff`, contract "`tm
-  --version`"): line 1 of `tm --version` is its. D11 says what this change does whether or not
-  it has landed.
-- **Every change built after this one** (key-scoping, key-minting-cli, tm-distribution,
-  agent-verb-coverage, and hosted-mcp-endpoint if it lands later; hosted's own SDK v2 move keeps
-  `TOOLS`' content, so on its own it needs no release) must cut a release when it
-  changes `openapi.json` or `TOOLS` structurally, and must regenerate `mcp-tools.json` when it
-  changes `TOOLS`. Read: `lane/d-verbs` `9433c0f` (its contract already defers to "the versioning
-  policy's catalog rule") and `lane/d-minting` `9f99806`.
-- **Shared files** this change edits that another milestone change also edits:
-  `openapi.json`, `clients/tm/src/api.generated.ts` (every change touching routes or
-  collections), `clients/tm/tm.ts` (tm-distribution, key-minting-cli, agent-verb-coverage),
-  `tests/test_tm_cli.ts` (the same three), `tests/test_hook_files_loaded.ts`,
-  `scripts/run_suite_battery.sh`, `scripts/battery_shards.tsv`, `.agents/rules/ports.md`,
-  `e2e/smoke.ts`, `.gitattributes`, `AGENTS.md`, `docs/readiness/README.md` (the hosted change
-  moves AC rows in `docs/readiness/agent-clients.md`, not this file's SH rows).
+- **Build order (root ruling 1, final):** hosted-mcp-endpoint, key-scoping, key-minting-cli,
+  tm-distribution, agent-verb-coverage, then this change, last, and in any case before the
+  hosted MCP address is given to any outside user. Every earlier change is on `main` when Phase 1
+  starts. Sibling heads read for this alignment: `lane/d-mcp` `9d4b060`, `lane/d-dist`
+  `c5c62d5`, `lane/d-scoping` `0d3232c`, `lane/d-minting` `b205abc`, `lane/d-verbs` `a3f72ee`
+  (combined review state `lane/readiness-wave` `7fb2b27`).
+- **Already present** (checked before Phase 1 starts, each by its command; any other answer
+  means the build order was changed: stop and report, change nothing):
+  1. `grep -c '^export const API_VERSION' clients/tm/src/api.generated.ts` prints `1`
+     (tm-distribution: `scripts/gen_tm_client.ts` writes it).
+  2. `test -f clients/tm/src/version.ts` succeeds and `grep -c 'api ${API_VERSION}'
+     clients/tm/tm.ts` prints `1` (tm-distribution: `VERSION`, the `package.json` import, and
+     both `--version` lines).
+  3. `test -f services/mcp/src/app.ts` succeeds (hosted-mcp-endpoint's service).
+  4. `test -f scripts/release_api.ts` fails, and `test -e api` fails (no earlier change cut a
+     release; root ruling 2).
+  5. `test -f mcp-tools.json` fails (this change's Phase 3 creates it).
+- **hosted-mcp-endpoint's `Api-Version` header.** Its D18 builds the header only when
+  `API_VERSION` exists at its Phase 6; it is built first, before tm-distribution adds
+  `API_VERSION`, so it defers the header ("Api-Version header deferred: API_VERSION absent") and
+  this plan's Phase 6 builds it, exactly as hosted D18 states. Phase 6 keeps its own
+  already-present check in case the hosted builder set the header anyway.
+- **No later milestone change.** After this change, every change that alters `openapi.json` or
+  `TOOLS` structurally cuts a release in its own commit (D5); the earlier milestone changes each
+  state that they cut none (root ruling 2).
+- **Shared files** this change edits that another milestone change also edits: `openapi.json`
+  and `clients/tm/src/api.generated.ts` (regenerated), `scripts/gen_openapi.ts`
+  (key-scoping), `tests/test_tm_client_gen.ts` (tm-distribution), `tests/test_hook_files_loaded.ts`
+  (this change only, among the designs read), `services/mcp/src/app.ts` and
+  `tests/test_mcp_service.ts` (hosted), `scripts/run_suite_battery.sh`,
+  `scripts/battery_shards.tsv`, `.agents/rules/ports.md`, `e2e/smoke.ts`, `.gitattributes`,
+  `AGENTS.md`, `docs/README.md`, `docs/readiness/README.md`. Every insertion point below is an
+  anchor no earlier change rewrites (root ruling 8).
 
 ## Implementation Plan
 
@@ -421,20 +438,19 @@ second; shard = the one whose summed seconds are lowest (a tie goes to the lower
 counting rows added earlier in the same phase; inserted in seconds-descending order (the file's
 header rule).
 
-### Phase 1: version source, `openapi.json` and tm carriers
+### Phase 1: version source and `openapi.json`
 
-- **Goal:** one version source drives `openapi.json` `info.version` and tm's `API_VERSION` and
-  `tm --version` (contract "The version", "`openapi.json`", "`tm --version`"; SH-5 in part).
+- **Goal:** one version source drives `openapi.json` `info.version`, and through it tm's
+  `API_VERSION` and line 2 of `tm --version`, which tm-distribution already prints (contract
+  "The version", "`openapi.json`", "`tm --version`"; SH-5 in part). Start only after the five
+  "Already present" checks (Depends on) pass.
 - **Files:**
   - create `pb_hooks/lib/api_version.js`
   - create `scripts/_api_contract.ts`
   - modify `scripts/gen_openapi.ts`
-  - modify `scripts/gen_tm_client.ts`
-  - modify `clients/tm/tm.ts`
   - modify `tests/test_tm_client_gen.ts`
-  - modify `tests/test_tm_cli.ts`
   - regen: `openapi.json` via `bun scripts/gen_openapi.ts`; `clients/tm/src/api.generated.ts`
-    via `bun scripts/gen_tm_client.ts`
+    via `bun scripts/gen_tm_client.ts` (its `API_VERSION` becomes `0.1.0`; no other line moves)
 - **Steps:**
   - `pb_hooks/lib/api_version.js`: exactly the D1 template with `0.1.0`.
   - `scripts/_api_contract.ts`: header comment `// The API contract: its version source and its
@@ -453,32 +469,17 @@ header rule).
     contract version, equal to info.version; versioning and deprecation: docs/api-versioning.md
     in this repository."` A thrown version error is reported by `main`'s existing catch as
     `❌ gen_openapi: <message>`.
-  - `scripts/gen_tm_client.ts` `render`: after the header comment and its blank line, push
-    `` `export const API_VERSION = ${JSON.stringify(spec.info?.version ?? "")};` `` and `""`.
-  - `clients/tm/tm.ts`: import `{ API_VERSION }` from `./src/api.generated.ts`. Per D11: if
-    `--version` handling exists, print `` `api ${API_VERSION}` `` right after its line; if not,
-    add option `version: { type: "boolean", default: false }` to `OPTIONS` (so usage text and
-    parsing know it), and make the first statement of `main`, before `parseArgs`:
-    `if (argv.includes("--version")) { console.log(pkg.version); console.log(`api ${API_VERSION}`);
-    return 0; }` with `import pkg from "./package.json"`, so `--version` wins over every other
-    argument, an unknown option included; and
-    add the usage line `  --version prints the version of tm.` (tm-distribution's exact line)
-    after the `--json` line of `HELP`. (`parse_args` in this design always means
-    `scripts/_argparse.ts`.)
   - Regenerate `openapi.json`, then `clients/tm/src/api.generated.ts`.
 - **Tests:**
-  - `tests/test_tm_client_gen.ts`, new case `(f) the client names the contract version`:
-    `render(SPEC)` contains `export const API_VERSION = "<SPEC.info.version>";`, and
-    `SPEC.info.version === read_api_version(REPO_ROOT)` (compared, not a literal). Watched failing
-    before the `gen_tm_client.ts` change: the string is absent.
-  - `tests/test_tm_cli.ts`, beside the `--help → exit 0` check: `tm(["--version"])` → exit 0,
-    stdout lines `[<clients/tm/package.json version>, "api <read_api_version(REPO_ROOT)>"]`,
-    stderr empty;
-    `tm(["--version", "list"])` and `tm(["--version", "--bogus"])` → the same two lines, exit 0
-    (no login, no server needed). The expected `api` line is `api ${read_api_version(REPO_ROOT)}`,
-    never a literal, so a later release does not break the suite.
-    Watched failing before the `tm.ts` change.
+  - `tests/test_tm_client_gen.ts`, new case `(f) the client's API_VERSION is the version
+    source's`: `render(SPEC)` contains `` `export const API_VERSION = ${JSON.stringify(SPEC.info.version)};` ``
+    and `SPEC.info.version === read_api_version(REPO_ROOT)` (both compared, never a literal).
+    Watched failing: run it before the `gen_openapi.ts` change; `openapi.json` still says
+    `1.0.0` and `read_api_version` says `0.1.0`.
+  - `tests/test_tm_cli.ts` is not edited: tm-distribution's `--version` cases read line 2's
+    expected value from `openapi.json`; run the suite to see them pass with `api 0.1.0`.
 - **Gate:** `bun tests/test_tm_client_gen.ts`; `PB_PORT_OFFSET=<n> bun tests/test_tm_cli.ts`;
+  `bun scripts/gen_tm_client.ts --check`;
   `bun scripts/gen_openapi.ts --check`; `make check-static`.
 
 ### Phase 2: the `Api-Version` header
@@ -509,21 +510,25 @@ header rule).
     ```
     (`bun run format` settles its layout.)
   - `tests/test_hook_files_loaded.ts`: add `"api_version.pb.js"` to `probed`, and a §2 probe
-    after the `me.pb.js` one: `GET /api/health` anonymous; check
+    as the last §2 probe, directly before the line `console.log("\n── §3 every hook file is
+    dispositioned ──");`: `GET /api/health` anonymous; check
     `"api_version.pb.js: /api/health carries Api-Version"`, got the response's `Api-Version`
     header, expected `read_api_version(REPO_ROOT)`. The suite's `api()` helper returns status
     and body only, so this probe uses `fetch(BASE_URL + "/api/health")` directly.
-  - `.agents/rules/ports.md`: in the Defaults list, after the entry `8195 =
-    test_route_errors` (it spans a line break), insert `8250 = test_api_version_header ·` before
-    `9700 = test_script_help`. Measured in a mirror: `check_port_collisions` stays green and the
-    lowest safe offset rises from 106 to 153.
+  - `.agents/rules/ports.md`: in the Defaults list, insert `8250 = test_api_version_header ·`
+    in ascending port order, directly before `9700 = test_script_help` (every earlier change's
+    ports are below 8250: hosted 8200-8207, key-scoping 8210-8215, key-minting-cli 8220-8224,
+    tm-distribution 8230-8231, agent-verb-coverage 8240, per the cross-change review). `bun
+    scripts/check_port_collisions.ts` must stay green.
   - `scripts/run_suite_battery.sh`: `run_suite "test_api_version_header" bun
-    tests/test_api_version_header.ts` after the `test_route_errors` line; `battery_shards.tsv`
+    tests/test_api_version_header.ts` directly before the comment line that starts `# ── guard:
+    the repo's real pb_migrations/`; `battery_shards.tsv`
     row per the rule above.
   - `e2e/smoke.ts`: new `probe_api_version()`: `fetch(BASE_URL + "/api/health")`; check
     `"GET /api/health carries Api-Version"`, got `r.headers.get("api-version")`, expected
-    `read_api_version(ROOT)` (import from `../scripts/_api_contract.ts`). Add it to `PROBES`
-    after `probe_health`.
+    `read_api_version(ROOT)` (import from `../scripts/_api_contract.ts`). Insert it in `PROBES`
+    directly before `probe_signup_rate_limit` (which stays last; the rate-limit probes must run
+    last, and every earlier change inserts before it too).
 - **Tests:** `tests/test_api_version_header.ts`, a self-booting room suite. Header comment:
   `/** Api-Version on every response (change api-versioning-policy). Self-contained clean-room
   server. Port 8250 + PB_PORT_OFFSET. INSPIRE_UPSTREAM_URL aims at a closed port. */`. Boot as `tests/test_route_errors.ts` does (scratch dir, `copy_tree` of
@@ -652,7 +657,8 @@ header rule).
       "tool tm_create input", "tool tm_create"]`; `ancestors("op GET /api/health")` →
       `["op GET /api/health"]`.
   Watched failing: the suite run before `_api_contract.ts` gains these exports fails at import.
-  `run_suite "test_api_contract" bun tests/test_api_contract.ts` goes after `test_openspec_checker`.
+  `run_suite "test_api_contract" bun tests/test_api_contract.ts` goes directly before the comment
+  line that starts `# ── guard: the repo's real pb_migrations/`.
 - **Gate:** `bun tests/test_api_contract.ts`; `bun scripts/gen_mcp_tools.ts --check`;
   `bun scripts/gen_gitattributes.ts --check`; `make check-static`.
 
@@ -758,8 +764,8 @@ header rule).
     12. `date before the newest release`: `--date 2026-11-09` with the case-2 operation added →
         exit 1, `is before the newest release 0.1.0 (2026-11-10)`.
     Watched failing: the suite run before `release_api.ts` exists fails on case 1.
-  - `run_suite` lines after `test_api_contract`: `test_api_version_checker`, then
-    `test_release_api`.
+  - `run_suite` lines directly before the comment line that starts `# ── guard: the repo's real
+    pb_migrations/`: `test_api_version_checker`, then `test_release_api`.
 - **Gate:** `bun tests/test_api_version_checker.ts`; `bun tests/test_release_api.ts`;
   `bun scripts/check_api_version.ts`; `make check-static`; then add a throwaway operation to a
   scratch copy only (never the tree) as case 2 does, and quote the red output in the PR body.
@@ -782,7 +788,8 @@ header rule).
     `## The changelog` (`api/CHANGELOG.md`, the D10 format, and that each bullet is a contract
     fact); `## Cutting a release` (D8's command, its flags and refusals, and the duty of D5);
     `## Release 1.0.0` and `## PocketBase upgrades` (D13).
-  - `docs/README.md`: a table row after the `openspec.md` row:
+  - `docs/README.md`: a row appended as the last row of the table that holds the `openspec.md`
+    row:
     `| [\`api-versioning.md\`](api-versioning.md) | How the API contract is versioned, released and deprecated, and where a client reads the version | Building a client against the API, or changing the contract |`.
   - `docs/readiness/README.md`: SH-4 verdict `met`, evidence ``docs/api-versioning.md`;
     `bun scripts/check_api_version.ts` (check-static) compares the tree's contract with
@@ -790,7 +797,7 @@ header rule).
     `tests/test_release_api.ts`.``, gap `none`. SH-5 verdict `met`, evidence ``pb_hooks/api_version.pb.js`
     sets `Api-Version` on every response; `tests/test_api_version_header.ts`; `openapi.json`
     `info.version`; `tm --version`.``, gap `none`.
-  - `AGENTS.md`, Commands block, after the `bun scripts/check_app_docs.ts` line:
+  - `AGENTS.md`, Commands block, as its last line (directly before the closing ```` ``` ````):
     `bun scripts/release_api.ts         # cut an API release; a contract change needs one (docs/api-versioning.md)`.
 - **Tests:** none new; documentation only.
 - **Gate:** `make check-static`; `make check`; `make smoke` (Docker; `probe_api_version` from
@@ -798,32 +805,48 @@ header rule).
 
 ### Phase 6: the hosted MCP header, only if hosted-mcp-endpoint deferred it
 
-- **Run this phase only if** `services/mcp/src/app.ts` exists and `grep -c 'set("Api-Version"'
-  services/mcp/src/app.ts` prints `0` (hosted D9 already lists `Api-Version` in
-  `Access-Control-Expose-Headers`, so grep for the `set` call, not the name). No file: hosted has
-  not landed and builds the header itself (D18). A non-zero count: nothing to do.
+- **Run this phase when** `grep -c API_VERSION services/mcp/src/app.ts` prints `0`, the expected
+  case under the build order (hosted D18 defers the header because `API_VERSION` did not exist
+  at its Phase 6; it then leaves the import out). The file exists (Already present 3). A
+  non-zero count means the hosted builder added the header anyway: skip the phase and say so in
+  the report.
 - **Goal:** every hosted MCP response carries `Api-Version` (contract "`Api-Version` header",
   last bullet; spec "The hosted MCP endpoint and the tm client name the contract version").
 - **Files:**
   - modify `services/mcp/src/app.ts`
   - modify `tests/test_mcp_service.ts`
+  - modify `e2e/smoke.ts`
 - **Steps:**
   - `services/mcp/src/app.ts`: add `import { API_VERSION } from
     "../../../clients/tm/src/api.generated.ts";`. In `make_app`, rename the existing `fetch`
     body to an inner `async function handle(req: Request, ip: string): Promise<Response>` (the
-    whole D9 pipeline with its 500 `catch`), and make `fetch` `async (req, ip) => { const res =
-    await handle(req, ip); res.headers.set("Api-Version", API_VERSION); return res; }`. If a
-    `Response` from the SDK has immutable headers (a `TypeError` on `set`), return `new
-    Response(res.body, { status: res.status, statusText: res.statusText, headers: new
-    Headers(res.headers) })` with the header set on the copy, for every response (one code path,
-    no branch on the error).
-  - `tests/test_mcp_service.ts`: the hosted design's D18 cases, named as there:
-    `version_on_200` (write-key `tools/list` → 200), `version_on_405` (GET `/mcp` → 405),
-    `version_on_401` (POST `/mcp` with no credential → 401), `version_on_404` (`GET /nope` → 404):
-    each response's `Api-Version` equals `read_api_version(REPO_ROOT)` (import from
-    `../scripts/_api_contract.ts`); and inside the existing `api_down_503` case, assert the same
-    of its 503.
-- **Tests:** the five assertions above, watched failing before the `fetch` change.
+    whole D9 pipeline with its 500 `catch`), and make `fetch`:
+    ```ts
+    async fetch(req: Request, ip: string): Promise<Response> {
+      const res = await handle(req, ip);
+      const headers = new Headers(res.headers);
+      headers.set("Api-Version", API_VERSION);
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+    }
+    ```
+    (always a copy: one code path whatever the SDK's `Response` allows). If the
+    `Access-Control-Expose-Headers` value hosted D9 builds does not contain `Api-Version`
+    (`grep -c 'Retry-After, Api-Version' services/mcp/src/app.ts` prints `0`), change that value to
+    `WWW-Authenticate, Retry-After, Api-Version`.
+  - `tests/test_mcp_service.ts`: the hosted design's D18 cases, named as there, inserted
+    directly before the `api_down_503` case (which stops the room and must stay last):
+    `version_on_200` (write-key `tools/list` → 200, sent with `Origin: https://claude.ai`, and its
+    `Access-Control-Expose-Headers` split on `,` and trimmed contains `Api-Version`),
+    `version_on_405` (GET `/mcp` → 405), `version_on_401` (POST `/mcp` with no credential → 401),
+    `version_on_404` (`GET /nope` → 404): each response's `Api-Version` equals
+    `read_api_version(REPO_ROOT)` (import from `../scripts/_api_contract.ts`); and inside the
+    existing `api_down_503` case, assert the same of its 503.
+  - `e2e/smoke.ts`: new `probe_mcp_api_version()`: `GET /nope` on the MCP base URL the hosted
+    probes use (the one `probe_mcp_refusals` fetches from); check `"MCP GET /nope carries
+    Api-Version"`, got `[r.status, r.headers.get("api-version")]`, expected `[404,
+    read_api_version(ROOT)]`. Insert it in `PROBES` directly before `probe_signup_rate_limit`.
+- **Tests:** the five assertions above and the smoke probe, each watched failing before the
+  `fetch` change.
 - **Gate:** `PB_PORT_OFFSET=<n> bun tests/test_mcp_service.ts`; `make check-static`; `make check`;
   `make smoke`.
 
@@ -854,8 +877,10 @@ header rule).
   met vacuously while nothing is deprecated. The first deprecating change must build and test it.
 - **The deprecation `Link` names a GitHub URL** that answers only once the repository is public
   (tm-distribution's ruling). No deprecation exists before then (D12).
-- **tm line 1 differs from tm-distribution's statement** that `--version` prints the package
-  version "and a newline": this change adds a second line. Reported to root for that contract.
+- **A `tm` published before this change prints `api 1.0.0`.** tm-distribution's release can
+  publish `@hsb3/tm` before this change lands; its line 2 would name the old constant, which is
+  no release and sorts above `0.1.0`. Reported to root: hold the first npm publish until this
+  change is on `main`, or accept that one published version names `1.0.0`.
 
 ## Open Questions
 

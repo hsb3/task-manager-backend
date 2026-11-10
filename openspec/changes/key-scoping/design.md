@@ -197,15 +197,15 @@ exchange; the minted `api_keys` record is created with them. Refresh changes onl
 
 ### D10. Delivery
 
-Phase 1 (the read-key `me` bug) needs nothing from `hosted-mcp-endpoint` and may land alone,
-before or after it. Phases 2 to 6 start after `hosted-mcp-endpoint` is merged (they extend its
-`me` `key` object and its `api_keys` fields); they are commits on one build branch and land on main as one pull
-request after Phase 6: between Phase 2 and Phase 6 a key can carry a reach that is not yet
-enforced everywhere. Phase 7 (OAuth consent and tool listing) is a second pull request, built
-after `hosted-mcp-endpoint` is built and the Phase 2 to 6 pull request is merged (it needs
-the `api_keys` reach fields, the registered decision record and `/me` filtered by reach), on the
-files and ids that change's design fixes (Depends on). Until Phase 7 lands, grants mint
-keys with reach `all`, which is today's behaviour.
+The fixed build order: `hosted-mcp-endpoint` (its Phases 1 to 9 and its root-run runbook), then
+this change's Phase 1 (the read-key `me` bug) as its own pull request, then Phases 2 to 6 as one
+pull request, then Phase 7 as the next pull request, all before `key-minting-cli` starts; then
+`key-minting-cli`, `tm-distribution`, `agent-verb-coverage`, and `api-versioning-policy` last.
+Phases 2 to 6 are commits on one build branch because between Phase 2 and Phase 6 a key can
+carry a reach that is not yet enforced everywhere. Phase 7 needs the `api_keys` reach fields,
+the registered decision record and `/me` filtered by reach from that pull request, and the
+files and ids `hosted-mcp-endpoint` fixes (Depends on). Until Phase 7 lands, grants mint keys
+with reach `all`, which is today's behaviour.
 
 ### D11. Dependencies, config, names
 
@@ -227,10 +227,12 @@ keys with reach `all`, which is today's behaviour.
 ## Depends on
 
 - `hosted-mcp-endpoint` built (build order 1), by contract section:
-  Read on lane `d-mcp` at `20568aa` (design) and `c89336a` (contract).
+  Read on lane `d-mcp` at `3fa24a9` (design and contract); none of the names below changed
+  since `20568aa`.
   - D12 and D19: the key middleware stores `e.set("tmApiKey", { id, scope, expires, client_id
-    })` and `/me` returns that object as `key`. Phase 1 writes the same line if it is not there
-    yet; Phase 2 replaces its object with `lib.keyInfo(key)`, a superset.
+    })` and `/me` returns that object as `key`, read as `const k = e.get("tmApiKey")` in `pb_hooks/me.pb.js`. Present since
+    hosted-mcp-endpoint Phase 1; if it is absent, the build order was changed: stop and report.
+    Phase 2 replaces its object with `lib.keyInfo(key)`, a superset.
   - D13: `api_keys` gains `client_id` `text4200600009`, `refresh_hash` `text4200600010`,
     `refresh_expires` `date4200600011`, `refresh_prev_hash` `text4200600012`, and its update
     rule ends with ` && @request.body.client_id:isset = false`. This change's ids
@@ -246,8 +248,10 @@ keys with reach `all`, which is today's behaviour.
     consent stage of `pb_hooks/views/oauth_authorize.html`; the `approve` branch of `POST
     /oauth/authorize` and the code grant of `POST /oauth/token` in
     `pb_hooks/oauth_server.pb.js`. Phase 7 edits exactly these.
-- `api-versioning-policy` (lane `d-versioning` commit `8e3ada5`, design D8): the release step
-  in Implementation Plan applies only once `scripts/release_api.ts` exists.
+- Build order: D10.
+- This change is built before api-versioning-policy, so it cuts no API release and edits no
+  `api/` file or `mcp-tools.json`. If `scripts/release_api.ts` exists when a phase starts, the
+  build order was changed: stop and report.
 - Shared files another milestone change also edits: `pb_hooks/api_keys.pb.js`,
   `pb_hooks/me.pb.js`, `pb_hooks/lib/routes.js` (the me response schema), `schema/api_keys.json`,
   `openapi.json`, `scripts/model/`, the newest `pb_migrations/*_seed_app_docs.js` and
@@ -264,21 +268,14 @@ removed, `roomkit.hooks_dir(S)`, `superuser upsert probe@example.com probe123456
 `roomkit.serve`, port = default + `PB_PORT_OFFSET`, `check(label, got, want)` and a non-zero
 exit on any mismatch), creates users through the superuser with `verified: true, approved:
 true`, and mints keys through `POST /api/collections/api_keys/records` under the user's password
-session. Each new suite gets one line in `scripts/run_suite_battery.sh` next to
-`run_suite "test_me_route"`, in the form `run_suite "<name>" bun tests/<name>.ts`, and one entry
-in the `.agents/rules/ports.md` defaults list (`8210 = test_key_levels` and so on, inserted in
-port order), and one row in `scripts/battery_shards.tsv` (`shard<TAB>seconds<TAB>label`): its
-seconds as measured by a local run of the suite, on the shard whose seconds sum is lowest, the
+session. Each new suite gets one line in `scripts/run_suite_battery.sh`, appended after the
+last `run_suite` line, in the form `run_suite "<name>" bun tests/<name>.ts`, and one entry in
+the `.agents/rules/ports.md` defaults list (`8210 = test_key_levels` and so on), in ascending
+port order before `9700 = test_script_help`, and one row in `scripts/battery_shards.tsv` (`shard<TAB>seconds<TAB>label`): its
+seconds as the whole-second wall time of one local run of the suite, on the shard whose
+seconds sum is lowest (ties: the lower number), the
 row placed so the file stays sorted by seconds descending (the file's own header rule;
-`bun scripts/check_battery_suites.ts` verifies). Every phase that regenerates `openapi.json` (2, 3, 4, 5, 7) also, if `scripts/release_api.ts`
-exists (it arrives with `api-versioning-policy`, whose build may come before or after this
-one), regenerates `mcp-tools.json` with `bun scripts/gen_mcp_tools.ts` and cuts a release in
-the same commit with `bun scripts/release_api.ts`; when that script answers `breaking change
-needs --major` with its fact list, the phase reruns it as `bun scripts/release_api.ts --major
---forced-by "NEW_DECISION"` (the script's verdict decides, not the
-builder). Its files (`api/openapi.released.json`, `api/mcp-tools.released.json`,
-`api/CHANGELOG.md` and the version constant it rewrites) join that phase's file list. Its
-`make check-static` gate then covers the release check. "RED first" means: write the case, run the suite against the tree before the
+`bun scripts/check_battery_suites.ts` verifies). "RED first" means: write the case, run the suite against the tree before the
 phase's code change, quote the failing line in the pull request, then make it pass.
 
 ### Phase 1: a read key's `me` reports no write capability (kata xgtp)
@@ -286,19 +283,18 @@ phase's code change, quote the failing line in the pull request, then make it pa
 - **Goal**: `GET /api/tracker/me` under a `read` key reports `write`, `manage` and `own` false
   for every workspace (contract, "`GET /api/tracker/me` under a key").
 - **Files**:
-  - modify `pb_hooks/api_keys.pb.js`
   - modify `pb_hooks/me.pb.js`
   - modify `tests/test_me_route.ts`
   - create `e2e/fixtures/smoke_key_user.js`
   - modify `e2e/smoke.ts`
+  - modify `e2e/README.md`
 - **Steps**:
-  - `pb_hooks/api_keys.pb.js`, in the `tmkApiKeyAuth` middleware, immediately before
-    `e.auth = owner;`, unless `hosted-mcp-endpoint` already put it there: `e.set("tmApiKey", { id:
-    key.id, scope: key.getString("scope"), expires: key.getString("expires"), client_id:
-    key.getString("client_id") });` (hosted-mcp-endpoint D12's line verbatim; `client_id` reads
-    `""` before that change adds the field).
+  - (`pb_hooks/api_keys.pb.js` already stores `e.set("tmApiKey", { id, scope, expires,
+    client_id })`: hosted-mcp-endpoint Phase 1, built first.)
   - `pb_hooks/me.pb.js`, after `const uid = e.auth.id;`: add
-    `const apiKey = e.get("tmApiKey"); const readOnly = !!apiKey && apiKey.scope === "read";`
+    `const readOnly = !!k && k.scope === "read";`, reusing hosted's `const k =
+    e.get("tmApiKey")` (move that declaration up to right after `const uid = e.auth.id;` if it
+    sits lower)
     and in `capabilities` AND each of the three flags with `!readOnly`
     (`write: !readOnly && active && role !== "viewer"`, and likewise `manage`, `own`). Extend the
     existing `decision:role-tiers` comment line to end with `; a read key holds none`.
@@ -312,13 +308,19 @@ phase's code change, quote the failing line in the pull request, then make it pa
     - Constants `KEY_USER = "smoke-keys@example.com"`, `KEY_PASSWORD = "smoke-keys-123456"`,
       `KEY_IP = "203.0.113.50"` (an `X-Real-IP` of its own, so the sign-in does not spend the
       budget `probe_forged_client_address` measures).
-    - In `main()`, after the health loop and before the probes: `docker compose cp
+    - In `main()`, after every wait `hosted-mcp-endpoint` Phase 8 put there (the PocketBase
+      `/api/health` loop and the PRM wait) and before the probes: `docker compose cp
       e2e/fixtures/smoke_key_user.js` to the container, written as `const SMOKE_MIGRATION =
       "1785199999_smoke_key_user.js";` and `run([...COMPOSE, "cp", path.join(ROOT,
       "e2e/fixtures/smoke_key_user.js"), "pocketbase:/pb/pb_migrations/" + SMOKE_MIGRATION])`
       (the file name is its own string, so `check_migration_citations` reads no path citation), then `run([...COMPOSE, "restart",
-      "pocketbase"])`, then the health wait again. Extract the existing inline
-      health loop into `async function wait_healthy(): Promise<boolean>` (its deadline computed
+      "pocketbase"])`, then resolve the port again (a restart republishes port 0 on a new host
+      port: extract the existing `compose port pocketbase 8080` lookup and its 8090 refusal
+      into `function resolve_base_url(): boolean`, which sets `BASE_URL` and returns false on a
+      non-zero exit, no port, or 8090, and call it in both places), then the PocketBase health
+      wait again (the MCP service keeps
+      running; its PRM wait is not repeated). Extract the inline PocketBase `/api/health` loop
+      (not the PRM wait, which stays where it is) into `async function wait_healthy(): Promise<boolean>` (its deadline computed
       as `Date.now() + HEALTH_TIMEOUT_MS` on each call, same log dump, returning false on
       timeout) and call it in both places; a non-zero code from
       `cp` or `restart`, or a false from `wait_healthy`, prints the output and returns 1.
@@ -333,8 +335,15 @@ phase's code change, quote the failing line in the pull request, then make it pa
       workspaces.every(w => !w.capabilities.write && !w.capabilities.manage &&
       !w.capabilities.own), true)` and `check("read key me lists the provisioned workspace",
       workspaces.length >= 1, true)`.
-    - Add `probe_read_key_me` to `PROBES` after `probe_password_signup` and before
-      `probe_forged_client_address`.
+    - Add `probe_read_key_me` to `PROBES` immediately before `probe_forged_client_address`
+      (`probe_signup_rate_limit` stays last; this change's four probes end up in phase
+      order, each inserted at the same anchor).
+  - `e2e/README.md`: replace the sentence `hosted-mcp-endpoint` Phase 8 wrote saying the keyed
+    paths stay battery-only (the one containing "battery-only") with: "A smoke run copies
+    `e2e/fixtures/smoke_key_user.js` into the image and restarts it, so the key probes have one
+    approved, verified user; keyed paths beyond those probes stay battery-only."; if no sentence
+    contains "battery-only", add that sentence after the list of probes hosted Phase 8 wrote.
+    Add `probe_read_key_me` to that same list of probes.
 - **Tests** (`tests/test_me_route.ts`, port 8177; add a section `── API keys ──` that mints, for
   the suite's workspace owner, a read key and a write key):
   - "read key me: owner workspace write/manage/own all false" → each `false` (RED first: today
@@ -499,6 +508,7 @@ phase's code change, quote the failing line in the pull request, then make it pa
   - modify `scripts/run_suite_battery.sh`, `scripts/battery_shards.tsv`, `.agents/rules/ports.md`
   - modify `docs/readiness/agent-clients.md`
   - modify `e2e/smoke.ts`
+  - modify `e2e/README.md`
 - **Steps**:
   - `pb_hooks/lib/api_keys.js` adds (pure functions, no PocketBase global at load):
     - `const LEVELS = ["read", "write", "manage", "own"];`
@@ -561,7 +571,7 @@ phase's code change, quote the failing line in the pull request, then make it pa
     reachHeaders(info)`: `{}` when `keyReach(info)` is null, else `{ x_tm_key_workspace: reach.workspace, x_tm_key_projects:
     reach.projects ? (reach.projects.join(",") || "-") : "" }`. Until Phase 4 no rule reads
     them.
-  - `pb_hooks/me.pb.js`: replace `readOnly` with `const level = apiKey ? apiKey.scope : "own"` and capabilities `write: active && role !== "viewer" &&
+  - `pb_hooks/me.pb.js`: replace `readOnly` with `const level = k ? k.scope : "own"` and capabilities `write: active && role !== "viewer" &&
     lib.levelAtLeast(level, "write")`, `manage: active && (role === "owner" || role ===
     "admin") && lib.levelAtLeast(level, "manage")`, `own: owner && level === "own"`
     (`lib` = `require(`${__hooks}/lib/api_keys.js`)` inside the handler).
@@ -592,7 +602,8 @@ phase's code change, quote the failing line in the pull request, then make it pa
     "title": "smoke level probe", "workspace": "<id>" }`, the server files it in the workspace's
     container project and default status), mint `{ scope: "write" }`; under the key DELETE the task (204), DELETE it again (403 `api_key_scope`), and
     `POST /api/tracker/workspaces/{ws}/transfer-ownership` with body `{ user: <own id> }` (403
-    `api_key_scope`). Add after `probe_read_key_me`.
+    `api_key_scope`). Add immediately before `probe_forged_client_address`; list it in
+    `e2e/README.md` (listed in Files).
 - **Tests** (`tests/test_key_levels.ts`, port 8210, run in the order listed; Alice owns WA with
   project PA and a second workspace WT; Bob is an active admin of WA and an active member of WT;
   Mia and Sam active members of WA, Vic a viewer of WA; Bob owns WC and WD and invites
@@ -669,7 +680,8 @@ phase's code change, quote the failing line in the pull request, then make it pa
       `["x", "tm", "key", "workspace"]` and `["x", "tm", "key", "projects"]`, for `m` from 0 to
       7, build the name joining the parts with `(m >> (i - 1)) & 1 ? "_" : "-"` before part `i`,
       and call `header.del(name)`.
-    - First statement of the middleware, before the `tmk_` test:
+    - First statement of the middleware, before `hosted-mcp-endpoint`'s `/oauth/` and
+      `/.well-known/` skip and before the `tmk_` test (so the headers go on every request):
       `require(`${__hooks}/lib/api_keys.js`).stripReachHeaders(e.request.header);` with the
       comment `// Only this middleware sets the reach headers the collection rules read, in any
       spelling (NEW_DECISION).`
@@ -742,7 +754,7 @@ phase's code change, quote the failing line in the pull request, then make it pa
     tokens. The `{:` refusal stays. `refuseUnbindableListRule`'s message
     `"project_items listRule may reference @request.auth.id only: "` becomes
     `"project_items listRule may reference @request.auth.id and the API-key reach headers only: "`,
-    and `tests/test_pb_migrate.ts` (added to this phase's files) expects
+    and `tests/test_pb_migrate.ts` (listed in Files) expects
     `"may reference @request.auth.id and the API-key reach headers only"` in its check
     "...output names the guard's refusal".
 - **Tests** (`tests/test_key_reach.ts`, port 8211; Alice owns WA (projects PA1, PA2; tasks T1 in
@@ -883,6 +895,7 @@ phase's code change, quote the failing line in the pull request, then make it pa
   - modify `scripts/run_suite_battery.sh`, `scripts/battery_shards.tsv`, `.agents/rules/ports.md`
   - modify `docs/readiness/agent-clients.md`
   - modify `e2e/smoke.ts`
+  - modify `e2e/README.md`
 - **Steps**:
   - `pb_hooks/lib/api_keys.js` adds, and exports, `function inReach(app, name, rec, reach)` (`rec` a plain
     object of field values): with `W = reach.workspace`, `P = reach.projects`,
@@ -937,7 +950,8 @@ phase's code change, quote the failing line in the pull request, then make it pa
     and a task in it, mint `{ scope: "write", reach: "workspace", workspace: <provisioned
     workspace id> }`; under the key: `GET /api/collections/tasks/records` lists no "Smoke B"
     task; `GET` that task by id → 404; `POST /api/collections/workspaces/records` → 403
-    `api_key_reach`. Add after `probe_key_levels`.
+    `api_key_reach`. Add immediately before `probe_forged_client_address`; list it in
+    `e2e/README.md` (listed in Files).
 - **Tests** (`tests/test_key_reach_live.ts`, port 8213; fixtures as Phase 4, tasks in PA1 and
   PA2 and WB each with one attachment, read through `roomkit.SSEListener`):
   - "kWA subscribed to tasks/* receives a WA create, not a WB create" (RED first: both).
@@ -965,7 +979,7 @@ phase's code change, quote the failing line in the pull request, then make it pa
 - **Goal**: consent offers a workspace and the levels the client asked for, the minted key
   carries them through refresh, and every level above `read` lists every tool (contract, OAuth
   and MCP tool listing; spec "OAuth consent sets the same limits"). Built on
-  `hosted-mcp-endpoint` as designed at lane `d-mcp` `20568aa` (D7, D11, D13 to D15, D19).
+  `hosted-mcp-endpoint` as designed at lane `d-mcp` `3fa24a9` (D7, D11, D13 to D15, D19).
 - **Files**:
   - create `pb_migrations/<slot>_oauth_codes_reach.js`
   - create `pb_migrations/<slot2>_seed_app_docs.js` (`<slot2>` the next slot after `<slot>`)
@@ -980,12 +994,14 @@ phase's code change, quote the failing line in the pull request, then make it pa
   - create `tests/test_oauth_key_limits.ts`
   - modify `tests/test_mcp_service.ts`, `tests/test_tm_mcp.ts`, `tests/test_oauth_token.ts`
   - modify `e2e/smoke.ts`
+  - modify `e2e/README.md`
   - modify `scripts/run_suite_battery.sh`, `scripts/battery_shards.tsv`, `.agents/rules/ports.md`
   - regen: `schema/` and `pb_hooks/field_patterns.json` via `bun scripts/gen_schema.ts`,
     `scripts/model/` via `bun scripts/model/extract_current.ts`, the new seed and
     `scripts/app_docs_seed.sha256` via `bun scripts/gen_app_docs_seed.ts`, `.gitattributes` via
-    `bun scripts/gen_gitattributes.ts`. `openapi.json` and the tool catalog do not change (the
-    OAuth routes are `internal: true`, hosted-mcp-endpoint D16), so no API release is cut.
+    `bun scripts/gen_gitattributes.ts`, `openapi.json` via `bun scripts/gen_openapi.ts` and
+    `clients/tm/src/api.generated.ts` via `bun scripts/gen_tm_client.ts` (whatever they produce
+    for the changed `oauth_codes` collection).
 - **Steps**:
   - `<slot>_oauth_codes_reach.js`, header `// oauth_codes: a sign-in's level may be manage or
     own, and its workspace choice rides to the minted key (NEW_DECISION).` Up, on
@@ -1083,10 +1099,11 @@ phase's code change, quote the failing line in the pull request, then make it pa
     "manage" | "own" | { access?: "read" | "write" | "manage" | "own"; workspace?: string } =
     "write"` (a string is `{ access: <it> }`; `access` defaults to `"write"`); the approve post
     adds `workspace=<opts.workspace>` when it is given. Existing callers are unchanged.
-  - `.agents/rules/ports.md`: `8215 = test_oauth_key_limits` in port order.
+  - `.agents/rules/ports.md`: `8215 = test_oauth_key_limits` in ascending port order before
+    `9700 = test_script_help`.
   - `e2e/smoke.ts`: `probe_oauth_scopes()`: `GET /.well-known/oauth-authorization-server` →
-    `scopes_supported` `["read", "write", "manage", "own"]`; inserted before
-    `probe_signup_rate_limit`.
+    `scopes_supported` `["read", "write", "manage", "own"]`; inserted immediately before
+    `probe_forged_client_address`; listed in `e2e/README.md` (listed in Files).
 - **Tests** (`tests/test_oauth_key_limits.ts`, port 8215, booted as `tests/test_oauth_authorize.ts`
   is: env `MCP_PUBLIC_URL=http://mcp.test`, the superuser raising the `/oauth/` rule to 100000
   right after boot, helpers from `tests/oauthkit.ts`, base request `authorize_params()`; users:
@@ -1165,7 +1182,7 @@ phase's code change, quote the failing line in the pull request, then make it pa
 - **Existing write keys lose powers** (ruling 5). Stated in the decision record and contract
   Compatibility; a key needing them is reissued.
 - **Hosted MCP built differently from its design.** Phase 7 names that change's files and ids
-  as its design (lane `d-mcp` `20568aa`) fixes them; a builder finding one renamed stops and
+  as its design (lane `d-mcp` `3fa24a9`) fixes them; a builder finding one renamed stops and
   reports rather than guessing.
 
 ## Open Questions

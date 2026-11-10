@@ -49,6 +49,8 @@ apply the reach (Errors: out of reach). Routes absent from this table keep today
 | `POST /api/tracker/workspaces/{id}/resolve-member-email` | manage | 404 unless `{id}` is W | 403 `api_key_scope` (level) |
 | `POST /api/tracker/workspaces/{id}/transfer-ownership` | own | 404 unless `{id}` is W | 403 `api_key_scope` (level) |
 | `GET /api/tracker/inspire` | read | allowed | allowed |
+| `GET /api/tracker/keys` (added by key-minting-cli) | read | lists only the calling key | lists only the calling key |
+| `POST /api/tracker/keys/{id}/revoke` (added by key-minting-cli) | none checked (a `null` level entry key-minting-cli adds with the route) | revokes only the calling key, whatever its `manage_keys`; another key's id answers the 404 an unknown id answers | same |
 | `POST /api/tracker/trash/purge`, `POST /api/tracker/cycles/rollover` | none checked | unchanged (superuser-only route) | unchanged |
 | `/api/tracker/admin/*` | none | 403 `api_key_path` (unchanged) | 403 `api_key_path` (unchanged) |
 
