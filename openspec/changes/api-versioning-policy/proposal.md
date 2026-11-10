@@ -100,6 +100,9 @@ reach routes the server does not own.
 - A released contract is recorded, and a change to the contract is checked against it, so a
   breaking change is caught before it ships rather than after.
 - A server states on the wire which contract version it speaks.
+- The policy covers PocketBase's own routes, so a PocketBase upgrade is gated as a contract
+  change, and it covers the MCP tool catalog's names and required inputs.
+- The policy binds from the first deploy of the hosted MCP endpoint to outside users.
 
 ## Capabilities
 
@@ -117,63 +120,27 @@ reach routes the server does not own.
   never breaking.
 - The release gate compares structure (routes, parameters, fields, types, statuses, error codes
   as documented); a behaviour change it cannot see, such as tighter validation on an existing
-  field, is caught by the change's spec delta, which names the class from Open Question 3.
+  field, is caught by the change's spec delta, which names the class from the breaking-change ruling.
 
 ## Open Questions
 
-Ordered by consequence; each option list puts the recommended one first.
+Every question below was ruled on 2026-11-10; the options weighed are in this proposal's history.
 
-1. **Versioning model.** Options: (a, recommended) one evolving contract as Linear does: no
-   client-pinned versions, additive changes freely, breaking changes only through
-   deprecate-then-remove, and the server announces its contract version in a response header
-   (SH-5); (b) client-pinned date versions in a request header, as Stripe and GitHub do: the
-   strongest guarantee, but every breaking change needs a hook that still answers in the old
-   shape, and PocketBase's own routes cannot be pinned at all; (c) a path prefix such as
-   `/api/tracker/v2/`: reaches only the custom routes, and doubles the route table on each
-   break. The first outside clients are the hosted MCP service and the `tm` client, both built
-   from this repository and able to follow a change within one release, so (b)'s cost buys
-   little.
-2. **PocketBase's own routes.** Collection CRUD, auth, files and realtime change with the pinned
-   PocketBase version, which is pre-1.0 and promises no backward compatibility. Options: (a,
-   recommended) covered: the contract is `openapi.json`, which already documents them, and a
-   PocketBase upgrade is a contract change gated like any other; a break PocketBase forces is
-   either held (stay on the old version through the deprecation window) or ships as a major
-   bump with notice; (b) excluded: the policy covers `/api/tracker/...` only and clients follow
-   PocketBase's changelog, which leaves the routes agents use most without a guarantee; (c)
-   wrapped: every client call moves behind `/api/tracker/...` routes the server owns, a large
-   build that hides PocketBase entirely.
-3. **What counts as breaking.** Options: (a, recommended) GitHub's list (which already covers
-   removed or renamed routes, parameters and fields, new required or newly required parameters,
-   type changes, removed enum values, new validation on an existing parameter, and changed
-   authorization) plus changing a status code or an error `code` and changing a default (page
-   size, sort order). Adding routes, optional parameters, response fields and enum values is
-   not breaking; error message text never is (it is copy, not contract); (b) structure only:
-   what the gate can diff (removed or renamed routes, fields, parameters, types), with
-   validation, statuses and defaults left free;
-   (c) any change to `openapi.json` other than an addition.
-4. **Deprecation notice and window.** Signals in every option: `deprecated: true` on the route,
-   parameter or field in `openapi.json`, a changelog entry, and on a deprecated route the
-   `Deprecation`, `Sunset` and `Link rel="deprecation"` headers (a deprecated field has no
-   per-field header; the contract and changelog carry it). Options for the minimum time a
-   deprecated item stays served: (a, recommended) 90 days, MCP's expedited floor: the outside
-   users are agents on the hosted endpoint, whose server-side catalog moves with the server, and
-   installed `tm` copies, which a 90-day window gives a full upgrade cycle; (b) 12 months, MCP's default; (c) no fixed period, as Linear:
-   notice plus direct contact, and judgment per change.
-5. **The MCP tool catalog.** Agents call tools by name, and hosts save those names (a Claude
-   Code permission rule names `mcp__<server>__<tool>`). Options: (a, recommended) covered by the
-   same rules: a tool's name, its input schema's required parameters and their types are
-   contract; descriptions and annotations are not; (b) excluded: `tools/list` is
-   self-describing and a model re-reads it each session; saved permission rules and scripts
-   break silently.
-6. **When the policy binds.** The server is UAT only and no outside client exists yet. Options:
-   (a, recommended) at the first deploy of the hosted MCP endpoint to outside users: that
-   deploy is release 1.0.0, and until then the contract changes freely with a changelog entry;
-   (b) now, so the milestone's own changes rehearse it, at the cost of windows on routes no one
-   outside uses; (c) at a later public release.
-7. **Where the released contract lives.** Options: (a, recommended) a committed snapshot of
-   `openapi.json` beside a changelog in the repository: a release is a reviewed commit that
-   copies the snapshot, bumps `info.version` and adds the changelog entry, and the gate diffs
-   the tree's `openapi.json` against the snapshot offline; (b) a git tag on `main`, with the
-   gate reading `openapi.json` at the latest release tag: no copy in the tree, but CI checkouts
-   must fetch tags and the gate must fail loudly when it finds no tag; (c) a GitHub Release
-   asset: outside the repository and needs the network in the gate.
+1. **Versioning model.** Ruled: one evolving contract as Linear does: no client-pinned
+   versions, additions ship freely, a breaking change only through deprecate-then-remove, and
+   every response names the contract version in a header.
+2. **PocketBase's own routes.** Ruled: covered; the contract is `openapi.json`, and a PocketBase
+   upgrade is a contract change gated like any other, held through the deprecation window or
+   shipped as a major bump with notice when PocketBase forces a break.
+3. **What counts as breaking.** Ruled: GitHub's list plus changing a status code, an error `code`
+   or a default (page size, sort order); additions and error message text are not breaking.
+4. **Deprecation notice and window.** Ruled: 90 days minimum, signalled by `deprecated: true` in
+   `openapi.json`, a changelog entry, and on a route the `Deprecation`, `Sunset` and
+   `Link rel="deprecation"` headers.
+5. **The MCP tool catalog.** Ruled: covered by the same rules; a tool's name and its required
+   inputs and their types are contract, descriptions and annotations are not.
+6. **When the policy binds.** Ruled: at the first deploy of the hosted MCP endpoint to outside
+   users, which is release 1.0.0; until then the contract changes freely with a changelog entry.
+7. **Where the released contract lives.** Ruled: a committed snapshot of `openapi.json` beside a
+   changelog; a release is a reviewed commit that updates the snapshot and `info.version`, and
+   the gate diffs the tree's `openapi.json` against the snapshot offline.
