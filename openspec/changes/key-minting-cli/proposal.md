@@ -103,8 +103,9 @@ carry it.
 - **Browser, against the built-in authorization server.** `tm login` opens the sign-in and
   consent page that decision hfrk ruling 3 already requires, as a pre-registered public client
   (`tm`) with a loopback redirect on any port and PKCE (RFC 8252). The token response is the
-  minted key (ruling 6), saved as today. No password or code is typed into the terminal; GitHub
-  and Google sign-in work whenever the server has them; the key appears in the key list tied to
+  minted key (ruling 6), saved as today. No password or code is typed into the terminal (the
+  page offers password and emailed-code sign-in; the hosted-mcp-endpoint contract leaves GitHub
+  and Google sign-in off it); the key appears in the key list tied to
   the `tm` client and revoking it ends the grant, the same as every hosted connection. It needs a
   browser on the same machine, and it cannot ship before the authorization server does.
 - **Password or emailed code in the terminal.** `tm` signs in with PocketBase's own
@@ -130,7 +131,7 @@ closer match to the surveyed CLIs and the better fit for SSH, is not adopted.
 - `tm login` signs in through the browser and saves a newly minted key; `tm login --with-key`
   keeps today's paste. `tm logout` deletes the saved login and revokes its key through that
   key's manage-keys permission (today a key cannot revoke even itself).
-- `tm keys create --name <name> --scope read|write [--expires <date>]` mints a key for another
+- `tm keys create --name <name> --scope <level> [--expires <date>]` mints a key for another
   agent or script through the same browser consent, prints the secret once and does not save it.
   Minting needs a person at the browser, and a key can never mint a key.
 - The key `tm login` saves carries a manage-keys permission, granted on the consent page: it
@@ -149,8 +150,8 @@ closer match to the surveyed CLIs and the better fit for SSH, is not adopted.
   mints a new key with no person present (ruling 6) and would be a stronger credential than the
   key it renews; when the saved key expires, `tm` asks for `tm login` again. The key's default
   name is `tm on <hostname>`; `TM_URL` and `TM_API_KEY` keep overriding the saved login.
-- Depends on the hosted-mcp-endpoint contract, not yet written: the lifetime of a grant's key.
-  If it is short (Linear's access tokens last 24 hours), `tm login` becomes a frequent prompt, and
+- Depends on the hosted-mcp-endpoint contract for the lifetime of a grant's key; that contract
+  has since been written and gives a grant's key 24 hours and a 30-day refresh token. If it is short (Linear's access tokens last 24 hours), `tm login` becomes a frequent prompt, and
   the trade-off between re-signing in and storing a refresh token returns as a question. A `tm
   keys create` key is a grant with no refresh token whose expiry the caller chooses (none unless
   `--expires` is given, as today); the contract has to admit that second kind of grant output.
@@ -181,7 +182,7 @@ closer match to the surveyed CLIs and the better fit for SSH, is not adopted.
   holds only a key, and a key cannot read or change key records (decision:api-key-reads-refused).
   Ruled 2026-11-10 (Open Question 2): the key `tm login` mints carries a manage-keys permission
   that lists and revokes, never mints. That partly supersedes decision:api-key-reads-refused, so a
-  new decision record states it before the contract is written. Ruling 6 stands: the grant still
+  new decision record states it before the build seeds it (design, Depends on). Ruling 6 stands: the grant still
   produces a key and nothing else.
 
 ## What the first key needs
