@@ -9,6 +9,11 @@ process of a local agent host. This change comes first among the milestone's cha
 credential a hosted client presents decides what key minting (AC-9) has to mint and what an
 installed client (AC-8) has to hold.
 
+Two answers an agent reads through MCP are folded in. Under a key, a path that matches no route
+answers 403 `api_key_path`, the same as a route closed to keys, so a tool cannot tell a missing
+route from a forbidden one (AC-12). A tool failure reaches the agent as plain text:
+`clients/tm/src/mcp.ts` `text(t, isError)` carries no status or error code (AC-13).
+
 What the server offers today (room probe, 2026-11-10, current migrations and hooks; tree paths
 as cited):
 
@@ -81,8 +86,10 @@ accept only OAuth or no authentication. Linear and GitHub serve both on one endp
   challenge when the credential is missing, invalid, revoked or expired. A refusal reads the same
   way under every client.
 - The endpoint validates `Origin` as the transport requires.
-- If the ruling below includes OAuth: the server publishes Protected Resource Metadata and names
-  an authorization server that hosted clients can complete a sign-in against.
+- The server publishes Protected Resource Metadata and names its own authorization server, which
+  hosted clients complete a sign-in against; a grant mints an API key.
+- Under a key, an unknown path answers not-found (AC-12), and a tool failure carries the server's
+  status and error code in structured form (AC-13).
 - The `tm mcp` stdio server keeps working unchanged for local agent hosts.
 
 ## How key scoping bears on it (AC-3, AC-4)
@@ -104,32 +111,16 @@ split that `scope` already gives.
 
 ## Open Questions
 
-1. **Which hosted clients the milestone must serve.** Claude Code and Cursor work with a bearer
-   key. Claude on the web works with one only under the beta header option. ChatGPT needs OAuth.
-   This list decides whether OAuth is in scope at all.
-2. **Credential scheme on the endpoint.** Options: the existing `tmk_` key as a bearer only; OAuth
-   2.1 only; or both on one endpoint, as Linear and GitHub do. A key alongside OAuth has to be
-   squared with the specification's "MUST NOT accept or transit any other tokens", which reads as
-   a ban on tokens issued for another resource rather than on a key this server issues for
-   itself. A decision record has to state that reading.
-3. **Where the authorization server lives, if OAuth is in.** PocketBase is not one, and the
-   server renders no page for sign-in or consent. Options: build one into this server, including
-   a minimal sign-in and consent page; run a separate service; or delegate to a hosted identity
-   provider. Sign-in currently needs a verified, approved user (decision:signup-approval,
-   decision:verified-login), and that has to survive whichever option is chosen.
-4. **Client registration, if OAuth is in.** CIMD, which the specification prefers and Claude,
-   ChatGPT and Claude Code support; DCR, which is deprecated but is the one Linear and Cursor use;
-   or pre-registered clients only.
-5. **Where the endpoint runs.** Options: a JSVM route inside PocketBase, which cannot load the MCP
-   SDK, so the protocol would be hand-written; a second process or service in Bun that reuses
-   `clients/tm/src/mcp.ts`'s catalog and calls the HTTP API with the caller's credential; or a
-   second process in the same container. This decides whether one tool catalog serves stdio and
-   HTTP, and whether deploys and rate limits (SH-6) see one service or two.
-6. **What a credential obtained by OAuth is.** A minted `tmk_` key bound to the grant (it shows up
-   in the key list, scoping lands once, and revoking it ends the grant), or a separate token kind.
-   This also settles AC-3 and AC-4 above, and what AC-9's minting command lists and revokes.
-7. **Read-only surface.** A separate read-only URL, as Linear does; the existing `read` scope
-   alone; or both.
-8. **Rate limiting under shared egress.** Hosted agents leaving through one provider's address
-   share one budget (SH-6). The question is whether this endpoint is budgeted per credential
-   instead of per address.
+Each is ruled in the decision record "Hosted MCP endpoint auth model" (kata `hfrk`, 2026-11-10);
+the contract states the result.
+
+1. **Which hosted clients the milestone must serve.** Ruled (hfrk 1): Claude on the web, Claude Code and Cursor; OAuth is in scope; ChatGPT is deferred.
+2. **Credential scheme on the endpoint.** Ruled (hfrk 2): OAuth and the `tmk_` key as `Authorization: Bearer` on one endpoint; "any other tokens" reads as tokens issued for another resource.
+3. **Where the authorization server lives.** Ruled (hfrk 3): built into this server, with one minimal sign-in and consent page reusing the users' sign-in, so decision:signup-approval and decision:verified-login apply unchanged.
+4. **Client registration.** Ruled (hfrk 4): Client ID Metadata Documents plus pre-registered client ids; no Dynamic Client Registration.
+5. **Where the endpoint runs.** Ruled (hfrk 5): a separate Bun service on its own service and domain, reusing the `tm` tool catalog and calling PocketBase over the private network with the caller's credential.
+6. **What a credential obtained by OAuth is.** Ruled (hfrk 6): a minted `tmk_` key tied to the OAuth client, listed with the user's keys, ending the grant when revoked, replaced by refresh; AC-3 and AC-4 are built once in the key model.
+7. **Read-only surface.** Ruled (hfrk 7): one URL; a read-scoped credential sees only read tools, and consent chooses read or write.
+8. **Rate limiting under shared egress.** Ruled (hfrk 8): per credential at the MCP service plus a per-address cap on missing or bad credentials; PocketBase exempts the MCP service's private-network calls.
+
+The questions the rulings leave open are in `contract.md`, Open Questions.
