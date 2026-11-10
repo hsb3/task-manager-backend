@@ -410,11 +410,11 @@ endpoint's URL is given to any outside user; its changelog section gains the pro
   4. `test -f scripts/release_api.ts` fails, and `test -e api` fails (no earlier change cut a
      release; root ruling 2).
   5. `test -f mcp-tools.json` fails (this change's Phase 3 creates it).
-- **hosted-mcp-endpoint's `Api-Version` header.** Its D18 builds the header only when
-  `API_VERSION` exists at its Phase 6; it is built first, before tm-distribution adds
-  `API_VERSION`, so it defers the header ("Api-Version header deferred: API_VERSION absent") and
-  this plan's Phase 6 builds it, exactly as hosted D18 states. Phase 6 keeps its own
-  already-present check in case the hosted builder set the header anyway.
+- **hosted-mcp-endpoint's `Api-Version` header.** Its D18 defers the header to this change
+  unconditionally (it is built first, before `API_VERSION` exists) and sends no report; its D9
+  sends `Access-Control-Expose-Headers: WWW-Authenticate, Retry-After`. This plan's Phase 6
+  builds the header and adds `Api-Version` to that value, exactly as hosted D18 states. Phase 6
+  keeps its own already-present check in case the hosted builder set the header anyway.
 - **No later milestone change.** After this change, every change that alters `openapi.json` or
   `TOOLS` structurally cuts a release in its own commit (D5); the earlier milestone changes each
   state that they cut none (root ruling 2).
@@ -806,8 +806,8 @@ header rule).
 ### Phase 6: the hosted MCP header, only if hosted-mcp-endpoint deferred it
 
 - **Run this phase when** `grep -c API_VERSION services/mcp/src/app.ts` prints `0`, the expected
-  case under the build order (hosted D18 defers the header because `API_VERSION` did not exist
-  at its Phase 6; it then leaves the import out). The file exists (Already present 3). A
+  case under the build order (hosted D18 defers the header to this change unconditionally and
+  leaves the import out). The file exists (Already present 3). A
   non-zero count means the hosted builder added the header anyway: skip the phase and say so in
   the report.
 - **Goal:** every hosted MCP response carries `Api-Version` (contract "`Api-Version` header",
@@ -829,11 +829,11 @@ header rule).
       return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
     }
     ```
-    (always a copy: one code path whatever the SDK's `Response` allows). If the
-    `Access-Control-Expose-Headers` value hosted D9 builds does not contain `Api-Version`
-    (`grep -c 'Retry-After, Api-Version' services/mcp/src/app.ts` prints `0`), change that value to
+    (always a copy: one code path whatever the SDK's `Response` allows). Change the
+    `Access-Control-Expose-Headers` value hosted D9 builds, `WWW-Authenticate, Retry-After`, to
     `WWW-Authenticate, Retry-After, Api-Version`.
-  - `tests/test_mcp_service.ts`: the hosted design's D18 cases, named as there, inserted
+  - `tests/test_mcp_service.ts`: in `origin_allowed`, the expected `Access-Control-Expose-Headers`
+    becomes `WWW-Authenticate, Retry-After, Api-Version` (both responses). Then the hosted design's D18 cases, named as there, inserted
     directly before the `api_down_503` case (which stops the room and must stay last):
     `version_on_200` (write-key `tools/list` → 200, sent with `Origin: https://claude.ai`, and its
     `Access-Control-Expose-Headers` split on `,` and trimmed contains `Api-Version`),

@@ -75,8 +75,9 @@ failure returns the AC-13 shape of `hosted-mcp-endpoint`'s contract (`isError: t
 Field names are the API's. A `Record` is the server's record verbatim.
 
 - **`tm_me`**: `GET /api/tracker/me` verbatim:
-  `{user: {id, name}, unread_notifications: integer, workspaces: [{id, name, role, status, counts, capabilities}], key: {id, scope, expires, client_id, reach, workspace, projects}}` (`reach`, `workspace` and
-  `projects` from change `key-scoping`). Fields a later server change adds are passed through.
+  `{user: {id, name}, unread_notifications: integer, workspaces: [{id, name, role, status, counts, capabilities}], key: {id, scope, expires, client_id, reach, workspace, projects, manage_keys}}` (`reach`,
+  `workspace` and `projects` from change `key-scoping`, `manage_keys` from change
+  `key-minting-cli`). Fields a later server change adds are passed through.
 - **`tm_workspace`**:
   ```json
   {

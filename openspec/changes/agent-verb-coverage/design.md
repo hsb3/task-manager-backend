@@ -220,8 +220,9 @@ exemption for that rule.
   the catalog. Suites keep importing the MCP *client* from `@modelcontextprotocol/sdk` 1.32.2
   (root `devDependencies`), as `tests/test_tm_mcp.ts` does.
 - Its smoke text: Phase 8 there makes `e2e/README.md` say a key cannot be minted against the
-  production image, so keyed paths stay battery-only. This change's smoke spike minted one
-  (superuser `otp` from the CLI, D13), so Phase 4 here corrects that sentence.
+  production image; key-scoping Phase 1 then replaces that sentence with one about its smoke
+  fixture user (`e2e/fixtures/smoke_key_user.js`). This change's probe mints its own key
+  (superuser `otp` from the CLI, D13), so Phase 4 adds one sentence after key-scoping's.
 - `key-scoping` (read at `lane/d-scoping` 0d3232c): its narrower `/me` and server-side limits
   pass through. Its key levels `read` < `write` < `manage` < `own` (stored in `scope`) mean a
   `write` key's second `DELETE` answers 403 `api_key_scope`, so only a `manage` or `own` key
@@ -735,14 +736,14 @@ clean-room server. Port 8240 + PB_PORT_OFFSET."
        was subscribed, so this sends the `DELETE` that answers 204); `tm subscribe id` →
        "tm subscribe follows" `json.following` true;
        `tm mark-read` → "tm mark-read answers" code 0.
-  - `e2e/README.md`: the sentence `hosted-mcp-endpoint` Phase 8 added saying a key cannot be
-    minted against the production image, so keyed paths stay battery-only, is replaced by:
-    "`probe_tm_verbs` mints a key against the production image: it creates a superuser in the
-    container, completes its MFA with a code from `pocketbase superuser otp`, creates an approved
-    user and signs in as that user by impersonation, then runs the `tm` verbs with the user's
-    write key." If that sentence is absent, the same text is appended at the end of the file
-    under a new heading `## Smoke probe with a key`. In the probe list hosted-mcp-endpoint
-    Phase 8 added, append `probe_tm_verbs` as its last entry.
+  - `e2e/README.md`: directly after the sentence key-scoping Phase 1 wrote (it begins "A smoke
+    run copies `e2e/fixtures/smoke_key_user.js`" and ends "keyed paths beyond those probes stay
+    battery-only."), insert the sentence: "`probe_tm_verbs` mints its own key instead: it creates
+    a superuser in the container, completes its MFA with a code from `pocketbase superuser otp`,
+    creates an approved user and signs in as that user by impersonation, then runs the `tm`
+    verbs with the user's write key." If that sentence is absent, the same sentence is appended
+    as a paragraph directly after the probe list hosted-mcp-endpoint Phase 8 added. In that
+    probe list, append `probe_tm_verbs` as its last entry.
   - `clients/tm/README.md`: first paragraph's verb list becomes "lists, shows, searches,
     creates, edits and comments on ..., trashes and restores them, follows tasks, reads and
     clears the inbox, and describes the key's workspaces"; "Use it" block gains, after the

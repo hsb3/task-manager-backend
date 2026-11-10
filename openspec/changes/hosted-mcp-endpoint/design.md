@@ -647,8 +647,8 @@ Fixed here so key-scoping, key-minting-cli and agent-verb-coverage can plan agai
   ` && @request.body.client_id:isset = false` at its end.
 - The matched key: the key middleware stores `e.set("tmApiKey", { id, scope, expires,
   client_id })`, a plain object read with `e.get("tmApiKey")` by any later hook or route
-  (`pb_hooks/me.pb.js` returns it as `key`); a later change adds its own properties to that
-  object in the same `e.set` call.
+  (`pb_hooks/me.pb.js` returns it as `key`); key-scoping replaces the object with
+  `keyInfo(key)`, and later fields are added there.
 - Consent choices: the consent stage's form posts `action=approve` with the radio `access`;
   another choice (a workspace, a level) is one more named input inside the same `<form>` in the
   template's `consent` block, read from the parsed form in the `approve` branch of `POST
@@ -686,7 +686,9 @@ contract does not, and D15 implements the stricter rule.
     key-scoping (AC-3, AC-4) and key-minting-cli (`manage_keys`, `last_used`), each appending to
     the rule this change extends.
   - `pb_hooks/me.pb.js`, the `GET /api/tracker/me` entry in `pb_hooks/lib/routes.js` and the
-    `tmApiKey` value set by the middleware (a plain object `{ id, scope, expires, client_id }`): key-minting-cli adds `manage_keys` to `key`.
+    `tmApiKey` value set by the middleware (a plain object `{ id, scope, expires, client_id }` here):
+    key-scoping replaces the object with `keyInfo(key)`, and later fields are added there
+    (key-minting-cli's `manage_keys` among them).
   - `pb_hooks/lib/oauth.js` (`CLIENTS`), `pb_hooks/oauth_server.pb.js` and
     `pb_hooks/views/oauth_authorize.html`: key-minting-cli adds the `tm` client and its consent.
   - `clients/tm/src/mcp.ts`: agent-verb-coverage adds tools to `TOOLS`.
@@ -805,7 +807,9 @@ and removes scratch, exit 1 on any failure.
     `refresh_prev_hash` in any item.
   - The existing `refused` table (`tests/test_api_keys.ts:388-433`, checked by the loop through line 445) keeps 403 for every row.
 - **Tests** (`tests/test_me_route.ts`, port unchanged 8177):
-  - `me_key_read`: read key: 200, `key` `{id: <id>, scope: "read", expires: "", client_id: ""}`.
+  - `me_key_read`: read key: 200; `key.id`, `key.scope`, `key.expires`, `key.client_id` equal
+    `<id>`, `"read"`, `""`, `""`; other properties of `key` are not checked (later changes add
+    them).
   - `me_key_expiry`: key created with `expires` one day ahead: `key.expires` equals the record's.
   - `me_session_no_key`: user token: no `key` property.
 - **Gate:** `bun tests/test_api_keys.ts`, `bun tests/test_me_route.ts`, `make check-static`.
@@ -839,7 +843,7 @@ and removes scratch, exit 1 on any failure.
     `h.values("X-Real-IP")`, split on `,` and trimmed, equals `SENTINEL`: `h.del("X-Real-IP")`;
     `return e.next()`. (The `Middleware` constructor order is `(fn, priority, id)`; the spike saw
     the priority silently become 0 with the arguments swapped.)
-  - `.agents/rules/ports.md`: insert ` · 8200 = test_internal_caller` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`).
+  - `.agents/rules/ports.md`: insert ` · 8200 = test_internal_caller` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list.
 - **Tests** (`tests/test_internal_caller.ts`, port 8200; boot with `MCP_INTERNAL_SECRET=s3cret`
   in `process.env` before `roomkit.serve`; as superuser PATCH `/api/settings` `rateLimits.rules`
   to the current `rateLimits.rules` (read back first) plus `{label: "/api/health", maxRequests: 3, duration: 60, audience:
@@ -933,7 +937,7 @@ and removes scratch, exit 1 on any failure.
     handler. Code issue (used from Phase 4): not in this phase.
   - `pb_hooks/lib/routes.js`: the three D16 entries for this phase, and D16's new wording of the
     `internal:` comment line.
-  - `.agents/rules/ports.md`: insert ` · 8201 = test_oauth_token` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`).
+  - `.agents/rules/ports.md`: insert ` · 8201 = test_oauth_token` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list.
 - **Tests** (`tests/test_oauth_token.ts`, port 8201; env `MCP_PUBLIC_URL=http://mcp.test` before
   boot; the suite inserts codes as the superuser via `POST /api/collections/oauth_codes/records`
   with `code_hash` = sha256 hex of a known code and `code_challenge` = the RFC 7636 Appendix B
@@ -1047,7 +1051,7 @@ and removes scratch, exit 1 on any failure.
   - `pb_hooks/oauth_server.pb.js`: `GET /oauth/authorize` and `POST /oauth/authorize` per D14
     (POST parses with `parse_form`; parameters from the form).
   - `pb_hooks/lib/routes.js`: the two D16 entries.
-  - `.agents/rules/ports.md`: insert ` · 8202/8203 = test_oauth_authorize` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`) (8203 is the suite's
+  - `.agents/rules/ports.md`: insert ` · 8202/8203 = test_oauth_authorize` in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (8203 is the suite's
     SMTP sink; it stays in the suite's reserved 82xx band rather than the 25xx sink band, which
     belongs to other suites).
   - `docs/readiness/agent-clients.md` AC-7: verdict `partly`; evidence "the API serves RFC 8414
@@ -1223,7 +1227,7 @@ and removes scratch, exit 1 on any failure.
   - `tsconfig.json` `include`: add `"services/**/*.ts"`. `package.json` `format:check` and
     `format`: add `"services/**/*.ts"` after `"scripts/**/*.ts"`. Run `bun run format`.
   - `.agents/rules/ports.md`: insert ` · 8205 = test_mcp_service · 8206/8207 = test_mcp_service` (the port gate's entry
-    pattern takes at most two ports per entry) in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list (so the text reads `... · 8200 = test_internal_caller · 9700 = ...`).
+    pattern takes at most two ports per entry) in ascending port order, immediately before ` · 9700 = test_script_help` in the defaults list.
   - `docs/readiness/agent-clients.md` (front-matter `updated:` set to the build date) AC-6:
     verdict `partly`; the Evidence bullet keeps its text and gains as its last sentence "`services/mcp/` serves
     the catalog over Streamable HTTP (`tests/test_mcp_service.ts`)"; gap "not deployed"; AC-7's

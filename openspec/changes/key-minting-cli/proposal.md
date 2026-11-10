@@ -181,7 +181,7 @@ closer match to the surveyed CLIs and the better fit for SSH, is not adopted.
 - **Listing and revoking from a key needs a new decision.** After the browser flow the CLI
   holds only a key, and a key cannot read or change key records (decision:api-key-reads-refused).
   Ruled 2026-11-10 (Open Question 2): the key `tm login` mints carries a manage-keys permission
-  that lists and revokes, never mints. That partly supersedes decision:api-key-reads-refused, so a
+  that lists and revokes (a key limited to part of the tracker: only itself), never mints. That partly supersedes decision:api-key-reads-refused, so a
   new decision record states it before the build seeds it (design, Depends on). Ruling 6 stands: the grant still
   produces a key and nothing else.
 
@@ -214,7 +214,7 @@ Each was ruled on 2026-11-10 with the option shown; the rejected options are kep
    Rejected: a password or emailed code in the terminal; the device flow.
 2. **How `tm keys list` and `tm keys revoke` are authorized.** Ruled: the key `tm login` mints
    carries a manage-keys permission, granted on the consent page, that lists and revokes the
-   user's keys and never mints; a new decision supersedes decision:api-key-reads-refused in part.
+   user's keys (a key limited to part of the tracker: only itself) and never mints; a new decision supersedes decision:api-key-reads-refused in part.
    Rejected: a terminal sign-in per command; a browser sign-in per command.
 3. **Where `tm` stores the saved key.** Ruled: the operating system's credential store through
    `Bun.secrets`, falling back to the 0600 file where no store is available. Rejected: the 0600
