@@ -42,9 +42,9 @@ What the client is today (tree paths as cited; probes run 2026-11-10 with Bun 1.
 - A saved login lives in `$XDG_CONFIG_HOME/tm/config.json`, falling back to
   `~/.config/tm/config.json` (`config_path` in `clients/tm/src/api.ts`). `TM_URL` and
   `TM_API_KEY` override it.
-- The repository is private today (`gh repo view`: `"visibility":"PRIVATE"`) and is to be made
-  public (ruling on question 1 below), after which its source and release assets need no GitHub
-  credential to read.
+- The repository was private when this proposal was written and is public since the ruling on
+  question 1 below (`gh repo view hsb3/task-manager-backend --json visibility`: `"PUBLIC"` on
+  2026-11-10), so its source and release assets need no GitHub credential to read.
 
 ### Two consumers
 
