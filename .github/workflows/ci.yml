@@ -116,3 +116,17 @@ jobs:
       - name: Check every suite ran in exactly one shard
         if: always()
         run: make ci-battery-verify
+
+  # Not a required check: the production image booted in Docker, probed through the public API (e2e/smoke.ts).
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - name: Run the smoke probes against the production image
+        run: make smoke

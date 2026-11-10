@@ -33,6 +33,7 @@ make dev                           # PocketBase on 8090 + seed; ignores PB_PORT_
 make                               # lists the documented targets (`make otp` = dashboard OTP)
 make check                         # THE gate: check-static, then the battery (every suite; CI runs it sharded)
 make check-static                  # server-free half: format, typecheck, gen_*.ts --check, check_*.ts
+make smoke                         # live probes against the production Docker image (e2e/smoke.ts); needs Docker
 make next-migration-slot           # next free migration timestamp
 bun tests/test_labels.ts           # one self-booting suite; a legacy suite needs a room (ports.md)
 bun scripts/gen_openapi.ts --check # drift gate (also gen_schema, gen_decisions); drop --check to regen
@@ -87,6 +88,8 @@ server on its port as its own and passes green against a stranger's database.
   it, say how to revert it. New behaviour, or anything needing a decision your brief cannot
   settle, is reported, not touched (owner ruling 2026-09-08).
 - Evidence is a command plus its actual output, never a claim. Declare bounded coverage.
+- A behaviour change is probed against the production image with `make smoke` (a probe function in
+  `e2e/smoke.ts`) before it is reported done, never against production.
 - Comments state only a constraint the code cannot show, in one line at its site; a file header is
   one line of purpose; `KEEP IN SYNC:` markers are load-bearing; never a count (it rots). Cite a
   decision record or collection and field over a migration filename, and version one (`v1:`/`v2:`).

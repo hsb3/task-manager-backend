@@ -11,6 +11,7 @@ accept through `/api/tracker/invitations/{id}/accept`. Authors write their own i
 |---|---|
 | `world.ts` | `generate(seed)` returns the world as plain data; `bun e2e/world.ts --seed N` prints it as JSON |
 | `seed.ts` | `seed_world(url, world, [email, password])` builds it; `bun e2e/seed.ts --seed N --url URL` from the shell |
+| `smoke.ts` | `make smoke`: live probes against the production Docker image; independent of the seeded world |
 
 ## Seed a room
 

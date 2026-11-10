@@ -30,7 +30,7 @@ command -v sqlite3 >/dev/null || { echo "$@: needs sqlite3 to tell whether pb_da
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help dev backend seed seed-if-fresh superuser superuser-password superuser-if-missing reset clean setup stop status env pocketbase next-migration-slot check check-static battery ci-battery-verify openapi local-up local-down local-logs
+.PHONY: help dev backend seed seed-if-fresh superuser superuser-password superuser-if-missing reset clean setup stop status env pocketbase next-migration-slot check check-static battery ci-battery-verify openapi local-up local-down local-logs smoke
 
 help: ## list targets
 	@grep -E '^[a-z][a-zA-Z0-9_-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -43,6 +43,9 @@ local-down: ## stop and remove the local container; keeps its pb_data volume
 
 local-logs: ## follow the local container's log
 	docker compose -f deploy/local/compose.yaml logs -f
+
+smoke: ## probe the production image in Docker (e2e/smoke.ts): throwaway project, volume and port; never pb-local/8090
+	bun e2e/smoke.ts
 
 dev: pocketbase env ## boot PocketBase http://127.0.0.1:8090 in the foreground; seeds a fresh DB
 	@bash -c ' \
