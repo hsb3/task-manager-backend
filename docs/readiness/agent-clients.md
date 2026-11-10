@@ -137,8 +137,7 @@ forbidden one.
 
 ## Unverified
 
-- Rate limiting as seen from a hosted agent's egress, and how the deployed proxy sets
-  `X-Real-IP`: not probed against the deployed server (SH-6 rests on a room).
+- Rate limiting as seen from a hosted agent's egress: not probed against the deployed server.
 - A restore from backup on the deployed server: `deploy/README.md` documents the procedure; no
   rehearsal against the deployed instance is on record.
 - What Claude custom connectors require of a server beyond reachability and authentication:
