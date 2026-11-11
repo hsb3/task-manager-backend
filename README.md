@@ -26,9 +26,22 @@ see the how-to [Run the production image locally](deploy/README.md#local).
 
 ## What a client does
 
-A client authenticates with an **API key**: a signed-in user creates an `api_keys` record with
-scope `read` or `write` and gets back a `tmk_…` secret. A read key only reads; a write key
-also creates, edits and comments.
+A client authenticates with an **API key**: a signed-in user creates an `api_keys` record and
+gets back a `tmk_…` secret, shown once. An MCP client that signs in through the hosted MCP
+endpoint gets a key minted for it instead, at the workspace and level chosen on the consent page.
+
+A key's `scope` is its level, following the workspace roles:
+
+- `read` only reads.
+- `write` also creates, edits, comments and moves work to the trash.
+- `manage` also changes workspace settings and vocabulary, cycles, templates, invitations and
+  members, and deletes trashed work for good.
+- `own` also changes roles, hands a workspace over, deletes or leaves one, and accepts or declines
+  invitations.
+
+A key acts at the lower of its level and its user's role. Its `reach` is every workspace the user
+belongs to (`all`, the default), one `workspace`, or chosen `projects` of one workspace (a
+projects key reads or writes only). Level and reach are fixed when the key is created.
 
 With `make dev` running, open a second terminal at the repo root:
 
