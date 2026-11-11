@@ -32,7 +32,7 @@ const SU_EMAIL = "probe@example.com";
 const SU_PASSWORD = "probe123456";
 const WHO = { email: "alice@example.com", password: "test123456" };
 const HOST = os.hostname();
-const SIGNED_IN = "<p>Signed in. You can close this tab and return to the terminal.</p>";
+const SIGNED_IN = "<p>Return to the terminal to finish signing in.</p>";
 
 let failures = 0;
 
@@ -374,7 +374,7 @@ try {
     tup(0, `logged in to ${BASE_URL} as Alice; key ${me1.key?.id} saved in ${CFG}\n`),
   );
   check(
-    "the callback page: 200, html, Signed in",
+    "the callback page: 200, html, sends the person back to the terminal to finish",
     tup(cb.status, cb.type, cb.html.includes(SIGNED_IN)),
     tup(200, "text/html; charset=utf-8", true),
   );
@@ -582,6 +582,7 @@ try {
         tup(fc.status, fc.html.includes(page)),
         tup(400, true),
       );
+    return fc;
   };
   await fake_case(
     "iss mismatch",
@@ -593,7 +594,18 @@ try {
     { iss: "" },
     "sign-in answered for another server; nothing was saved",
   );
-  await fake_case("token error", { token_error: true }, "sign-in failed: The code is invalid.");
+  {
+    const fc = await fake_case(
+      "token error",
+      { token_error: true },
+      "sign-in failed: The code is invalid.",
+    );
+    check(
+      "  token error: the page never claimed success; it sent the person back to the terminal",
+      tup(fc.html.includes("Signed in"), fc.html.includes(SIGNED_IN)),
+      tup(false, true),
+    );
+  }
   await fake_case(
     "callback error",
     { error: "server_error", error_description: `<b>"x" & 'y'</b>` },
@@ -630,6 +642,16 @@ try {
       "keys create --json when the key's details cannot be read → exit 1, the key still printed, a note",
       tup(mo.code, mo.json?.key, mo.stderr.includes("the key was created")),
       tup(1, FAKE_KEY, true),
+    );
+  }
+  {
+    const lt = start(["login", "--no-browser", "--url", FAKE], FXDG);
+    await fake_browser(await lt.url);
+    const lo = await lt.done;
+    check(
+      "login when the key's details cannot be read → exit 1, says the login was saved, and it was",
+      tup(lo.code, lo.stderr.includes("the login was saved"), read(FCFG)?.includes(FAKE_KEY)),
+      tup(1, true, true),
     );
   }
   delete mode.me_fail;

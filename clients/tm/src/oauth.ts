@@ -114,7 +114,7 @@ export async function sign_in(
         res.end(
           why
             ? `<p>Sign-in did not finish: ${html(why)}. Return to the terminal for details.</p>`
-            : "<p>Signed in. You can close this tab and return to the terminal.</p>",
+            : "<p>Return to the terminal to finish signing in.</p>",
           close,
         );
         if (why) fail(new ConfigError(why));

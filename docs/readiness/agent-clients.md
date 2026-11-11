@@ -26,10 +26,14 @@ write, expirable and revocable, and a revoked or expired one is refused on its n
 - Gap: none.
 
 **AC-2** A key cannot reach operator-only surfaces or read other keys.
-- Verdict: met.
+- Verdict: met, with one deliberate exception: a key carrying the manage-keys permission lists
+  and revokes its own user's keys (never their secrets) through `GET /api/tracker/keys` and
+  `POST /api/tracker/keys/{id}/revoke`, and a workspace- or project-limited key reaches only
+  itself there (decision:api-key-manages-keys).
 - Evidence: `pb_hooks/api_keys.pb.js` allowlist (`/api/files/`, `/api/realtime`, `/api/tracker/`
   except `/api/tracker/admin/`; collections other than system ones and `api_keys`) answering 403
-  `api_key_path`; decision:api-key-reads-refused.
+  `api_key_path`; decision:api-key-reads-refused, superseded in part by
+  decision:api-key-manages-keys; `tests/test_key_management.ts`.
 - Gap: none.
 
 **AC-3** A key can be limited to a workspace or project.

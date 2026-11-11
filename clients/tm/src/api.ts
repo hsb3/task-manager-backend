@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Error as ApiErrorBody, Paths } from "./api.generated.ts";
-import { os_delete, os_get, os_set, type Store, store_mode } from "./store.ts";
+import { os_clear, os_delete, os_get, os_set, type Store, store_mode } from "./store.ts";
 
 export type Config = { url: string; key: string; headers?: Record<string, string> };
 
@@ -42,10 +42,16 @@ export async function save_config(cfg: {
     throw e;
   }
   if (mode === "os" && previous && previous !== url) await os_delete(previous);
-  if (store === "file" && mode === "os")
+  if (store === "file" && mode === "os") {
     console.error(
       `tm: no credential store is available; the key is saved in ${file}, readable only by this user`,
     );
+    // an older key left in the store would win over this file on the next run
+    if (!(await os_clear(url)))
+      console.error(
+        `tm: warning: the credential store could not be reached to remove an older key for ${url}; it would be used instead of this login, so run tm login again once the store is available`,
+      );
+  }
   return { file, store };
 }
 

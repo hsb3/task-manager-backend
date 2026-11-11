@@ -45,3 +45,15 @@ export async function os_set(url: string, key: string): Promise<boolean> {
 export async function os_delete(url: string): Promise<void> {
   await call((s) => s.delete(entry(url)));
 }
+
+/** Best-effort delete: false when a store exists but could not be reached or refused. */
+export async function os_clear(url: string): Promise<boolean> {
+  const s = backend.secrets();
+  if (!s) return true; // no store, so nothing older can be kept in one
+  try {
+    await s.delete(entry(url));
+    return true;
+  } catch {
+    return false;
+  }
+}

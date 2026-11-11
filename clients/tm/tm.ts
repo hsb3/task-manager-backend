@@ -192,7 +192,13 @@ async function browser_login(v: {
   });
   const { file, store } = await save_config({ url, key });
   await retire(previous, key);
-  const me = await api({ url, key }, "GET /api/tracker/me", {});
+  let me: Awaited<ReturnType<typeof api<"GET /api/tracker/me">>>;
+  try {
+    me = await api({ url, key }, "GET /api/tracker/me", {});
+  } catch (e) {
+    console.error("tm: note: the login was saved, but its details could not be read");
+    throw e;
+  }
   const k = me.key!;
   if (v.json)
     console.log(

@@ -103,9 +103,17 @@ try {
       check("save_config returns store file", r, { file, store: "file" });
       check("the file holds url and key", read(file), { url: URL_B, key: KEY });
       check(
-        "stderr notes the file fallback",
-        stderr(),
-        `tm: no credential store is available; the key is saved in ${file}, readable only by this user\n`,
+        "stderr notes the file fallback, then warns once that an older store entry could not be cleared",
+        tup(
+          stderr().split("\n")[0],
+          stderr()
+            .split("\n")
+            .filter((l) => l.startsWith("tm: warning:")).length,
+        ),
+        tup(
+          `tm: no credential store is available; the key is saved in ${file}, readable only by this user`,
+          1,
+        ),
       );
       check("the key is never printed", stderr().includes(KEY), false);
       check("file mode 600", (fs.statSync(file).mode & 0o777).toString(8), "600");
@@ -234,6 +242,49 @@ try {
       "config.json",
     ]);
   });
+
+  {
+    // an earlier login put K1 in the store; the store cannot take K2, so K2 goes to the file
+    const entries = new Map<string, string>([[`tm|${URL_B}`, "tmk_" + "1".repeat(40)]]);
+    const no_set = {
+      get: async (o: any) => entries.get(`${o.service}|${o.name}`) ?? null,
+      set: async () => {
+        throw coded("ERR_SECRETS_PLATFORM_ERROR", "no bus");
+      },
+      delete: async (o: any) => entries.delete(`${o.service}|${o.name}`),
+    };
+    await run_case("a file save clears the older store entry", undefined, no_set, async () => {
+      await save_config({ url: URL_B, key: KEY });
+      check(
+        "the older key is gone from the store; the newer login is the one used",
+        tup([...entries.keys()], (await load_config()).key),
+        tup([], KEY),
+      );
+    });
+    entries.set(`tm|${URL_B}`, "tmk_" + "1".repeat(40));
+    const unreachable = {
+      ...no_set,
+      delete: async () => {
+        throw coded("ERR_SECRETS_PLATFORM_ERROR", "no bus");
+      },
+    };
+    await run_case(
+      "the older entry cannot be cleared",
+      undefined,
+      unreachable,
+      async ({ stderr }) => {
+        await save_config({ url: URL_B, key: KEY });
+        const warn = stderr()
+          .split("\n")
+          .filter((l) => l.startsWith("tm: warning:"));
+        check(
+          "one warning line names the url and says to log in again",
+          tup(warn.length, warn[0]?.includes(URL_B), warn[0]?.includes("run tm login again")),
+          tup(1, true, true),
+        );
+      },
+    );
+  }
 
   const deny_delete = {
     get: async () => null,

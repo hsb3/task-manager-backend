@@ -129,8 +129,9 @@ already have put on main.
     contract's Compatibility tells scripts to add `--with-key`. An agent's shell often has a
     non-terminal stdin and may rightly run `tm login` for a person at the browser.
 20. **Key name default** `tm on <os.hostname()>` for `tm login` (proposal).
-21. **Callback page copy** (HTML, `Content-Type: text/html; charset=utf-8`): success `<p>Signed in.
-    You can close this tab and return to the terminal.</p>`; failure `<p>Sign-in did not finish:
+21. **Callback page copy** (HTML, `Content-Type: text/html; charset=utf-8`): success `<p>Return to
+    the terminal to finish signing in.</p>` (root ruling 2026-11-11: the page is answered before
+    the token exchange, so it never claims success; the terminal prints the outcome); failure `<p>Sign-in did not finish:
     <escaped message>. Return to the terminal for details.</p>`, status 200 for success and 400
     for failure; the message is escaped by replacing `&`, `<`, `>`, `"` and `'` with their HTML
     entities.
@@ -594,7 +595,7 @@ form `8112/8113 = test_file_storage` uses).
       `mkdirSync(dir, { recursive: true, mode: 0o700 })` then `chmodSync(dir, 0o700)`; if
       `store_mode() === "os"` and `await os_set(url, key)` → write `{ url }`, return `os`; else
       write `{ url, key }`, print `tm: no credential store is available; the key is saved in
-      <file>, readable only by this user` on stderr (only when the mode was `os`), return `file`.
+      <file>, readable only by this user` on stderr (only when the mode was `os`), return `file`. (root ruling 2026-11-11: that fallback then removes the store entry for the URL, best effort; when the store cannot be reached it prints one `tm: warning:` line, so an older stored key never wins over the file.)
       File written with `{ mode: 0o600 }` then `chmodSync(file, 0o600)` as today.
     - `load_config(): Promise<Config>` (now async): first `store_mode()` (so a bad
       `TM_CREDENTIAL_STORE` is refused on every run); `url` = `TM_URL` ‖ saved URL; key =
@@ -838,6 +839,11 @@ form `8112/8113 = test_file_storage` uses).
   request's success path and logs on failure.
 - **Callback port probing.** Another local process could hit the listener; it gets 400 without
   our random `state`, and PKCE binds the code to this `tm` (RFC 8252 §8.1).
+- **Metadata issuer not compared with the URL** (accepted, root ruling 2026-11-11). `tm` checks
+  the callback's `iss` against the metadata `issuer` but does not compare that `issuer` with the
+  URL the metadata came from (RFC 8414 §3.3): the server's issuer is `PB_PUBLIC_URL`, which a
+  room or deployment can set apart from the URL `tm` was given, and `tm` reads the metadata from
+  the configured URL, over HTTPS in any real deployment.
 
 ## Open Questions
 
