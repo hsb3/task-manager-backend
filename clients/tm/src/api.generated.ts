@@ -422,7 +422,7 @@ export interface OauthCodesListResult {
   totalPages: number;
 }
 
-/** A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read, write, manage or own), reach (all or workspace) and workspace, which carry the person's workspace choice to the minted key, expires. No client rule opens it: only the server reads or writes it. The minted key keeps its scope, reach and workspace through every refresh (decision:api-key-reach-and-levels). */
+/** A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read, write, manage or own), reach (all or workspace) and workspace, which carry the person's workspace choice to the minted key, expires. No client rule opens it: only the server reads or writes it. The minted key keeps its scope, reach and workspace through every refresh (decision:api-key-reach-and-levels). For the tm client it also holds key_name, key_expires and manage_keys, copied onto the key it mints. */
 export interface OauthCodesRecord {
   client_id: string;
   client_name: string;
@@ -431,6 +431,9 @@ export interface OauthCodesRecord {
   created?: string;
   expires: string;
   id: string;
+  key_expires?: string;
+  key_name?: string;
+  manage_keys?: boolean;
   reach?: "all" | "workspace";
   redirect_uri: string;
   scope: "read" | "write" | "manage" | "own";
@@ -1403,6 +1406,9 @@ export const FIELD_TYPES = {
     created: "string",
     expires: "string",
     id: "string",
+    key_expires: "string",
+    key_name: "string",
+    manage_keys: "boolean",
     reach: "string",
     redirect_uri: "string",
     scope: "string",

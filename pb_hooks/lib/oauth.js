@@ -9,6 +9,10 @@ const CLIENTS = {
       "http://localhost:8787/callback",
     ],
   },
+  tm: {
+    client_name: "tm (command line)",
+    redirect_uris: ["http://127.0.0.1/callback"],
+  },
 };
 
 // The consent page shows the host, so it is a name ending in a letter label: no IP literal (a
@@ -94,6 +98,37 @@ function parse_scope(raw) {
 function scope_text(scope) {
   const LADDER = require(`${__hooks}/lib/api_keys.js`).LEVELS;
   return LADDER.slice(0, LADDER.indexOf(scope) + 1).join(" ");
+}
+
+// "keys" asks for the manage-keys permission (tm only); the rest is the level scope.
+function split_keys(raw) {
+  const pieces = String(raw || "")
+    .split(" ")
+    .filter((v) => v !== "");
+  return {
+    scope: pieces.filter((v) => v !== "keys").join(" "),
+    keys: pieces.indexOf("keys") >= 0,
+  };
+}
+
+// The tm client's key_name and key_expires: {ok: {key_name, key_expires}} or {error}.
+function tm_params(p) {
+  const name = (p.key_name || "").trim() || (p.key_name ? "" : "tm");
+  const len = [...name].length;
+  if (len < 1 || len > 200)
+    return { error: "key_name must be 1 to 200 characters" };
+  if (!p.key_expires) return { ok: { key_name: name, key_expires: "" } };
+  const bad = { error: "key_expires must be a future UTC date-time" };
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(p.key_expires))
+    return bad;
+  let d;
+  try {
+    d = new DateTime(p.key_expires.replace("T", " "));
+  } catch (_) {
+    return bad;
+  }
+  if (!d.after(new DateTime())) return bad;
+  return { ok: { key_name: name, key_expires: d.string() } };
 }
 
 // Read and write always; manage and own only when the client asked for them.
@@ -422,6 +457,8 @@ module.exports = {
   LADDER: require(`${__hooks}/lib/api_keys.js`).LEVELS,
   parse_scope,
   scope_text,
+  split_keys,
+  tm_params,
   offered_levels,
   consent_workspaces,
   pkce_s256,

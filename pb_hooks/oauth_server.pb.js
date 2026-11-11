@@ -75,6 +75,7 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/token", (e) => {
         "resource names another resource.",
       );
     // Writes commit because the callback returns instead of throwing; a found code is consumed whatever fails after.
+    const tm = p.client_id === "tm";
     $app.runInTransaction((tx) => {
       let code;
       try {
@@ -123,23 +124,46 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/token", (e) => {
         out = {
           error: ["invalid_grant", "The code is unknown, used or expired."],
         };
+      } else if (
+        tm &&
+        !code.getDateTime("key_expires").isZero() &&
+        !code.getDateTime("key_expires").after(new DateTime())
+      ) {
+        out = {
+          error: ["invalid_grant", "The requested key expiry has passed."],
+        };
       } else {
+        // A tm grant is never refreshed and lives until key_expires, if any (decision:api-key-manages-keys).
         const access = fresh("tmk_");
-        const refresh = fresh("tmr_");
+        const refresh = tm ? "" : fresh("tmr_");
         const key = new Record(tx.findCollectionByNameOrId("api_keys"));
         key.set("user", code.getString("user"));
-        key.set("name", code.getString("client_name"));
+        key.set(
+          "name",
+          tm
+            ? code.getString("key_name") || "tm"
+            : code.getString("client_name"),
+        );
         key.set("scope", code.getString("scope"));
         key.set("reach", code.getString("reach") || "all");
         key.set("workspace", code.getString("workspace"));
-        key.set("expires", at(DAY));
+        key.set("expires", tm ? code.getString("key_expires") : at(DAY));
         key.set("client_id", p.client_id);
         key.set("key_hash", $security.sha256(access));
-        key.set("refresh_hash", $security.sha256(refresh));
-        key.set("refresh_expires", at(30 * DAY));
+        key.set("refresh_hash", tm ? "" : $security.sha256(refresh));
+        key.set("refresh_expires", tm ? "" : at(30 * DAY));
         key.set("refresh_prev_hash", "");
+        key.set("manage_keys", tm && code.getBool("manage_keys"));
         tx.save(key);
-        out = { ok: { access, refresh, scope: code.getString("scope") } };
+        out = {
+          ok: {
+            access,
+            refresh,
+            scope: code.getString("scope"),
+            keys: key.getBool("manage_keys"),
+            expires: key.getDateTime("expires"),
+          },
+        };
       }
     });
   } else if (p.grant_type === "refresh_token") {
@@ -151,6 +175,12 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/token", (e) => {
       );
     if (!known(p.client_id))
       return lib.token_error(e, "invalid_client", "The client is not known.");
+    if (p.client_id === "tm")
+      return lib.token_error(
+        e,
+        "invalid_grant",
+        "tm grants are not refreshed.",
+      );
     if (!lib.resource_ok(p.resource))
       return lib.token_error(
         e,
@@ -240,12 +270,19 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/token", (e) => {
   if (out.error) return lib.token_error(e, out.error[0], out.error[1]);
   e.response.header().set("Cache-Control", "no-store");
   e.response.header().set("Pragma", "no-cache");
+  const scope = lib.scope_text(out.ok.scope) + (out.ok.keys ? " keys" : "");
+  if (!out.ok.refresh) {
+    const body = { access_token: out.ok.access, token_type: "Bearer", scope };
+    if (!out.ok.expires.isZero())
+      body.expires_in = out.ok.expires.unix() - new DateTime().unix();
+    return e.json(200, body);
+  }
   return e.json(200, {
     access_token: out.ok.access,
     token_type: "Bearer",
     expires_in: 86400,
     refresh_token: out.ok.refresh,
-    scope: lib.scope_text(out.ok.scope),
+    scope,
   });
 });
 

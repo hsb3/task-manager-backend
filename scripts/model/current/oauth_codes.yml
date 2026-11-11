@@ -73,6 +73,15 @@ fields:
   values:
   - all
   - workspace
+- name: key_name
+  type: text
+  required: false
+- name: key_expires
+  type: date
+  required: false
+- name: manage_keys
+  type: bool
+  required: false
 field_policies: []
 unique_indexes:
 - CREATE UNIQUE INDEX `idx_oauth_codes_code_hash` ON `oauth_codes` (`code_hash`)

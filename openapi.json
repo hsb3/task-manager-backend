@@ -1167,7 +1167,7 @@
         "type": "object"
       },
       "OauthCodesRecord": {
-        "description": "A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read, write, manage or own), reach (all or workspace) and workspace, which carry the person's workspace choice to the minted key, expires. No client rule opens it: only the server reads or writes it. The minted key keeps its scope, reach and workspace through every refresh (decision:api-key-reach-and-levels).",
+        "description": "A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read, write, manage or own), reach (all or workspace) and workspace, which carry the person's workspace choice to the minted key, expires. No client rule opens it: only the server reads or writes it. The minted key keeps its scope, reach and workspace through every refresh (decision:api-key-reach-and-levels). For the tm client it also holds key_name, key_expires and manage_keys, copied onto the key it mints.",
         "properties": {
           "client_id": {
             "description": "The app the code was issued to.",
@@ -1198,6 +1198,19 @@
           "id": {
             "description": "Record id, assigned by the server.",
             "type": "string"
+          },
+          "key_expires": {
+            "description": "The key expiry tm asked for; empty for none or for other clients.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "key_name": {
+            "description": "The key name tm asked for; empty for other clients.",
+            "type": "string"
+          },
+          "manage_keys": {
+            "description": "Whether the person let tm's key list and revoke keys.",
+            "type": "boolean"
           },
           "reach": {
             "description": "Every workspace, or the one workspace the person chose; empty means every workspace.",
