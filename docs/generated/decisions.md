@@ -484,7 +484,7 @@ Prior art: GitHub revokes a personal access token for every use at once and docu
 
 Rule: before each realtime message is sent to a client authenticated by an API key, the server re-checks that the key still exists, is not revoked, has not expired, and that its owner still passes the users authRule; a client failing the check receives nothing further: it is unsubscribed and its stream is closed. The check matches the token the stream subscribed with, so a stream opened with an access token that a refresh has since replaced ends too.
 
-Accepted limit: the check runs per message, so a revoked key's stream is closed at the next message it would receive; an idle stream stays connected, receiving nothing, until then. A client that re-subscribes with its owner's session stays tied to the key it first subscribed with and ends with it.
+Accepted limit: the check runs per message, so a revoked key's stream is closed at the next message it would receive; an idle stream stays connected, receiving nothing, until then. A client that re-subscribes with its owner's session stays tied to the key it last subscribed with and ends with it.
 
 ## landing-and-switch-check
 
