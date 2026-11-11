@@ -1343,6 +1343,20 @@ require(`${__hooks}/lib/routes.js`).add(
     // draft item the recipient cannot open are excluded on all three by the same
     // predicate, through the workspace and each of the three item links.
     const ws = String(e.request.url.query().get("workspace") || "");
+    const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+      e.get("tmApiKey"),
+    );
+    const kw = reach ? reach.workspace : "";
+    const kp =
+      reach && reach.projects ? "," + reach.projects.join(",") + "," : "";
+    let keyClause = "";
+    // KEEP IN SYNC: the notifications reach clause of the key reach rules (decision:api-key-reach-and-levels).
+    if (reach) keyClause += " AND notifications.workspace = {:kw}";
+    if (reach && reach.projects)
+      keyClause +=
+        " AND ((notifications.task != '' AND EXISTS (SELECT 1 FROM tasks kt WHERE kt.id = notifications.task AND instr({:kp}, ',' || kt.project || ',') > 0)) OR " +
+        "(notifications.document != '' AND EXISTS (SELECT 1 FROM documents kd WHERE kd.id = notifications.document AND instr({:kp}, ',' || kd.project || ',') > 0)) OR " +
+        "(notifications.decision != '' AND EXISTS (SELECT 1 FROM decisions kc WHERE kc.id = notifications.decision AND instr({:kp}, ',' || kc.project || ',') > 0)))";
     const res = e.app
       .db()
       .newQuery(
@@ -1394,9 +1408,10 @@ require(`${__hooks}/lib/routes.js`).add(
           "AND [[user]] = {:me}" +
           (ws
             ? " AND (notifications.workspace = {:ws} OR notifications.workspace = '')"
-            : ""),
+            : "") +
+          keyClause,
       )
-      .bind({ me: e.auth.id, ws: ws })
+      .bind({ me: e.auth.id, ws: ws, kw: kw, kp: kp })
       .execute();
     return e.json(200, { updated: res.rowsAffected() });
   },

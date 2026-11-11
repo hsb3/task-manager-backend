@@ -11,6 +11,9 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/search", (e) => {
     throw new BadRequestError("workspace query param must not be empty");
   const wsId = (query.get("workspace") || "").trim();
   const CAP = 20;
+  const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+    e.get("tmApiKey"),
+  );
   if (!raw)
     return e.json(200, {
       query: raw,
@@ -85,6 +88,18 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/search", (e) => {
         " OR EXISTS (SELECT 1 FROM workspace_members dm WHERE dm.workspace = " +
         coll +
         ".workspace AND dm.[[user]] = {:uid} AND dm.role = 'admin' AND dm.status = 'active'))";
+    // KEEP IN SYNC: the item reach clause of the key reach rules (decision:api-key-reach-and-levels).
+    let keyClause = "";
+    if (reach) keyClause += " AND " + coll + ".workspace = {:kw}";
+    if (reach && reach.projects)
+      keyClause +=
+        coll === "projects"
+          ? " AND instr({:kp}, ',' || projects.id || ',') > 0"
+          : " AND " +
+            coll +
+            ".project != '' AND instr({:kp}, ',' || " +
+            coll +
+            ".project || ',') > 0";
     const sql =
       "SELECT " +
       coll +
@@ -111,11 +126,15 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/search", (e) => {
       // The membership `scope` above still governs: a workspace the caller cannot read
       // narrows to zero rows rather than opening.
       (wsId ? " AND " + coll + ".workspace = {:ws}" : "") +
+      keyClause +
       " ORDER BY rank, id LIMIT " +
       (CAP + 1);
     const q = e.app.db().newQuery(sql);
     const binds = { uid: uid, q: pat };
     if (wsId) binds.ws = wsId;
+    if (reach) binds.kw = reach.workspace;
+    if (reach && reach.projects)
+      binds.kp = "," + reach.projects.join(",") + ",";
     q.bind(binds);
     const rows = arrayOf(
       new DynamicModel({ id: "", title: "", project: "", rank: 0 }),
@@ -223,6 +242,10 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/trash", (e) => {
   // A TRASHED workspace is refused outright, the owner included: this route bypasses
   // collection rules, so the cascade cannot reach it.
   if (String(ws.get("trashed")) !== "") throw new NotFoundError("not found");
+  const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+    e.get("tmApiKey"),
+  );
+  if (reach && wsId !== reach.workspace) throw new NotFoundError("not found");
   // KEEP IN SYNC: decisions/documents/milestones listRule draft branch (mirrors the export
   // route's canSeeDrafts below) — trashing a draft must not publish it to the members its
   // viewRule hides it from; an empty author matches nobody (PBTT-544). tasks have no branch.
@@ -340,6 +363,11 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/trash", (e) => {
     // KEEP IN SYNC (below): project_items viewRule trash branch in schema/project_items.view.json — for non-task items an owner/admin or `draft = false || author`.
     where += " && (draft = false || author = {:uid})";
     params.uid = uid;
+  }
+  // KEEP IN SYNC: the item reach clause of the key reach rules (decision:api-key-reach-and-levels).
+  if (reach && reach.projects) {
+    where += " && project != '' && {:kpf} ~ project";
+    params.kpf = reach.projects.join(",") || "-";
   }
   if (filter) where += " && (" + filter + ")";
   // The id tiebreak makes the order total, so pages are disjoint and complete.
@@ -575,6 +603,11 @@ require(`${__hooks}/lib/routes.js`).add(
     } catch (_) {
       throw new NotFoundError("workspace not found");
     }
+    const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+      e.get("tmApiKey"),
+    );
+    if (reach && wsId !== reach.workspace)
+      throw new NotFoundError("workspace not found");
     // A trashed workspace is unwritable here by anyone, owner included; same 404 as unknown id.
     if (String(ws.get("trashed")) !== "")
       throw new NotFoundError("workspace not found");
@@ -916,6 +949,11 @@ require(`${__hooks}/lib/routes.js`).add(
     } catch (_) {
       throw new NotFoundError("workspace not found");
     }
+    const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+      e.get("tmApiKey"),
+    );
+    if (reach && wsId !== reach.workspace)
+      throw new NotFoundError("workspace not found");
     // A trashed workspace resolves nobody for anyone, owner included; same 404 as unknown id.
     if (String(ws.get("trashed")) !== "")
       throw new NotFoundError("workspace not found");
@@ -1110,6 +1148,11 @@ require(`${__hooks}/lib/routes.js`).add("POST /api/tracker/export", (e) => {
     }
   }
   if (!isMember) throw new NotFoundError("not found");
+  const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+    e.get("tmApiKey"),
+  );
+  if (reach && wsId !== reach.workspace) throw new NotFoundError("not found");
+  const keyProjects = reach && reach.projects;
 
   // KEEP IN SYNC: documents.listRule draft branch (same shape in decisions/milestones) —
   // owner OR an ACTIVE admin member sees drafts; a plain member never sees another user's
@@ -1165,6 +1208,13 @@ require(`${__hooks}/lib/routes.js`).add("POST /api/tracker/export", (e) => {
       return readableProjectIds.indexOf(pid) !== -1;
     });
   }
+  // KEEP IN SYNC: the item reach clause of the key reach rules (decision:api-key-reach-and-levels).
+  if (keyProjects)
+    selectedProjectIds = (selectedProjectIds || readableProjectIds).filter(
+      function (pid) {
+        return keyProjects.indexOf(pid) !== -1;
+      },
+    );
   // A narrowing selection filters project-bearing rows to `project ∈ selected OR project = ''` —
   // the empty-project (workspace-level) rows stay because they are always readable and the
   // exported tasks reference them; other projects' rows drop. Never widens beyond readable.
@@ -1182,8 +1232,9 @@ require(`${__hooks}/lib/routes.js`).add("POST /api/tracker/export", (e) => {
   }
   const projNarrow = function (params) {
     if (selectedProjectIds === null) return "";
-    const ors = ["project = ''"];
-    if (containerId) {
+    if (keyProjects && !selectedProjectIds.length) return " && project = '-'";
+    const ors = keyProjects ? [] : ["project = ''"];
+    if (containerId && !keyProjects) {
       ors.push("project = {:ppc}");
       params.ppc = containerId;
     }
@@ -1245,7 +1296,7 @@ require(`${__hooks}/lib/routes.js`).add("POST /api/tracker/export", (e) => {
     projTrashReq: true,
     project: true,
   });
-  const labelsOut = fetchScoped("labels", { project: true }); // no trashed/draft columns
+  const labelsOut = fetchScoped("labels", { project: !keyProjects }); // no trashed/draft columns
   const statusesOut = fetchScoped("statuses", {}); // workspace-only (no project column)
   const membersOut = fetchScoped("workspace_members", {}); // read rule: any member reads all rows
 
@@ -1289,7 +1340,7 @@ require(`${__hooks}/lib/routes.js`).add("POST /api/tracker/export", (e) => {
   const activityOut = allActivity.filter(function (a) {
     const t = a.get("task");
     // A task-bearing row still has to be intersected, or a narrowed export gains other tasks.
-    return t ? !!taskIdSet[t] : true;
+    return t ? !!taskIdSet[t] : !keyProjects;
   });
   const allSubs = fetchAll("task_subscribers", "task.workspace = {:w}", {
     w: wsId,
@@ -1475,6 +1526,9 @@ require(`${__hooks}/lib/routes.js`).add(
     const target = (typeof body.user === "string" ? body.user : "").trim();
     if (!target) throw new BadRequestError("user is required");
     const isSuperuser = e.auth.isSuperuser();
+    const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+      e.get("tmApiKey"),
+    );
     let currentOwner = "";
     if (isSuperuser) {
       currentOwner = (
@@ -1497,6 +1551,8 @@ require(`${__hooks}/lib/routes.js`).add(
         } catch (_) {
           throw new NotFoundError("workspace not found");
         }
+        if (reach && wsId !== reach.workspace)
+          throw new NotFoundError("workspace not found");
         // OWNER OR SUPERUSER — unlike the vocab route, an active admin confers no authority here.
         // Deny → 404, SAME as not-found (no existence leak).
         if (ws.get("owner") !== uid && !isSuperuser)
@@ -1646,6 +1702,9 @@ require(`${__hooks}/lib/routes.js`).add(
   "GET /api/tracker/workspaces/trash",
   (e) => {
     const uid = e.auth.id;
+    const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+      e.get("tmApiKey"),
+    );
     // OWNER OR ACTIVE ADMIN (decision:workspace-trash-cascades R2), resolved in ONE query through the back-relation
     // rather than a membership lookup per row. A member, a viewer, a suspended admin and a
     // non-member all match zero rows and get the SAME empty 200, so the route confirms no
@@ -1656,11 +1715,12 @@ require(`${__hooks}/lib/routes.js`).add(
       "workspaces",
       "trashed != '' && (owner = {:u} || (workspace_members_via_workspace.user ?= {:u} && " +
         "workspace_members_via_workspace.role ?= 'admin' && " +
-        "workspace_members_via_workspace.status ?= 'active'))",
+        "workspace_members_via_workspace.status ?= 'active'))" +
+        (reach ? " && id = {:kw}" : ""),
       "-trashed",
       501,
       0,
-      { u: uid },
+      { u: uid, kw: reach ? reach.workspace : "" },
     );
     const items = [];
     for (let i = 0; i < recs.length && i < 500; i++) items.push(recs[i]);
@@ -1686,6 +1746,11 @@ require(`${__hooks}/lib/routes.js`).add(
       throw new NotFoundError("workspace not found");
     }
     if (ws.get("owner") !== e.auth.id)
+      throw new NotFoundError("workspace not found");
+    const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+      e.get("tmApiKey"),
+    );
+    if (reach && (wsId !== reach.workspace || reach.projects))
       throw new NotFoundError("workspace not found");
 
     const inWs = $dbx.hashExp({ workspace: wsId });

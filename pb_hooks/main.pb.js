@@ -980,16 +980,31 @@ onRecordAfterCreateSuccess((e) => {
 // $apis.requireAuth() middleware -> e.auth is the logged-in user record.
 require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/summary", (e) => {
   const uid = e.auth.id;
+  const reach = require(`${__hooks}/lib/api_keys.js`).keyReach(
+    e.get("tmApiKey"),
+  );
+  const params = { uid };
+  let keyFilter = "";
+  // KEEP IN SYNC: the item reach clause of the key reach rules (decision:api-key-reach-and-levels).
+  if (reach) {
+    keyFilter += " && workspace = {:kw}";
+    params.kw = reach.workspace;
+  }
+  if (reach && reach.projects) {
+    keyFilter += ' && project != "" && {:kpf} ~ project';
+    params.kpf = reach.projects.join(",") || "-";
+  }
   // KEEP IN SYNC: the membership and trash clauses of tasks.listRule; the personal scope (my projects or assigned to me) narrows them, never replaces them
   const tasks = e.app.findRecordsByFilter(
     "tasks",
     // project.shadow = false keeps this personal: the workspace container is owned by the
     // workspace owner, so without it their total absorbs every member's workspace-level item.
-    '((project.owner = {:uid} && project.shadow = false) || assignee = {:uid}) && (workspace.owner = {:uid} || (workspace.workspace_members_via_workspace.user ?= {:uid} && workspace.workspace_members_via_workspace.status ?= "active")) && trashed = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed = ""',
+    '((project.owner = {:uid} && project.shadow = false) || assignee = {:uid}) && (workspace.owner = {:uid} || (workspace.workspace_members_via_workspace.user ?= {:uid} && workspace.workspace_members_via_workspace.status ?= "active")) && trashed = "" && (project = "" || (project.created != "" && project.trashed = "")) && workspace.trashed = ""' +
+      keyFilter,
     "",
     0,
     0,
-    { uid },
+    params,
   );
   // Statuses are now config-driven (G1 #74: a `statuses` RELATION), so accumulate
   // dynamically — byStatus is keyed by status RELATION ID (config-driven, no change
