@@ -2,6 +2,7 @@
 /**
  * decision:api-key-reach-and-levels: a limited key's realtime events and protected-file downloads
  * follow its reach; subscription options cannot widen it; sessions and unlimited keys unchanged.
+ * A key's open stream ends when the key is revoked, deleted or expires.
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, fixtures by name.
  * Port 8213 + PB_PORT_OFFSET.
@@ -13,6 +14,7 @@ import path from "node:path";
 import { py_repr, run_checked, tup } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 import { copy_tree } from "../scripts/_scratch_copy.ts";
+import { authorize_params, exchange, PKCE } from "./oauthkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -411,6 +413,162 @@ try {
       [],
     );
   }
+
+  console.log(
+    "\n── realtime after a key ends: revoked, deleted, expired, revoked at /oauth/revoke, replaced by a refresh, owner unapproved ──",
+  );
+  const kRev = await mint("kRev", {});
+  const kDel = await mint("kDel", {});
+  const kLive = await mint("kLive", {});
+  const oauthParams = authorize_params();
+  const grant = async (label: string): Promise<{ access: string; refresh: string }> => {
+    const code = crypto.randomUUID();
+    const [sCode] = await api("POST", recs("oauth_codes"), su, {
+      code_hash: new Bun.CryptoHasher("sha256").update(code).digest("hex"),
+      user: lr.record?.id,
+      client_id: oauthParams.client_id,
+      client_name: "Cursor",
+      redirect_uri: oauthParams.redirect_uri,
+      code_challenge: PKCE.challenge,
+      scope: "write",
+      expires: new Date(Date.now() + 600_000).toISOString(),
+    });
+    const granted = await exchange(BASE_URL, code, oauthParams);
+    check(
+      `(fixture) ${label}: a code inserted and exchanged`,
+      tup(sCode, granted.status),
+      tup(200, 200),
+    );
+    return {
+      access: granted.body?.access_token ?? "tmk_none",
+      refresh: granted.body?.refresh_token ?? "tmr_none",
+    };
+  };
+  const oauthPost = async (path: string, form: Record<string, string>): Promise<[number, any]> => {
+    const r = await fetch(BASE_URL + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(form).toString(),
+    });
+    return [r.status, await r.json().catch(() => ({}))];
+  };
+  const kOauth = (await grant("OAuth key to revoke")).access;
+  const rotated = await grant("OAuth key to refresh");
+  const [sc2, carolRec] = await api("POST", USERS, su, {
+    email: "carol@example.com",
+    password: "test123456",
+    passwordConfirm: "test123456",
+    name: "Carol",
+    verified: true,
+    approved: true,
+  });
+  check("(fixture) Carol created", sc2, 200);
+  check(
+    "(fixture) Carol joins WA as a member",
+    (
+      await api("POST", recs("workspace_members"), su, {
+        workspace: WA,
+        user: carolRec.id,
+        role: "member",
+        status: "active",
+      })
+    )[0],
+    200,
+  );
+  const [sck, kCarol] = await api("POST", KEYS, su, {
+    user: carolRec.id,
+    name: "kCarol",
+    scope: "read",
+  });
+  check("(fixture) superuser mints Carol a key", sck, 200);
+  const EXPIRY_MS = 6000; // long enough for every listener to subscribe first
+  const [sExp, kExpRec] = await api("POST", KEYS, alice, {
+    name: "kExp",
+    scope: "write",
+    expires: new Date(Date.now() + EXPIRY_MS).toISOString(),
+  });
+  check("(fixture) key kExp minted, expiring shortly", sExp, 200);
+  const expiresAt = Date.now() + EXPIRY_MS;
+  const ended: [string, roomkit.SSEListener][] = [
+    ["revoked key", listen(kRev, "tasks/*")],
+    ["revoked key, second client", listen(kRev, "tasks/*")],
+    ["deleted key", listen(kDel, "tasks/*")],
+    ["expired key", listen(kExpRec.key ?? "tmk_none", "tasks/*")],
+    ["key revoked at /oauth/revoke", listen(kOauth, "tasks/*")],
+    ["access token replaced by a refresh", listen(rotated.access, "tasks/*")],
+    ["key of an owner no longer approved", listen(kCarol.key ?? "tmk_none", "tasks/*")],
+  ];
+  const live: [string, roomkit.SSEListener][] = [
+    ["live key", listen(kLive, "tasks/*")],
+    ["Alice's session", listen(alice, "tasks/*")],
+  ];
+  for (const [, l] of [...ended, ...live]) await l.start();
+  await sleep(500);
+  const before = await make(
+    "tasks",
+    { title: "before end", workspace: WA, project: PA1 },
+    "task created before the keys end",
+  );
+  await settle(() => [...ended, ...live].every(([, l]) => has(l, "create", before)));
+  check(
+    "(fixture) every listener receives a create before its key ends",
+    [...ended, ...live].map(([, l]) => has(l, "create", before)),
+    [...ended, ...live].map(() => true),
+  );
+  const keyId = async (token: string) => (await api("GET", "/api/tracker/me", token))[1]?.key?.id;
+  const revId = await keyId(kRev);
+  const delId = await keyId(kDel);
+  check(
+    "(fixture) Alice revokes kRev",
+    (await api("PATCH", `${KEYS}/${revId}`, alice, { revoked: true }))[0],
+    200,
+  );
+  check("(fixture) Alice deletes kDel", (await api("DELETE", `${KEYS}/${delId}`, alice))[0], 204);
+  check(
+    "(fixture) the OAuth key revoked at /oauth/revoke",
+    (await oauthPost("/oauth/revoke", { token: kOauth, client_id: oauthParams.client_id }))[0],
+    200,
+  );
+  const [sRef, refreshed] = await oauthPost("/oauth/token", {
+    grant_type: "refresh_token",
+    refresh_token: rotated.refresh,
+    client_id: oauthParams.client_id,
+  });
+  check("(fixture) the second OAuth key refreshed", sRef, 200);
+  const renewed = listen(refreshed.access_token ?? "tmk_none", "tasks/*");
+  await renewed.start();
+  live.push(["the refreshed access token, subscribed after the refresh", renewed]);
+  check(
+    "(fixture) superuser withdraws Carol's approval",
+    (await api("PATCH", `${USERS}/${carolRec.id}`, su, { approved: false }))[0],
+    200,
+  );
+  await sleep(Math.max(0, expiresAt - Date.now()) + 1000);
+  check(
+    "(fixture) the expired key answers 401",
+    (await api("GET", "/api/tracker/me", kExpRec.key))[0],
+    401,
+  );
+  const after = await make(
+    "tasks",
+    { title: "after end", workspace: WA, project: PA1 },
+    "task created after the keys end",
+  );
+  await settle(() => live.every(([, l]) => has(l, "create", after)));
+  for (const [who, l] of ended) {
+    // A client still registered accepts a same-user subscribe (204); a dropped one is unknown (404).
+    const [sSub] = await api("POST", "/api/realtime", alice, {
+      clientId: l.client_id,
+      subscriptions: ["tasks/*"],
+    });
+    check(
+      `${who}: no event after it ends, and its realtime client is dropped`,
+      tup(has(l, "create", after), sSub),
+      tup(false, 404),
+    );
+  }
+  for (const [who, l] of live)
+    check(`${who} still receives the later create (control)`, has(l, "create", after), true);
 } finally {
   for (const l of listeners) l.stop = true;
   if (server !== null) await roomkit.stop(server);

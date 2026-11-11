@@ -687,7 +687,7 @@ try {
     tup(s, r.user ?? null, await whoami(r.key ?? "tmk_none")),
     tup(200, bob_id, bob_id),
   );
-  // Accepted limit (decision:api-keys): an open stream keeps the auth it subscribed with.
+  // decision:key-revocation-ends-open-streams: revoking a key ends a stream opened with it.
   const stream = new roomkit.SSEListener(BASE_URL, WRITE_KEY, "workspaces");
   await stream.start();
   check("write key subscribes to workspaces", await (stream as any)._subscribe(), 204);
@@ -699,9 +699,9 @@ try {
   const until = Date.now() + 5000;
   while (Date.now() < until && !(await after_revoke())) await Bun.sleep(100);
   check(
-    "a stream opened before the revoke still delivers (accepted limit, pinned)",
+    "a stream opened before the revoke delivers nothing after it",
     tup(s, await after_revoke()),
-    tup(200, true),
+    tup(200, false),
   );
   check("the revoked key re-subscribing → 401", await (stream as any)._subscribe(), 401);
   stream.stop = true;

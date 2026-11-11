@@ -109,6 +109,8 @@ Accepted limits:
 
 **Superseded in part:** write keys no longer reach every non-admin tracker route; a key's level and reach decide (decision:api-key-reach-and-levels).
 
+**Superseded in part:** open realtime streams no longer survive revocation; revoking, deleting or expiring a key ends them (decision:key-revocation-ends-open-streams).
+
 ## app-settings
 
 - **Slug:** `decision:app-settings`
@@ -467,6 +469,22 @@ Supersedes the prior-art statements in decision:item-display-keys and decision:n
 
 - **What this app does.** A task, decision, document or milestone moves to another project of its own workspace by changing `project`; a project of another workspace is refused with a 400. The move leaves `key` unchanged: the item keeps its old prefix and number and takes no number from the new project, so the next item created there gets that project's next number. An item with no key arrives keyless and stays keyless. A client cannot change `key` at all. `tests/test_item_keys.ts` proves the move on a task and the key lock on all four types; `tests/test_scope.ts` proves the refusal of another workspace's project on all four types.
 - **Why not re-key as Linear does.** A re-key leaves the old label in every link, comment and note that already used it, and Linear keeps those working by resolving the old identifier to the issue. This app stores no former key, so a re-keyed item's old label would find nothing. Keeping the key gives each item one label for life, at the cost of a prefix that may not match the project the item now sits in.
+
+## key-revocation-ends-open-streams
+
+- **Slug:** `decision:key-revocation-ends-open-streams`
+- **Title:** Revoking, deleting or expiring an API key ends its open realtime streams
+- **Ref:** `api_keys`
+
+Revoking, deleting or expiring an API key ends every realtime stream opened with it, not only its next request. This supersedes in part decision:api-keys ("Open realtime streams survive revocation").
+
+Why: the milestone 1 security audit (kata 62gm, finding q38p, confirmed by root in a clean room) showed a stream kept receiving records after its key was revoked, deleted or expired, while REST answered 401. A key is a long-lived credential handed to agents; incident response must be able to cut a stolen one off, and an OAuth-minted key must not outlive its 24-hour expiry on an open stream. A session token's stream may keep its auth because a session is short-lived and tied to a person; a key is neither.
+
+Prior art: GitHub revokes a personal access token for every use at once and documents no grace period for open connections; Linear's API key revocation takes effect immediately for all access. Both treat revocation as ending access, not new requests only.
+
+Rule: before each realtime message is sent to a client authenticated by an API key, the server re-checks that the key still exists, is not revoked, has not expired, and that its owner still passes the users authRule; a client failing the check receives nothing further: it is unsubscribed and its stream is closed. The check matches the token the stream subscribed with, so a stream opened with an access token that a refresh has since replaced ends too.
+
+Accepted limit: the check runs per message, so a revoked key's stream is closed at the next message it would receive; an idle stream stays connected, receiving nothing, until then. A client that re-subscribes with its owner's session stays tied to the key it last subscribed with and ends with it.
 
 ## landing-and-switch-check
 
