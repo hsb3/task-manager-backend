@@ -111,9 +111,10 @@ forbidden one.
 - Gap: none.
 
 **AC-13** An MCP tool failure returns the server's status and error code in structured form.
-- Verdict: missing.
-- Evidence: `clients/tm/src/mcp.ts` `text(t, isError)` returns plain text with `isError`.
-- Gap: no structured status or code.
+- Verdict: met.
+- Evidence: `clients/tm/src/mcp.ts` `error_result`; `tests/test_tm_mcp.ts` cases
+  `edit_read_key_structured`, `show_missing_404`.
+- Gap: none.
 
 **AC-14** A failure of the deployed server reaches the operator without anyone watching.
 - Verdict: partly.

@@ -1,16 +1,38 @@
-// `tm mcp`: the verbs as MCP tools over stdio, for an agent host that holds an API key.
+// The tm tool catalog as an MCP server: `tm mcp` over stdio, and the hosted MCP service's factory.
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  type CallToolResult,
-  type Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import { AjvJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/ajv";
-import { ApiError, UsageError, type Config } from "./api.ts";
+import { readFileSync } from "node:fs";
+import { ProtocolError, ProtocolErrorCode, Server } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { AjvJsonSchemaValidator } from "@modelcontextprotocol/server/validators/ajv";
+import { api, ApiError, UsageError, type Config } from "./api.ts";
 import * as verbs from "./verbs.ts";
+
+export {
+  createMcpHandler,
+  isLegacyRequest,
+  WebStandardStreamableHTTPServerTransport,
+  Server,
+} from "@modelcontextprotocol/server";
+
+export const VERSION: string = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
+
+export type Scope = "read" | "write";
+
+type ToolDef = {
+  name: string;
+  description: string;
+  inputSchema: { type: "object"; properties?: Record<string, unknown>; required?: string[] };
+  annotations: { readOnlyHint: boolean; destructiveHint?: boolean; idempotentHint?: boolean };
+  run: (cfg: Config, a: any) => Promise<unknown>;
+};
+
+type ToolResult = {
+  content: { type: "text"; text: string }[];
+  isError: boolean;
+  structuredContent?: Record<string, unknown>;
+};
 
 const ID = { type: "string", description: "The item's id, as `tm_list` or `tm_search` return it." };
 const KIND = {
@@ -33,8 +55,6 @@ const HIT_FIELDS = [
 ] as const satisfies readonly (keyof verbs.Found["results"][number])[];
 const PROJECT = { type: "string", description: "A project id." };
 const WORKSPACE = { type: "string", description: "A workspace id." };
-
-type ToolDef = Tool & { run: (cfg: Config, a: any) => Promise<unknown> };
 
 /** The catalog: one record per verb, read tools marked read-only, write tools non-destructive. */
 export const TOOLS: ToolDef[] = [
@@ -129,13 +149,53 @@ export const TOOLS: ToolDef[] = [
   },
 ];
 
-const text = (t: string, isError = false): CallToolResult => ({
-  content: [{ type: "text", text: t }],
-  isError,
-});
+/** The catalog in order, without `run`; a read scope keeps only the read-only tools. */
+export function tools_for(scope: Scope): Omit<ToolDef, "run">[] {
+  return TOOLS.filter((t) => scope === "write" || t.annotations.readOnlyHint === true).map(
+    ({ run, ...tool }) => tool,
+  );
+}
+
+const STATUS_CODES: Record<number, string> = {
+  400: "invalid_request",
+  401: "unauthorized",
+  403: "forbidden",
+  404: "not_found",
+  409: "conflict",
+  429: "rate_limited",
+};
+
+function error_code(status: number | null, data: Record<string, unknown>): string {
+  if (status === null) return "invalid_arguments";
+  if (status === 0) return "unreachable";
+  const entries = Object.values(data);
+  const only = entries.length === 1 ? (entries[0] as { code?: unknown } | null) : null;
+  if (typeof only?.code === "string") return only.code;
+  if (entries.length > 1) return "validation_failed";
+  if (status >= 200 && status < 300) return "bad_response";
+  if (STATUS_CODES[status]) return STATUS_CODES[status];
+  if (status >= 400 && status < 500) return "request_failed";
+  return "server_error";
+}
+
+/** A failed call: the error object as structuredContent, and serialized as the one text block. */
+export function error_result(
+  status: number | null,
+  message: string,
+  data: Record<string, unknown> = {},
+): ToolResult {
+  const structuredContent = {
+    error: { status, code: error_code(status, data), message, fields: data },
+  };
+  return {
+    content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+    isError: true,
+    structuredContent,
+  };
+}
 
 const validators = new Map(
-  TOOLS.map((t) => [t.name, new AjvJsonSchemaValidator().getValidator(t.inputSchema)]),
+  TOOLS.map((t) => [t.name, new AjvJsonSchemaValidator().getValidator(t.inputSchema as any)]),
 );
 
 /** The same JSON `tm --json` prints; a refusal is a result the agent reads, not a protocol error. */
@@ -143,34 +203,57 @@ export async function call(
   cfg: Config,
   name: string,
   args: Record<string, unknown>,
-): Promise<CallToolResult> {
+): Promise<ToolResult> {
   const tool = TOOLS.find((t) => t.name === name);
-  if (!tool) return text(`no tool ${name}`, true);
+  if (!tool) throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Unknown tool: ${name}`);
   const checked = validators.get(name)!(args);
-  if (!checked.valid) return text(`${name}: ${checked.errorMessage}`, true);
+  if (!checked.valid) return error_result(null, `${name}: ${checked.errorMessage}`);
   try {
-    return text(JSON.stringify(await tool.run(cfg, args), null, 2));
+    const result = await tool.run(cfg, args);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: false };
   } catch (e) {
-    if (e instanceof ApiError) {
-      const details = Object.keys(e.body.data).length ? `\n${JSON.stringify(e.body, null, 2)}` : "";
-      return text(e.body.message + details, true);
-    }
-    if (e instanceof UsageError) return text(e.message, true);
+    if (e instanceof UsageError) return error_result(null, e.message);
+    if (e instanceof ApiError) return error_result(e.body.status, e.body.message, e.body.data);
     throw e;
   }
 }
 
+const LIST_CACHE = { ttlMs: 300000, cacheScope: "private" } as const;
+
+/** One server over the catalog; `scope_of` decides which tools `tools/list` shows. */
+export function make_server(cfg: Config, scope_of: () => Promise<Scope>): Server {
+  const server = new Server(
+    { name: "tm", version: VERSION },
+    {
+      capabilities: { tools: {} },
+      cacheHints: { "tools/list": LIST_CACHE, "server/discover": LIST_CACHE },
+    },
+  );
+  server.setRequestHandler(
+    "tools/list",
+    async () => ({ tools: tools_for(await scope_of()) }) as any,
+  );
+  server.setRequestHandler(
+    "tools/call",
+    (req) => call(cfg, req.params.name, req.params.arguments ?? {}) as any,
+  );
+  return server;
+}
+
+/** The key's scope from `/me`; the full list when that cannot be read, so a call fails with the API's own refusal. */
+function scope_from_me(cfg: Config): () => Promise<Scope> {
+  return async () => {
+    try {
+      return (await api(cfg, "GET /api/tracker/me", {})).key?.scope ?? "write";
+    } catch {
+      return "write";
+    }
+  };
+}
+
 /** Serve on stdin/stdout until the host closes the pipe. */
 export async function serve(cfg: Config): Promise<void> {
-  const server = new Server({ name: "tm", version: "0.1.0" }, { capabilities: { tools: {} } });
-  server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: TOOLS.map(({ run, ...tool }) => tool),
-  }));
-  server.setRequestHandler(CallToolRequestSchema, (req) =>
-    call(cfg, req.params.name, req.params.arguments ?? {}),
-  );
-  const closed = new Promise<void>((resolve) => (server.onclose = resolve));
-  await server.connect(new StdioServerTransport());
-  process.stdin.once("end", () => void server.close()); // the transport itself never notices end of input
-  await closed;
+  const handle = serveStdio(() => make_server(cfg, scope_from_me(cfg)));
+  await new Promise<void>((resolve) => process.stdin.once("end", resolve));
+  await handle.close();
 }
