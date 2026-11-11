@@ -22,6 +22,9 @@ export default defineRailway(() => {
       GOOGLE_CLIENT_ID: preserve(),
       GOOGLE_CLIENT_SECRET: preserve(),
       MAIL_SENDER_ADDRESS: preserve(),
+      MCP_INTERNAL_SECRET: preserve(),
+      MCP_INTERNAL_URL: preserve(),
+      MCP_PUBLIC_URL: preserve(),
       PB_BACKUPS_CRON: preserve(),
       PB_BACKUPS_CRON_MAX_KEEP: preserve(),
       PB_BACKUPS_S3_ACCESS_KEY: preserve(),
@@ -42,7 +45,22 @@ export default defineRailway(() => {
     },
   });
 
+  const mcp = service("mcp", {
+    source: github("hsb3/task-manager-backend", { checkSuites: true }),
+    build: { builder: "DOCKERFILE", dockerfilePath: "services/mcp/Dockerfile", watchPatterns: ["services/mcp/**", "clients/tm/src/**", "clients/tm/package.json", "package.json", "bun.lock"] },
+    healthcheck: "/.well-known/oauth-protected-resource",
+    healthcheckTimeout: 60,
+    replicas: { "us-east4-eqdc4a": 1 },
+    domains: ["mcp.admin.tasks-pocketbase.functionform.ai"],
+    env: {
+      MCP_INTERNAL_SECRET: preserve(),
+      MCP_PUBLIC_URL: preserve(),
+      PB_INTERNAL_URL: preserve(),
+      PB_PUBLIC_URL: preserve(),
+    },
+  });
+
   return project("task-manager", {
-    resources: [pocketbase, pocketbaseVolume, pbBackups, pbFiles],
+    resources: [pocketbase, mcp, pocketbaseVolume, pbBackups, pbFiles],
   });
 });

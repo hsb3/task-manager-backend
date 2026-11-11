@@ -17,7 +17,7 @@ and its preview/apply commands are in [railway/README.md](railway/README.md).
 
 ## Local
 
-`make local-up` builds the `Dockerfile` image and runs it at `http://127.0.0.1:8090` (`+ PB_PORT_OFFSET`), with `pb_data` in a named volume; `make local-logs` follows the log and `make local-down` removes the container. Drop the data too with `docker compose -f deploy/local/compose.yaml down -v`. No superuser, mail, S3 or OAuth is configured. `make smoke` builds the same image under its own compose project on a free port, runs the live probes in `e2e/smoke.ts` against it, and removes the container, volume and image tag whatever the result. Files: [local/compose.yaml](local/compose.yaml).
+`make local-up` builds the `Dockerfile` and `services/mcp/Dockerfile` images and runs them at `http://127.0.0.1:8090` (API) and `http://127.0.0.1:8089` (MCP service), each `+ PB_PORT_OFFSET`, with `pb_data` in a named volume; `make local-logs` follows the log and `make local-down` removes the containers. Drop the data too with `docker compose -f deploy/local/compose.yaml down -v`. No superuser, mail, S3 or OAuth is configured. `make smoke` builds the same images under its own compose project on free ports, runs the live probes in `e2e/smoke.ts` against them, and removes the containers, volume and image tags whatever the result. Files: [local/compose.yaml](local/compose.yaml).
 
 ## Bootstrapping a new Railway project
 
@@ -268,6 +268,24 @@ decision:refused-migration-fails-the-deploy); it does not gate a deploy.
 - **Proving transactional/alert mail was DELIVERED needs no inbox access** — Resend's
   `GET /emails` reports `last_event: delivered`. `ALERT_SELFTEST=1` arms a one-shot send on the
   first request after boot; unset it afterwards or every deploy emails.
+
+## The MCP service
+
+The `mcp` Railway service is the hosted MCP endpoint (`services/mcp/`), built from `services/mcp/Dockerfile`. It deploys when a watch pattern is touched: `services/mcp/**`, `clients/tm/src/**`, `clients/tm/package.json`, `package.json`, `bun.lock`. It is created by the runbook in `openspec/changes/hosted-mcp-endpoint/design.md`, Phase 10; the entry for `mcp` in `railway/railway.ts` records what that runbook creates by CLI, so `railway config plan` proposes no change to it. `make local-up` serves it on 8089 (`+ PB_PORT_OFFSET`).
+
+| Service | Variable | Value on Railway | If missing |
+| --- | --- | --- | --- |
+| mcp | `PORT` | Railway-provided | 8080 |
+| mcp | `MCP_HOST` | unset (listens on `::`) | `::` |
+| mcp | `MCP_INTERNAL_PORT` | `8081` | 8081 |
+| mcp | `PB_INTERNAL_URL` | `http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:<pocketbase PORT>` | exit 1 |
+| mcp | `PB_PUBLIC_URL` | `${{pocketbase.PB_PUBLIC_URL}}` | exit 1 |
+| mcp | `MCP_PUBLIC_URL` | `https://mcp.<API host>` | exit 1 |
+| mcp | `MCP_INTERNAL_SECRET` | 64 hex characters, shared with pocketbase | exit 1 |
+| mcp | `MCP_ALLOWED_ORIGINS` | unset | `https://claude.ai,https://www.cursor.com` |
+| pocketbase | `MCP_INTERNAL_SECRET` | same value | exemption off; metadata-document clients refused |
+| pocketbase | `MCP_INTERNAL_URL` | `http://${{mcp.RAILWAY_PRIVATE_DOMAIN}}:8081` | metadata-document clients refused |
+| pocketbase | `MCP_PUBLIC_URL` | same as mcp's | any `resource` parameter answers `invalid_target` |
 
 ## Operator scripts
 
