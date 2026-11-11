@@ -23,11 +23,13 @@ capabilities:
   update:
     verbatim: '@request.auth.id != "" && user = @request.auth.id && @request.body.user:isset = false &&
       @request.body.scope:isset = false && @request.body.key_hash:isset = false && @request.body.expires:isset
-      = false && (@request.body.revoked:isset = false || @request.body.revoked = true)'
+      = false && (@request.body.revoked:isset = false || @request.body.revoked = true) && @request.body.client_id:isset
+      = false'
     actors:
     - custom(user = @request.auth.id)
     authRequired: guard
     body_guards:
+    - '@request.body.client_id:isset'
     - '@request.body.expires:isset'
     - '@request.body.key_hash:isset'
     - '@request.body.revoked'
@@ -41,6 +43,7 @@ capabilities:
     - '@request.body.expires:isset = false'
     - '@request.body.revoked:isset = false'
     - '@request.body.revoked = true'
+    - '@request.body.client_id:isset = false'
   delete:
     verbatim: '@request.auth.id != "" && user = @request.auth.id'
     actors:
@@ -72,9 +75,31 @@ fields:
 - name: revoked
   type: bool
   required: false
+- name: client_id
+  type: text
+  required: false
+- name: refresh_hash
+  type: text
+  required: false
+  hidden: true
+- name: refresh_expires
+  type: date
+  required: false
+  hidden: true
+- name: refresh_prev_hash
+  type: text
+  required: false
+  hidden: true
 field_policies:
 - 'key_hash: hidden field'
+- 'refresh_hash: hidden field'
+- 'refresh_expires: hidden field'
+- 'refresh_prev_hash: hidden field'
 unique_indexes:
 - CREATE UNIQUE INDEX `idx_api_keys_key_hash` ON `api_keys` (`key_hash`)
+- CREATE UNIQUE INDEX `idx_api_keys_refresh_hash` ON `api_keys` (`refresh_hash`) WHERE `refresh_hash`
+  != ''
 other_indexes:
 - CREATE INDEX `idx_api_keys_user` ON `api_keys` (`user`)
+- CREATE INDEX `idx_api_keys_refresh_prev_hash` ON `api_keys` (`refresh_prev_hash`) WHERE `refresh_prev_hash`
+  != ''

@@ -292,6 +292,18 @@ const ROUTES = {
               ],
             },
           },
+          key: {
+            type: "object",
+            description:
+              'Present only under an API key: the key\'s id, scope, expiry ("" for never) and client ("" for a key minted by hand).',
+            properties: {
+              id: { type: "string" },
+              scope: { type: "string", enum: ["read", "write"] },
+              expires: { type: "string" },
+              client_id: { type: "string" },
+            },
+            required: ["id", "scope", "expires", "client_id"],
+          },
         },
         required: ["user", "unread_notifications", "workspaces"],
       },

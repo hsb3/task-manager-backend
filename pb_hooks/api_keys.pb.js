@@ -4,6 +4,7 @@
 onRecordCreateRequest((e) => {
   const key = "tmk_" + $security.randomString(40);
   e.record.set("key_hash", $security.sha256(key));
+  e.record.set("client_id", "");
   // A superuser mints for the user it names; anyone else only for themself.
   if (!e.hasSuperuserAuth()) e.record.set("user", e.auth.id);
   e.record.withCustomData(true);
@@ -15,6 +16,9 @@ onRecordCreateRequest((e) => {
 require(`${__hooks}/lib/routes.js`).use(
   new Middleware(
     (e) => {
+      const p = e.request.url.path;
+      if (p.startsWith("/oauth/") || p.startsWith("/.well-known/"))
+        return e.next();
       const header = e.request.header
         .get("Authorization")
         .trim()
@@ -54,6 +58,15 @@ require(`${__hooks}/lib/routes.js`).use(
       // Allowlist by the MATCHED route pattern, never the raw URL.
       const method = e.request.method;
       const route = String(e.request.pattern).replace(/^[A-Z]+ /, "");
+      // An unmatched request reaches here under PB's catch-all pattern.
+      if (route === "/{path...}" || route === "/") throw new NotFoundError();
+      if (e.request.pathValue("collection")) {
+        try {
+          $app.findCollectionByNameOrId(e.request.pathValue("collection"));
+        } catch (_) {
+          throw new NotFoundError();
+        }
+      }
       let allowed = false;
       if (
         route === "/api/collections/{collection}/records" ||
@@ -113,6 +126,12 @@ require(`${__hooks}/lib/routes.js`).use(
         });
       }
 
+      e.set("tmApiKey", {
+        id: key.id,
+        scope: key.getString("scope"),
+        expires: key.getString("expires"),
+        client_id: key.getString("client_id"),
+      });
       e.auth = owner;
       return e.next();
     },

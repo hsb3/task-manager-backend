@@ -38,15 +38,19 @@
         "type": "object"
       },
       "ApiKeysRecord": {
-        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read or write), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.",
+        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read or write), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.\n\n**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is \"\" for a key minted by hand; a value sent at create is replaced with \"\", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash.",
         "properties": {
+          "client_id": {
+            "description": "The app a sign-in minted this key for, or empty for a key minted by hand; set by the server, and a later change is refused.",
+            "type": "string"
+          },
           "created": {
             "description": "When the record was created; set by the server.",
             "format": "date-time",
             "type": "string"
           },
           "expires": {
-            "description": "When the key stops working, or empty for a key that never expires; it can be set only at create.",
+            "description": "When the key stops working, or empty for a key that never expires; a client sets it only at create, and a sign-in's refresh moves it forward.",
             "format": "date-time",
             "type": "string"
           },
@@ -55,11 +59,24 @@
             "type": "string"
           },
           "key_hash": {
-            "description": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced and a later change is refused. Hidden system field — not returned in API responses.",
+            "description": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced, a client's later change is refused, and a sign-in's refresh replaces it. Hidden system field — not returned in API responses.",
             "type": "string"
           },
           "name": {
             "description": "A label to tell your keys apart, up to 200 characters, stored trimmed; it may be renamed later.",
+            "type": "string"
+          },
+          "refresh_expires": {
+            "description": "When the sign-in's current refresh token stops working; set by the server. Hidden system field — not returned in API responses.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "refresh_hash": {
+            "description": "A fingerprint of the sign-in's current refresh token, filled by the server and never shown to clients. Hidden system field — not returned in API responses.",
+            "type": "string"
+          },
+          "refresh_prev_hash": {
+            "description": "A fingerprint of the refresh token the current one replaced, kept so a replayed token ends the sign-in. Hidden system field — not returned in API responses.",
             "type": "string"
           },
           "revoked": {
@@ -9783,6 +9800,34 @@
               "application/json": {
                 "schema": {
                   "properties": {
+                    "key": {
+                      "description": "Present only under an API key: the key's id, scope, expiry (\"\" for never) and client (\"\" for a key minted by hand).",
+                      "properties": {
+                        "client_id": {
+                          "type": "string"
+                        },
+                        "expires": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "enum": [
+                            "read",
+                            "write"
+                          ],
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "scope",
+                        "expires",
+                        "client_id"
+                      ],
+                      "type": "object"
+                    },
                     "unread_notifications": {
                       "type": "integer"
                     },

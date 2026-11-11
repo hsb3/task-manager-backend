@@ -15,13 +15,19 @@ export interface ApiKeysListResult {
 
 **Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.
 
-A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys. */
+A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.
+
+**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is "" for a key minted by hand; a value sent at create is replaced with "", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. */
 export interface ApiKeysRecord {
+  client_id?: string;
   created?: string;
   expires?: string;
   id: string;
   key_hash?: string;
   name: string;
+  refresh_expires?: string;
+  refresh_hash?: string;
+  refresh_prev_hash?: string;
   revoked?: boolean;
   scope: "read" | "write";
   updated?: string;
@@ -1009,6 +1015,7 @@ export interface Paths {
   };
   "GET /api/tracker/me": {
     response: {
+      key?: { client_id: string; expires: string; id: string; scope: "read" | "write" };
       unread_notifications: number;
       user: { id: string; name: string };
       workspaces: {
@@ -1165,11 +1172,15 @@ export interface Paths {
 
 export const FIELD_TYPES = {
   api_keys: {
+    client_id: "string",
     created: "string",
     expires: "string",
     id: "string",
     key_hash: "string",
     name: "string",
+    refresh_expires: "string",
+    refresh_hash: "string",
+    refresh_prev_hash: "string",
     revoked: "boolean",
     scope: "string",
     updated: "string",
