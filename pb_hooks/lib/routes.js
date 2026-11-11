@@ -2,7 +2,7 @@
 // The one place a custom route registers: the table is what openapi.json documents (scripts/gen_openapi.ts reads it) and the only routerAdd call site (scripts/check_route_registry.ts refuses another).
 
 // auth: "any" = any signed-in auth record (user, API key or superuser) · "users" = a signed-in user (an API key acts as its user) · "superuser" = superusers only · "none" = no sign-in.
-// internal: true = reachable only by the server itself (loopback); left out of openapi.json on purpose.
+// internal: true = left out of openapi.json on purpose: loopback-only routes the server calls itself, and the OAuth surface its own metadata describes.
 // request = the body the handler reads · query = the query parameters the handler reads · responses = the error statuses the handler itself returns, each one line, answered with the shared Error body · denies: ["superuser"] = refused in the handler with 403 · docs = the app_docs slug whose body leads the description.
 const ROUTES = {
   "GET /admin": {
@@ -949,6 +949,26 @@ const ROUTES = {
     auth: "none",
     internal: true,
     response: { status: 204, schema: null },
+  },
+  "GET /.well-known/oauth-authorization-server": {
+    summary:
+      "The OAuth authorization server's metadata (RFC 8414), which MCP clients discover it by.",
+    auth: "none",
+    internal: true,
+    response: { status: 200, schema: null },
+  },
+  "POST /oauth/token": {
+    summary:
+      "Exchanges an authorization code, or a refresh token, for an API key and a refresh token.",
+    auth: "none",
+    internal: true,
+    response: { status: 200, schema: null },
+  },
+  "POST /oauth/revoke": {
+    summary: "Ends a sign-in given its API key or refresh token (RFC 7009).",
+    auth: "none",
+    internal: true,
+    response: { status: 200, schema: null },
   },
 };
 const MIDDLEWARE = {

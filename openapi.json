@@ -38,7 +38,7 @@
         "type": "object"
       },
       "ApiKeysRecord": {
-        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read or write), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.\n\n**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is \"\" for a key minted by hand; a value sent at create is replaced with \"\", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash.",
+        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read or write), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.\n\n**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is \"\" for a key minted by hand; a value sent at create is replaced with \"\", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is \"\" for a key minted by hand.",
         "properties": {
           "client_id": {
             "description": "The app a sign-in minted this key for, or empty for a key minted by hand; set by the server, and a later change is refused.",
@@ -1095,6 +1095,105 @@
         "required": [
           "id",
           "kind",
+          "user"
+        ],
+        "type": "object"
+      },
+      "OauthCodesListResult": {
+        "description": "Paginated list of `oauth_codes` records.",
+        "properties": {
+          "items": {
+            "description": "The records of this page.",
+            "items": {
+              "$ref": "#/components/schemas/OauthCodesRecord"
+            },
+            "type": "array"
+          },
+          "page": {
+            "description": "The page returned, counting from 1.",
+            "type": "integer"
+          },
+          "perPage": {
+            "description": "Records per page.",
+            "type": "integer"
+          },
+          "totalItems": {
+            "description": "Records matching the filter across all pages.",
+            "type": "integer"
+          },
+          "totalPages": {
+            "description": "Pages at this page size.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "perPage",
+          "totalItems",
+          "totalPages",
+          "items"
+        ],
+        "type": "object"
+      },
+      "OauthCodesRecord": {
+        "description": "A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read or write), expires. No client rule opens it: only the server reads or writes it.",
+        "properties": {
+          "client_id": {
+            "description": "The app the code was issued to.",
+            "type": "string"
+          },
+          "client_name": {
+            "description": "The app's name, which becomes the key's name.",
+            "type": "string"
+          },
+          "code_challenge": {
+            "description": "The app's PKCE challenge (S256).",
+            "type": "string"
+          },
+          "code_hash": {
+            "description": "A fingerprint of the one-time code, never the code itself.",
+            "type": "string"
+          },
+          "created": {
+            "description": "When the record was created; set by the server.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires": {
+            "description": "Ten minutes after issue; an expired code is refused and later purged.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Record id, assigned by the server.",
+            "type": "string"
+          },
+          "redirect_uri": {
+            "description": "Where the app asked to be sent back; the exchange must name the same address.",
+            "type": "string"
+          },
+          "scope": {
+            "description": "The access the person granted.",
+            "enum": [
+              "read",
+              "write"
+            ],
+            "type": "string"
+          },
+          "user": {
+            "description": "The account that approved the sign-in. Relation record id (target collection: users).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "client_name",
+          "code_challenge",
+          "code_hash",
+          "expires",
+          "id",
+          "redirect_uri",
+          "scope",
           "user"
         ],
         "type": "object"
@@ -5360,6 +5459,259 @@
         "summary": "Update a notifications record.",
         "tags": [
           "notifications"
+        ]
+      }
+    },
+    "/api/collections/oauth_codes/records": {
+      "get": {
+        "description": "oauth_codes — one-time codes of the sign-in an MCP client starts. Access governed by the collection's list API rule.",
+        "parameters": [
+          {
+            "description": "Page number (1-based).",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Records per page.",
+            "in": "query",
+            "name": "perPage",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated sort fields, e.g. `-created,title`.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "PocketBase filter expression.",
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated relations to expand (dynamic).",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated fields to return.",
+            "in": "query",
+            "name": "fields",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Skip the totalItems/totalPages count for speed.",
+            "in": "query",
+            "name": "skipTotal",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthCodesListResult"
+                }
+              }
+            },
+            "description": "Paginated list."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List/search oauth_codes records.",
+        "tags": [
+          "oauth_codes"
+        ]
+      },
+      "post": {
+        "description": "oauth_codes — one-time codes of the sign-in an MCP client starts. Access governed by the collection's create API rule. Create/update/delete are superuser-only (governed by API rules at runtime).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OauthCodesRecord"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthCodesRecord"
+                }
+              }
+            },
+            "description": "The created record."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create a oauth_codes record.",
+        "tags": [
+          "oauth_codes"
+        ]
+      }
+    },
+    "/api/collections/oauth_codes/records/{id}": {
+      "delete": {
+        "description": "oauth_codes — one-time codes of the sign-in an MCP client starts. Access governed by the collection's delete API rule. Create/update/delete are superuser-only (governed by API rules at runtime).",
+        "parameters": [
+          {
+            "description": "Record id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted (no content)."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Delete a oauth_codes record.",
+        "tags": [
+          "oauth_codes"
+        ]
+      },
+      "get": {
+        "description": "oauth_codes — one-time codes of the sign-in an MCP client starts. Access governed by the collection's view API rule.",
+        "parameters": [
+          {
+            "description": "Record id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated relations to expand (dynamic).",
+            "in": "query",
+            "name": "expand",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated fields to return.",
+            "in": "query",
+            "name": "fields",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthCodesRecord"
+                }
+              }
+            },
+            "description": "The record."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Fetch one oauth_codes record.",
+        "tags": [
+          "oauth_codes"
+        ]
+      },
+      "patch": {
+        "description": "oauth_codes — one-time codes of the sign-in an MCP client starts. Access governed by the collection's update API rule. Create/update/delete are superuser-only (governed by API rules at runtime).",
+        "parameters": [
+          {
+            "description": "Record id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OauthCodesRecord"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthCodesRecord"
+                }
+              }
+            },
+            "description": "The updated record."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Update a oauth_codes record.",
+        "tags": [
+          "oauth_codes"
         ]
       }
     },
@@ -11853,6 +12205,10 @@
     {
       "description": "notifications — an inbox item for a task, document or decision",
       "name": "notifications"
+    },
+    {
+      "description": "oauth_codes — one-time codes of the sign-in an MCP client starts",
+      "name": "oauth_codes"
     },
     {
       "description": "project_items — read-only union of every item type, ordered by the server",
