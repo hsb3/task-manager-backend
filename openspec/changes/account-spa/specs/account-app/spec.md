@@ -8,7 +8,7 @@ administrator approves pending accounts, through a web app the PocketBase server
 ### Requirement: The server serves the account app at /account/
 
 The PocketBase image SHALL serve the account app's built files under `/account/`, answer every
-path under `/account` with the security headers the contract names, and SHALL leave every other
+path under `/account` with the security headers the contract names on GET and HEAD, and SHALL leave every other
 path answering as it did before the app existed: a path that matches no route or file still
 answers 404, never the app's page.
 
@@ -122,7 +122,7 @@ approve one on request.
 #### Scenario: An administrator approves
 
 - **WHEN** an app administrator approves a waiting account
-- **THEN** the account leaves the waiting list and can sign in once its email is confirmed
+- **THEN** the account leaves the waiting list when its email is already confirmed, and otherwise stays listed as waiting for email confirmation; it can sign in once both hold
 
 #### Scenario: Anyone else
 

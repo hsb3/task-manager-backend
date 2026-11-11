@@ -23,6 +23,8 @@ the signup flow had no page anyone could see. What the server offers today (room
 - Keys are minted with a session through `POST /api/collections/api_keys/records` (the secret is
   in that response only), listed through `GET /api/tracker/keys` and revoked through
   `POST /api/tracker/keys/{id}/revoke` (key-minting-cli, on main).
+- The sign-up journey (a password chosen through the mailed link, then approval) is described
+  only in backend decision records; no client walks it (WEB-6, partly).
 - The server serves no static files: the image has no `pb_public`, and the only page it renders
   is the OAuth sign-in and consent page (`pb_hooks/views/oauth_authorize.html`).
 

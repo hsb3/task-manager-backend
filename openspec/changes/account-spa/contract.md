@@ -83,7 +83,7 @@ store (the browser's `localStorage`, key `pocketbase_auth`).
 | `/profile` | Load | `GET /api/collections/_externalAuths/records` (the caller's linked providers), `GET /api/collections/users/auth-methods` |
 | `/profile` | Save name | `PATCH /api/collections/users/records/{id}` `{name}` |
 | `/keys` | Load | `GET /api/tracker/keys`, `GET /api/tracker/me` (workspace names) |
-| `/keys` | Choose a workspace for a projects reach | `GET /api/collections/projects/records?filter=(workspace='<id>' && trashed='')&sort=name&fields=id,name&perPage=500` |
+| `/keys` | Choose a workspace for a projects reach | `GET /api/collections/projects/records` with `filter` `workspace = "<id>" && trashed = ""` (bound through the SDK's `pb.filter`), `sort=name`, `fields=id,name`, every page at 500 a page (the SDK's `getFullList`) |
 | `/keys` | Create | `POST /api/collections/api_keys/records` `{name, scope, reach, workspace?, projects?, expires?}`; the answer's `key` is the secret |
 | `/keys` | Revoke | `POST /api/tracker/keys/{id}/revoke` |
 | signed-in layout | Load | `GET /api/tracker/admin/pending-users`: 200 shows the Approvals entry, 404 hides it |
@@ -103,12 +103,12 @@ Dates are shown in UTC as `YYYY-MM-DD HH:MM UTC`; an empty `expires` or `last_us
 
 | Screen | Content |
 | --- | --- |
-| `/auth/email-verification` | "Check your email", then "We sent a link to {email}. Open it to choose your password; choosing it confirms your address. An administrator then approves new accounts before they can sign in." and a "Send a new link" button, disabled for 60 seconds after each send, reading "Send a new link in {n}s" meanwhile |
+| `/auth/email-verification` | "Check your email", then "We sent a link to {email}. Open it to choose your password; choosing it confirms your address. An administrator then approves new accounts before they can sign in." and a "Send a new link" button, disabled for 60 seconds when the screen opens (signup has just sent a link) and after each send, reading "Send a new link in {n}s" meanwhile. With no `email` in the URL: "We sent a link to your email address." in place of the first sentence, and no button |
 | `/auth/password-reset`, after sending | "If an account uses {email}, a link to choose a new password is on its way." |
 | `/auth/password-reset-confirm`, after saving | "Password saved. You can sign in now; a new account can sign in once an administrator approves it." and a "Go to sign in" button |
 | `/auth/email-verification-confirm`, confirmed | "Email address confirmed. Choose a password to sign in." and a "Choose a password" button to `/auth/password-reset` |
-| `/profile` | Email (read-only), Name (editable, Save), "Sign-in methods": "Password", then per enabled provider "{displayName}: linked" or a "Link {displayName}" button |
-| `/keys` | Table columns Name, Level, Reach, Client, Created, Expires, Last used, Status; a "New key" button; a "Revoke" button on each Active key. Level shows `Read`, `Write`, `Manage`, `Own`. Reach shows `All workspaces`, the workspace's name (its id when the caller's `/me` does not list it), or `{n} projects in {workspace name}`. Client shows `client_id`, or `—` when empty. Status is `Revoked` when `revoked`, else `Expired` when `expires` is not empty and not later than now, else `Active`. With no keys: "No keys yet." |
+| `/profile` | Email (read-only), Name (editable, Save; "Saved." after a save), "Sign-in methods": "Password", then per enabled provider "{displayName}: linked" or a "Link {displayName}" button |
+| `/keys` | Table columns Name, Level, Reach, Client, Created, Expires, Last used, Status; a "New key" button; a "Revoke" button on each Active key. Level shows `Read`, `Write`, `Manage`, `Own`. Reach shows `All workspaces`, the workspace's name (its id when the caller's `/me` does not list it), or `{n} projects in {workspace name}` (`1 project in {workspace name}` for one; the workspace's id in place of its name when `/me` does not list it). Client shows `client_id`, or `—` when empty. Status is `Revoked` when `revoked`, else `Expired` when `expires` is not empty and not later than now, else `Active`. With no keys: "No keys yet." |
 | `/keys`, New key dialog | Name; Level (radio: the four levels, labelled as on the OAuth consent page); Reach (radio "Every workspace", "One workspace", "Some projects of one workspace"); Workspace (select of the caller's `/me` workspaces whose `status` is `active`, shown for the two narrower reaches); Projects (checkboxes, shown for the projects reach); Expires (optional date, at least tomorrow in UTC). After creating: "Copy this key now. It is not shown again.", the secret, a "Copy" button, a "Done" button |
 | `/keys`, Revoke dialog | "Revoke key "{name}"?", "Anything using this key stops working at once. This cannot be undone.", "Cancel", "Revoke" |
 | `/approvals` | Table columns Name, Email, Signed up, Status, and an "Approve" button where `approved` is false. Status: `Waiting for approval` (verified, not approved), `Email not confirmed; waiting for approval` (neither), `Waiting for email confirmation` (approved, not verified). With none: "No accounts are waiting." |
@@ -174,4 +174,4 @@ decision:rate-limit-counts-x-real-ip): the app adds no limit and no bypass.
   path answers as before, including 404 for an unknown path.
 - **CORS** is unchanged: the app is same-origin.
 - **API, collections, rules, rate limits, `openapi.json`**: unchanged. The `users` collection's
-  three mail templates change text only.
+  reset-password and verification mail templates change text only; the signup mail's link comes from a hook.
