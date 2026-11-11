@@ -449,14 +449,12 @@ try {
   // COVERS: hook:keys.pb.js#onRecordUpdateRequest:decisions
   // COVERS: hook:keys.pb.js#onRecordUpdateRequest:documents
   // COVERS: hook:keys.pb.js#onRecordUpdateRequest:milestones
-  // Bounded: for milestones the two tiers are indistinguishable from outside — `project` is
-  // required there, so the keyless case only this hook refuses cannot be constructed.
   console.log("\n── §8 a keyless item stays keyless: no client-minted label, no mint at move ──");
-  for (const collection of ["tasks", "decisions", "documents"]) {
+  for (const collection of ["tasks", "decisions", "documents", "milestones"]) {
     let keyless: any;
     [s, keyless] = await create_item(token, collection, WS, null, `keyless ${collection}`);
     check(
-      `${collection.padEnd(9)} created with no project → 200, empty key`,
+      `${collection.padEnd(10)} created with no project → 200, empty key`,
       tup(s, keyless.key ?? null),
       tup(200, ""),
     );
@@ -466,14 +464,14 @@ try {
       token,
       { key: "ANY-99" },
     );
-    check(`PATCHing a label onto the keyless ${collection.padEnd(9)} → 400`, s, 400);
+    check(`PATCHing a label onto the keyless ${collection.padEnd(10)} → 400`, s, 400);
     let back: any;
     [s, back] = await api(
       "GET",
       `/api/collections/${collection}/records/${getitem(keyless, "id")}`,
       token,
     );
-    check(`the keyless ${collection.padEnd(9)} still carries no key`, back.key ?? null, "");
+    check(`the keyless ${collection.padEnd(10)} still carries no key`, back.key ?? null, "");
   }
 
   // Ruled keep-empty: assignItemKey is the only minter, so moving into a project with a
