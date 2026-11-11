@@ -260,6 +260,23 @@ check("...while one own-file site under the plain form exits 0", rc, 0);
 });
 check("...and a mention in an ordinary comment is not a second site", rc, 0);
 
+console.log("\n── (k) an ordinary comment is not presence, except in a Markdown mirror ──");
+[rc, out] = verdict({
+  ...mirrored,
+  "b.py": "# RETRY_BUDGET = 5 was the budget\nRETRY_BUDGET = 15\n",
+});
+check("a twin surviving only in a comment exits 1", rc, 1);
+check(
+  "...naming the side that lost it",
+  out.includes("'5' still appears in a.py but no longer in b.py"),
+  true,
+);
+[rc, out] = verdict({
+  "a.py": "# KEEP IN SYNC: b.md lists `RETRY_BUDGET`.\nRETRY_BUDGET = 5\n",
+  "b.md": "# Constants\n\n* RETRY_BUDGET is the retry count\n",
+});
+check("...while a Markdown bullet is the mirror itself and exits 0", rc, 0);
+
 console.log(
   "\n── (i) the shipped error-predicate sites: either half moved at any one site goes red ──",
 );
