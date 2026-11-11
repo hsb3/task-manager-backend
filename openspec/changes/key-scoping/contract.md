@@ -42,7 +42,7 @@ apply the reach (Errors: out of reach). Routes absent from this table keep today
 | `GET /api/tracker/search` | read | matches only in W | matches only items and projects in P |
 | `GET /api/tracker/summary` | read | counts only W's tasks | counts only P's tasks |
 | `GET /api/tracker/trash?workspace=` | read | 404 unless `workspace` is W | 404 unless W; lists only P's trashed items |
-| `POST /api/tracker/export` | read | 404 unless `workspace` is W | 404 unless W; exports P's projects and their work, and W's workspace record, statuses, labels, cycles and members (below) |
+| `POST /api/tracker/export` | read | 404 unless `workspace` is W | 404 unless W; exports P's projects and their work, and W's workspace record, statuses, labels and members (below) |
 | `GET /api/tracker/workspaces/trash` | read | lists only W | lists only W |
 | `GET /api/tracker/workspaces/{id}/deletion-impact` | read | 404 unless `{id}` is W | 404 |
 | `POST /api/tracker/workspaces/{id}/vocab` | manage | 404 unless `{id}` is W | 403 `api_key_scope` (level) |
@@ -182,7 +182,7 @@ subscription that asks for `expand` in its options is refused with 403 `api_key_
   2. "Access": "Read" and "Read and write", plus "Manage" when the requested scope reaches
      `manage` and "Own" when it reaches `own`. The highest requested level is preselected; a
      lower one may be chosen.
-  A submitted workspace the user does not belong to, or a level above the requested one,
+  A submitted workspace the user does not belong to, or a level not offered,
   re-renders the consent stage with status 200 (as the consent page answers every re-rendered
   stage) and the message `Choose one of the options shown.`, and issues no code.
 - **Minted key.** `scope` is the chosen level; `reach` is `all`, or `workspace` with `workspace`
