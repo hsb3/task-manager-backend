@@ -53,6 +53,7 @@ export default defineRailway(() => {
     replicas: { "us-east4-eqdc4a": 1 },
     domains: ["mcp.admin.tasks-pocketbase.functionform.ai"],
     env: {
+      PORT: preserve(),
       MCP_INTERNAL_SECRET: preserve(),
       MCP_PUBLIC_URL: preserve(),
       PB_INTERNAL_URL: preserve(),

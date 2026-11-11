@@ -101,6 +101,13 @@ for (const u of [
   "https://x.exa\tmple/a",
   "https://x/a b",
   "https://x/a\u00a0",
+  "https://evil.example\\claude.ai/meta",
+  "https://evil.example\\@claude.ai/meta",
+  "https://[2606:4700::1]/a",
+  "https://93.184.215.14/a",
+  "https://0x7f.1/a",
+  "https://1572395042/a",
+  "https://%D1%81laude.ai/meta",
 ])
   check(
     `url_rules: ${u} → reason`,
@@ -241,6 +248,27 @@ for (const [label, over, reason] of [
     "redirect_uris missing or invalid",
   ],
   ["redirect_fragment", { redirect_uris: ["https://x/cb#f"] }, "redirect_uris missing or invalid"],
+  [
+    "redirect_backslash",
+    { redirect_uris: ["https://evil.example\\@claude.ai/cb"] },
+    "redirect_uris missing or invalid",
+  ],
+  ["redirect_userinfo", { redirect_uris: ["https://u@x/cb"] }, "redirect_uris missing or invalid"],
+  [
+    "redirect_numeric_host",
+    { redirect_uris: ["https://0x7f.1/cb"] },
+    "redirect_uris missing or invalid",
+  ],
+  [
+    "redirect_ip_literal",
+    { redirect_uris: ["https://[::1]/cb"] },
+    "redirect_uris missing or invalid",
+  ],
+  [
+    "redirect_percent_host",
+    { redirect_uris: ["https://%D1%81laude.ai/cb"] },
+    "redirect_uris missing or invalid",
+  ],
   ["secret_client", { client_secret: "s" }, "client is not a public client"],
   [
     "jwt_auth_method",

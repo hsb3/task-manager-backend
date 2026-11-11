@@ -233,8 +233,10 @@ private, loopback or link-local address) and requires valid JSON with `client_id
 URL, a `client_name`, and `redirect_uris` holding the request's redirect URI.
 `token_endpoint_auth_method`, if present, must be `none`. A document is cached as its HTTP cache
 headers allow, for at most 24 hours. *(Q3)* Any HTTPS host may serve a document; the consent page
-names it. The `client_id` and each redirect URI are written in printable ASCII (an
-internationalised host as punycode, which the consent page shows as is).
+names it. The host of the `client_id` and of each `https` redirect URI is a DNS name of letters,
+digits, hyphens and dots whose last label begins with a letter, never an IP address (an
+internationalised host is written as punycode, and the consent page shows it so), and the rest
+of each URL is printable ASCII without `#` or `\`.
 
 Known documents for the milestone clients (ruling 1):
 

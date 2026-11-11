@@ -275,7 +275,7 @@ The `mcp` Railway service is the hosted MCP endpoint (`services/mcp/`), built fr
 
 | Service | Variable | Value on Railway | If missing |
 | --- | --- | --- | --- |
-| mcp | `PORT` | `8080`, set explicitly (the public domain targets it) | 8080 |
+| mcp | `PORT` | `8080`, set explicitly and declared in `railway/railway.ts` (the public domain targets it) | 8080 |
 | mcp | `MCP_HOST` | unset (listens on `::`) | `::` |
 | mcp | `MCP_INTERNAL_PORT` | `8081`; pocketbase's `MCP_INTERNAL_URL` names the same port, so change both or neither | 8081 |
 | mcp | `PB_INTERNAL_URL` | `http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:<pocketbase PORT>` | exit 1 |

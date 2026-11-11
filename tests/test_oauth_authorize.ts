@@ -187,6 +187,24 @@ const STUB_ANSWERS: Record<string, [number, object | string]> = {
     200,
     doc_client("https://idnredirect.example/meta", "I", ["https://\u0441laude.ai/cb"]),
   ],
+  "https://bsredirect.example/meta": [
+    200,
+    doc_client("https://bsredirect.example/meta", "B", ["https://evil.example\\@claude.ai/cb"]),
+  ],
+  "https://jsredirect.example/meta": [
+    200,
+    doc_client("https://jsredirect.example/meta", "J", ["javascript:alert(1)//"]),
+  ],
+  "https://evil.example\\@claude.ai/meta": [
+    200,
+    doc_client("https://evil.example\\@claude.ai/meta", "Claude Code"),
+  ],
+  "https://numredirect.example/meta": [
+    200,
+    doc_client("https://numredirect.example/meta", "N", ["https://0x7f.1/cb"]),
+  ],
+  "https://[2606:4700::1]/meta": [200, doc_client("https://[2606:4700::1]/meta", "V6")],
+  "https://noname.example/meta": [200, doc_client("https://noname.example/meta", "")],
   "https://ctlredirect.example/meta": [
     200,
     doc_client("https://ctlredirect.example/meta", "T", ["https://x.exa\tmple/cb"]),
@@ -791,10 +809,19 @@ try {
     for (const [label, id, redirect] of [
       ["redirect_non_ascii", "https://idnredirect.example/meta", "https://\u0441laude.ai/cb"],
       ["redirect_control", "https://ctlredirect.example/meta", "https://x.exa\tmple/cb"],
+      [
+        "redirect_backslash",
+        "https://bsredirect.example/meta",
+        "https://evil.example\\@claude.ai/cb",
+      ],
+      ["redirect_scheme", "https://jsredirect.example/meta", "javascript:alert(1)//"],
+      ["redirect_numeric_host", "https://numredirect.example/meta", "https://0x7f.1/cb"],
+      ["client_id_ip_literal", "https://[2606:4700::1]/meta", "http://localhost/callback"],
+      ["client_id_backslash", "https://evil.example\\@claude.ai/meta", "http://localhost/callback"],
     ]) {
       a = await get({ ...cc, client_id: id!, redirect_uri: redirect! });
       check(
-        `${label}: a returned redirect URI outside printable ASCII → 400 'could not be verified.'`,
+        `${label}: an id or returned redirect URI outside the URL rule → 400 'could not be verified.'`,
         tup(a.status, a.text.includes("could not be verified."), a.text.includes("right now")),
         tup(400, true, false),
       );
@@ -829,6 +856,7 @@ try {
       "https://notjson.example/meta",
       "https://empty.example/meta",
       "https://nouris.example/meta",
+      "https://noname.example/meta",
     ]) {
       a = await get({ ...cc, client_id: id });
       check(

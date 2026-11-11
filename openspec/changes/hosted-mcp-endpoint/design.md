@@ -116,10 +116,15 @@ Request: `POST {MCP_INTERNAL_URL}/internal/client-metadata`, headers
 Rules, in order (each failure is 422 with the quoted reason unless marked 503):
 
 1. URL (`check_client_id_url`), checked on the **raw string** before any parsing normalises it:
-   every character is printable ASCII (`\x21`-`\x7e`: no space, control character or non-ASCII
-   character, so an internationalised host is accepted only as punycode, and is shown as
-   punycode; slice-3 review item 1: a Unicode host was fetched as punycode but shown raw, so
-   `https://сlaude.ai/...` with a Cyrillic `с` read as `claude.ai` on the consent page);
+   the host, which the consent page shows, is a DNS name of letters, digits, hyphens and dots
+   whose last label begins with a letter (optional trailing dot), with an optional `:port` (so
+   no IP literal, since a numeric host such as `0x7f.1` parses to an address the page would not
+   name, and no Unicode, `%`, `\` or userinfo: an
+   internationalised host is accepted only as punycode and shown as punycode; a Unicode host
+   would be fetched as punycode but shown raw, so `https://сlaude.ai/...` with a Cyrillic `с`
+   would read as `claude.ai`), and every other character is printable ASCII (`\x21`-`\x7e`)
+   other than `#` and `\` (a URL parser reads `\` as `/`, so `https://evil.example\@claude.ai/`
+   would reach `evil.example` while a reader sees `claude.ai`);
    starts with `https://`; contains no `#`, no `?`, and no `@` before the first `/` after the
    scheme; the raw path (from the first `/` after `https://`) is not empty or `/`; no raw path
    segment, compared case-insensitively, is `.`, `..`, `%2e`, `%2e%2e`, `.%2e` or `%2e.`; and `new URL(raw)`
@@ -139,8 +144,8 @@ Rules, in order (each failure is 422 with the quoted reason unless marked 503):
 6. JSON object, else "document is not a JSON object". `client_id` must equal the URL string
    exactly ("client_id does not match the URL"). `client_name` a non-empty string, cut to 200
    characters ("client_name missing or invalid" when absent, empty or not a string).
-   `redirect_uris` a non-empty array of strings, each printable ASCII as in rule 1, holding no
-   `#` (RFC 6749 3.1.2: a redirection endpoint has no fragment), and parsing with `new URL()` to
+   `redirect_uris` a non-empty array of strings, each following rule 1's host and character rule
+   (so no `#`: RFC 6749 3.1.2, a redirection endpoint has no fragment), and parsing with `new URL()` to
    protocol `https:`, or to protocol `http:` with hostname exactly `localhost` or `127.0.0.1`,
    and each at most 2000 characters ("redirect_uris missing or invalid").
    `token_endpoint_auth_method` absent or `"none"`; `client_secret` absent ("client is not a
@@ -441,13 +446,15 @@ oauth_codes WHERE expires < {:now}` through `$app.db().newQuery(...).bind({ now 
 no cron is added.
 
 Metadata documents are cached in `$app.store()` under `cimd:<client_id>` as `{ client, exp }`.
-PocketBase does not rely on the service for what the consent page shows (slice-3 review items
-1-4): an `https://` `client_id` with any character outside printable ASCII (`\x21`-`\x7e`) is
-refused as "could not be verified." before any call to the service; a 200 whose `client` lacks a
+PocketBase does not rely on the service for what the consent page shows: an `https://`
+`client_id` breaking D5 rule 1's host and character rule (or over 2000 characters) is refused as
+"could not be verified." before any call to the service; a 200 whose `client` lacks a non-empty
 string `client_name` or a non-empty `redirect_uris` array of strings is "right now" (and is not
-cached); a returned redirect URI outside printable ASCII makes the client "could not be
-verified."; the client keeps the `client_id` PocketBase asked for, whatever id the service
-returns; and `client_name` is cut to 200 characters on the PocketBase side too.
+cached); a returned redirect URI that is not `https://` or loopback `http://`, breaks the same
+host and character rule, or is over 2000 characters makes the client "could not be verified.";
+the client keeps the `client_id` PocketBase asked for, whatever id the service returns; and
+`client_name` is cut to 200 characters on the PocketBase side too. The two URL shapes are one
+pair of literals in `services/mcp/src/cimd.ts` and `pb_hooks/lib/oauth.js` (`KEEP IN SYNC`).
 OTP wrong-guess counts live under `oauth_otp_tries:<otp id>`. The page-signing secret is
 `oauthFlowSecret`, set once per boot with `$security.randomString(40)` in `onBootstrap`, the
 pattern of `pb_hooks/mail.pb.js:19` (`signupMailSecret`).
@@ -1371,9 +1378,9 @@ and removes scratch, exit 1 on any failure.
     "X-TM-Internal": secret, "Content-Type": "application/json" }, body: JSON.stringify({
     client_id: id }), timeout: 8 })`; 200: store `{ client: res.json.client, exp: Date.now() +
     res.json.max_age * 1000 }` when `max_age > 0`, return it; 422: "could not be verified"; any
-    other status or a thrown error: "right now". The guards of D13's last paragraph (printable
-    ASCII id and redirect URIs, the 200's shape, the requested id kept, the 200-character name)
-    wrap this branch.
+    other status or a thrown error: "right now". The guards of D13's last paragraph (the URL
+    shapes of the id and redirect URIs, the 200's shape, the requested id kept, the
+    200-character name) wrap this branch.
 - **Tests** (`tests/test_mcp_cimd.ts`, no port; fake `lookup` and `fetch`; write
   `refuses_private_address` first):
   - `url_rules`: `http://x/a`, `https://u@x/a`, `https://x`, `https://x/`, `https://x/a#f`,
@@ -1528,7 +1535,8 @@ command is exact; a step that cannot run as written stops the runbook and is rep
    'PB_INTERNAL_URL=http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:${{pocketbase.PORT}}'
    --variables "MCP_PUBLIC_URL=https://mcp.<API host from step 2>" --variables PORT=8080`
    (`PORT` is set explicitly because the service listens on two ports, `PORT` and
-   `MCP_INTERNAL_PORT` 8081, and step 7's domain must target `PORT`; `MCP_INTERNAL_PORT` stays
+   `MCP_INTERNAL_PORT` 8081, and step 7's domain must target `PORT`; `railway.ts` declares
+   `PORT` on `mcp` (`preserve()`), so step 11's plan sees it; `MCP_INTERNAL_PORT` stays
    unset at its 8081 default, the port step 6's `MCP_INTERNAL_URL` names: change both or
    neither).
 5. `railway environment edit --service-config mcp build.builder DOCKERFILE --service-config mcp

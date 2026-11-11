@@ -11,6 +11,16 @@ const CLIENTS = {
   },
 };
 
+// The consent page shows the host, so it is a name ending in a letter label: no IP literal (a
+// numeric host like 0x7f.1 parses to an address), Unicode, %, \ or userinfo.
+// KEEP IN SYNC: services/mcp/src/cimd.ts "(?:[A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*\.?(?::\d{1,5})?" "[\x21\x22\x24-\x5b\x5d-\x7e]*"
+const AUTHORITY = String.raw`(?:[A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*\.?(?::\d{1,5})?`;
+const REST = String.raw`[\x21\x22\x24-\x5b\x5d-\x7e]*`;
+const CLIENT_ID_SHAPE = new RegExp(`^https://${AUTHORITY}/${REST}$`);
+const REDIRECT_SHAPE = new RegExp(
+  `^(?:https://${AUTHORITY}|http://(?:localhost|127\\.0\\.0\\.1)(?::\\d{1,5})?)(?:/${REST})?$`,
+);
+
 function issuer() {
   return ($os.getenv("PB_PUBLIC_URL") || "http://127.0.0.1:8090").replace(
     /\/+$/,
@@ -169,11 +179,10 @@ function resolve_client(app, client_id) {
       ok: false,
       message: "The app asking to sign in could not be verified.",
     };
-    // Printable ASCII only: a Unicode host would be shown as a lookalike of another.
-    const printable = (u) => typeof u === "string" && /^[\x21-\x7e]+$/.test(u);
-    if (!printable(client_id)) return invalid;
+    if (client_id.length > 2000 || !CLIENT_ID_SHAPE.test(client_id))
+      return invalid;
     const as_client = (c) =>
-      c.redirect_uris.every(printable)
+      c.redirect_uris.every((u) => u.length <= 2000 && REDIRECT_SHAPE.test(u))
         ? {
             ok: true,
             client: {
@@ -210,6 +219,7 @@ function resolve_client(app, client_id) {
       if (
         !client ||
         typeof client.client_name !== "string" ||
+        client.client_name === "" ||
         !Array.isArray(client.redirect_uris) ||
         !client.redirect_uris.length ||
         !client.redirect_uris.every((u) => typeof u === "string")
