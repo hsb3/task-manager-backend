@@ -16,6 +16,7 @@
     "clients/**/*.ts",
     "e2e/**/*.ts",
     "scripts/**/*.ts",
+    "services/**/*.ts",
     "tests/**/*.ts"
   ]
 }

@@ -22,6 +22,7 @@
 3	12	test_shadow_project
 4	11	test_owner_transfer
 1	11	test_battery_stop_room
+4	11	test_mcp_service
 2	10	test_oauth
 1	9	test_boot_refusals
 4	9	test_signup_verification

@@ -51,20 +51,23 @@ writes.
 - Gap: an open stream outlives its key's revocation.
 
 **AC-6** An agent with no local process can reach the tracker over MCP.
-- Verdict: missing.
+- Verdict: partly.
 - Evidence: `clients/tm/src/mcp.ts` connects only `StdioServerTransport`. The MCP
   specification defines two standard transports, stdio and Streamable HTTP ("Transports",
   https://modelcontextprotocol.io/specification/2025-06-18/basic/transports). A Claude custom
   connector "must be reachable over the public internet from Anthropic's IP ranges" ("Getting
   started with custom connectors using remote MCP",
   https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp).
-- Gap: no network-reachable MCP endpoint.
+  `services/mcp/` serves the catalog over Streamable HTTP (`tests/test_mcp_service.ts`).
+- Gap: not deployed.
 
 **AC-7** A remote MCP endpoint authenticates in a way hosted MCP clients support.
 - Verdict: partly.
 - Evidence: the API serves RFC 8414 metadata, a sign-in and consent page, token and revocation
   endpoints (`pb_hooks/oauth_server.pb.js`; `tests/test_oauth_token.ts`,
-  `tests/test_oauth_authorize.ts`).
+  `tests/test_oauth_authorize.ts`). The MCP service answers 401 with a `WWW-Authenticate`
+  challenge naming its Protected Resource Metadata (`services/mcp/src/app.ts`, case
+  `no_credential_401`).
 - Gap: no deployed MCP endpoint presents the challenge yet (AC-6).
 
 **AC-8** The CLI runs on a machine that has no checkout of this repository.

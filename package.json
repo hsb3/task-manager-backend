@@ -7,8 +7,8 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "format:check": "prettier --check \"clients/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\"",
-    "format": "prettier --write \"clients/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\""
+    "format:check": "prettier --check \"clients/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"services/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\"",
+    "format": "prettier --write \"clients/**/*.ts\" \"e2e/**/*.ts\" \"scripts/**/*.ts\" \"services/**/*.ts\" \"tests/**/*.ts\" \"pb_hooks/**/*.js\""
   },
   "devDependencies": {
     "@fission-ai/openspec": "1.16.1",
