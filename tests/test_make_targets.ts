@@ -57,7 +57,7 @@ function copy_resolver(root: string): void {
   try {
     const root = scratch;
     fs.copyFileSync(path.join(REPO, "Makefile"), path.join(root, "Makefile"));
-    for (const dir of ["scripts/model", "battery-manifests"]) {
+    for (const dir of ["scripts/model", "battery-manifests", "web/account"]) {
       fs.mkdirSync(path.join(root, dir), { recursive: true });
     }
     // The gate globs these; empty files suffice because the stub bun only records its argv.
@@ -125,8 +125,17 @@ function copy_resolver(root: string): void {
     unlink_missing_ok(log);
     const whole = run(root, ["check"], env);
     check(
-      "check runs check-static, then the whole battery",
-      whole.returncode === 0 && same(calls(), [...STATIC, ["battery", ""]]),
+      "check runs check-static, the account app's gate, then the whole battery",
+      whole.returncode === 0 &&
+        same(calls(), [
+          ...STATIC,
+          ["bun", "install --frozen-lockfile"],
+          ["bun", "run lint"],
+          ["bun", "run build"],
+          ["bun", "run typecheck"],
+          ["bun", "run test"],
+          ["battery", ""],
+        ]),
     );
 
     unlink_missing_ok(log);
