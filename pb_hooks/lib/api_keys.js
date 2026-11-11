@@ -162,19 +162,34 @@ function accountWide(method, route, collection) {
 const REACH_MESSAGE =
   "This API key is limited to part of the tracker, so it cannot be used for this endpoint.";
 
-// PB reads a header as a rule token lower-cased with "-" as "_", so every "-"/"_" choice at the three separators reaches it; del canonicalizes case.
-function stripReachHeaders(header) {
-  for (const parts of [
-    ["x", "tm", "key", "workspace"],
-    ["x", "tm", "key", "projects"],
-  ]) {
-    for (let m = 0; m < 8; m++) {
-      let name = parts[0];
-      for (let i = 1; i < parts.length; i++)
-        name += ((m >> (i - 1)) & 1 ? "_" : "-") + parts[i];
-      header.del(name);
-    }
+// PB 0.40.4 names a header's rule token with inflector.Snakecase: split on runs of [^A-Za-z0-9], "_" before an upper after a non-upper, lower-cased.
+function ruleToken(name) {
+  const up = (c) => c >= "A" && c <= "Z";
+  let out = "";
+  for (const w of String(name).split(/[^A-Za-z0-9]+/)) {
+    if (!w) continue;
+    if (out) out += "_";
+    for (let i = 0; i < w.length; i++)
+      out += (i > 0 && up(w[i]) && !up(w[i - 1]) ? "_" : "") + w[i];
   }
+  return out.toLowerCase();
+}
+
+const REACH_TOKENS = ["x_tm_key_workspace", "x_tm_key_projects"];
+
+// toString JSON-encodes the Go header map, the one JSVM route to its raw names; a name left after del refuses the request.
+function stripReachHeaders(header) {
+  const reachNames = () =>
+    Object.keys(JSON.parse(toString(header))).filter(
+      (n) => REACH_TOKENS.indexOf(ruleToken(n)) !== -1,
+    );
+  const found = reachNames();
+  if (!found.length) return;
+  for (const n of found) header.del(n);
+  if (reachNames().length)
+    throw new BadRequestError(
+      "The request carries a header the tracker does not accept.",
+    );
 }
 
 // KEEP IN SYNC: the C_* clauses of the key reach rules migration.

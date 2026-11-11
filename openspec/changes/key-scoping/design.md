@@ -63,16 +63,20 @@ Alternatives weighed:
   proven balanced (quotes, parentheses, `//` comments) before wrapping; spike: an unwrapped
   `1=1) || (1=1` widens any naive wrapper. Rules are combined by PocketBase itself and cannot be
   broken out of.
-- **Every spelling is removed.** PocketBase turns a header name into a rule token by lower-casing
-  it and replacing `-` with `_`, so `x_tm_key_workspace` or `X-Tm-Key_Projects` sent by a client
-  reaches the same token, and when two spellings are present which one the rule sees varies
-  between requests (truth review, room probe). Go stores each incoming name in its canonical
-  form, and the JSVM exposes no way to list header names (spike: `Object.keys` and `for…in` on
-  `e.request.header` yield its methods), so `stripReachHeaders` deletes, for each of the two
-  names, all eight spellings that choose `-` or `_` at each of its three separators; `del`
-  canonicalizes the name it is given. Spike: after this, a forged underscore spelling on a user
-  session no longer narrows it, and an empty forged one on a limited request no longer widens
-  it (eight requests per spelling, six spellings, one stable answer each).
+- **Every spelling is removed.** PocketBase 0.40.4 turns a header name into a rule token with
+  `inflector.Snakecase` (`core/event_request.go`): it splits the name on every run of characters
+  outside `[A-Za-z0-9]`, joins the pieces with `_`, puts `_` before an upper-case letter that
+  follows a non-upper-case one, and lower-cases the result. So `x_tm_key_workspace`,
+  `X.Tm.Key.Workspace`, `x~tm~key~workspace`, `x--tm-key-workspace` and `-x-tm-key-workspace-`
+  sent by a client all reach the same token, and when two names reach it which value the rule
+  sees varies between requests (Go map order). The JSVM's `Object.keys` and `for…in` on
+  `e.request.header` yield its methods, but `toString(e.request.header)` JSON-encodes the Go map
+  with its raw names (spike, room probe). So `stripReachHeaders` lists every incoming name that
+  way, computes its token by the same rule (`ruleToken`) and deletes each name whose token is
+  `x_tm_key_workspace` or `x_tm_key_projects`; if one is still listed after `del`, it refuses the
+  request with 400. (Build correction, fix-first review F1: the design first said PocketBase only
+  lower-cases and maps `-` to `_`, and removed the eight `-`/`_` spellings; a limited key sending
+  `X.Tm.Key.Workspace` with an empty or out-of-reach value escaped its reach.)
 - **Headers in rules** (chosen). Spike on PocketBase 0.40.4: a middleware-set header is visible
   to `@request.headers.*` in list (`totalItems` correct), view (404), create (400), update (404,
   and a body moving the record out is caught by a clause on `@request.body.*`), delete (404,
@@ -676,10 +680,11 @@ phase's code change, quote the failing line in the pull request, then make it pa
       `collection === "user_settings" && method !== "GET" && method !== "HEAD"`.
     - `const REACH_MESSAGE = "This API key is limited to part of the tracker, so it cannot be used for this endpoint.";`
   - `pb_hooks/api_keys.pb.js` middleware:
-    - `pb_hooks/lib/api_keys.js` also adds `function stripReachHeaders(header)`: for each of
-      `["x", "tm", "key", "workspace"]` and `["x", "tm", "key", "projects"]`, for `m` from 0 to
-      7, build the name joining the parts with `(m >> (i - 1)) & 1 ? "_" : "-"` before part `i`,
-      and call `header.del(name)`.
+    - `pb_hooks/lib/api_keys.js` also adds `function ruleToken(name)` (PocketBase's
+      `inflector.Snakecase`, D2) and `function stripReachHeaders(header)`: for every name in
+      `Object.keys(JSON.parse(toString(header)))` whose `ruleToken` is `x_tm_key_workspace` or
+      `x_tm_key_projects`, call `header.del(name)`; if such a name is still listed afterwards,
+      throw `BadRequestError` (build correction, D2).
     - First statement of the middleware, before `hosted-mcp-endpoint`'s `/oauth/` and
       `/.well-known/` skip and before the `tmk_` test (so the headers go on every request):
       `require(`${__hooks}/lib/api_keys.js`).stripReachHeaders(e.request.header);` with the

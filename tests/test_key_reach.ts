@@ -408,6 +408,123 @@ try {
     200,
   );
   check("(fixture) T3 is still live", await live("tasks", T3), 200);
+
+  console.log(
+    `\n── reach headers in every spelling PocketBase folds onto the rule token (each ${RUNS} times running) ──`,
+  );
+  // PB 0.40.4 reads a header name as inflector.Snakecase: runs of characters outside [A-Za-z0-9] split it.
+  const forgedNames = (last: string): string[] => {
+    const words = ["x", "tm", "key", last];
+    const out = new Set([
+      `X.Tm.Key.${last[0].toUpperCase()}${last.slice(1)}`,
+      `X-Tm-Key-${last[0].toUpperCase()}${last.slice(1)}_`,
+      `X-Tm_Key.${last}`,
+    ]);
+    for (const c of "!#$%&'*+-.^_`|~") {
+      const j = words.join(c);
+      for (const n of [j, words.join(c + c), c + j, j + c]) out.add(n);
+    }
+    return [...out];
+  };
+  // Left off for the rest of the run: the room is this suite's own and is deleted with it.
+  check(
+    "(fixture) superuser lifts the room's request rate limit for the sweep",
+    (await api("PATCH", "/api/settings", su, { rateLimits: { enabled: false } }))[0],
+    200,
+  );
+  const wsNames = forgedNames("workspace");
+  const pjNames = forgedNames("projects");
+  const CB = await make("comments", { task: T3, body: "on T3" }, "comment on T3 in WB");
+  const CP2 = await make("comments", { task: T2, body: "on T2 again" }, "second comment on T2");
+  const titles = tup(await field("tasks", T2, "title"), await field("tasks", T3, "title"));
+  const sweep = [
+    {
+      name: "kWA",
+      token: kWA,
+      wide: tup(WB, ""),
+      out: T3,
+      comment: CB,
+      ws: WB,
+      pr: PB1,
+      own: `workspace='${WA}'`,
+    },
+    {
+      name: "kP1",
+      token: kP1,
+      wide: tup(WA, PA2),
+      out: T2,
+      comment: CP2,
+      ws: WA,
+      pr: PA2,
+      own: `project='${PA1}'`,
+    },
+  ];
+  for (const k of sweep) {
+    const own = await truth("tasks", k.own);
+    const bad: Record<string, string[]> = {
+      list: [],
+      view: [],
+      update: [],
+      create: [],
+      delete: [],
+    };
+    for (let i = 0; i < wsNames.length; i++) {
+      for (let r = 0; r < RUNS; r++) {
+        // Even runs forge an empty value ("no limit"), odd runs an out-of-reach one.
+        const f = { [wsNames[i]]: r % 2 ? k.wide[0] : "", [pjNames[i]]: r % 2 ? k.wide[1] : "" };
+        const tag = `${wsNames[i]} / ${pjNames[i]}`;
+        if (!Bun.deepEquals(await list(k.token, "tasks", "", f), own)) bad.list.push(tag);
+        if ((await api("GET", `${recs("tasks")}/${k.out}`, k.token, null, f))[0] !== 404)
+          bad.view.push(tag);
+        if (
+          (await api("PATCH", `${recs("tasks")}/${k.out}`, k.token, { title: "forged" }, f))[0] !==
+          404
+        )
+          bad.update.push(tag);
+        if (
+          (
+            await api(
+              "POST",
+              recs("tasks"),
+              k.token,
+              { title: "forged", workspace: k.ws, project: k.pr },
+              f,
+            )
+          )[0] !== 400
+        )
+          bad.create.push(tag);
+        if ((await api("DELETE", `${recs("comments")}/${k.comment}`, k.token, null, f))[0] !== 404)
+          bad.delete.push(tag);
+      }
+    }
+    for (const [op, tags] of Object.entries(bad))
+      check(
+        `${k.name}, ${wsNames.length} forged spelling pairs: ${op} out of reach → refused every run`,
+        [...new Set(tags)],
+        [],
+      );
+  }
+  check(
+    "(after the sweep) T2 and T3 keep their titles, both comments live, no forged task exists",
+    tup(
+      tup(await field("tasks", T2, "title"), await field("tasks", T3, "title")),
+      await live("comments", CB),
+      await live("comments", CP2),
+      (await api("GET", `${recs("tasks")}?filter=${encodeURIComponent("title='forged'")}`, su))[1]
+        .totalItems,
+    ),
+    tup(titles, 200, 200, 0),
+  );
+  const every = await truth("tasks", "");
+  const stripped: string[] = [];
+  for (const n of wsNames)
+    for (let r = 0; r < RUNS; r++)
+      if (!Bun.deepEquals(await list(alice, "tasks", "", { [n]: WB }), every)) stripped.push(n);
+  check(
+    "each forged workspace spelling: WB on Alice's session → every task (removed)",
+    [...new Set(stripped)],
+    [],
+  );
 } finally {
   if (server !== null) await roomkit.stop(server);
   fs.rmSync(S, { recursive: true, force: true });

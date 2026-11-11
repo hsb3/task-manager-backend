@@ -29,6 +29,7 @@ const recs = (c: string) => `/api/collections/${c}/records`;
 const REACH_MSG =
   "This API key is limited to part of the tracker, so it cannot be used for this endpoint.";
 const WAIT_MS = 8000; // bound on an in-reach event's arrival
+const RUNS = 8; // a forged header and the real one tie at random (Go map order)
 const GRACE_MS = 1500; // bound on a late out-of-reach event after the in-reach one arrived
 
 let failures = 0;
@@ -65,8 +66,14 @@ async function api(
   return [r.status, parsed];
 }
 
-async function download(url: string, auth: string | null = null): Promise<[number, Uint8Array]> {
-  const r = await fetch(BASE_URL + url, { headers: auth ? { Authorization: auth } : {} });
+async function download(
+  url: string,
+  auth: string | null = null,
+  extra: Record<string, string> = {},
+): Promise<[number, Uint8Array]> {
+  const r = await fetch(BASE_URL + url, {
+    headers: auth ? { Authorization: auth, ...extra } : extra,
+  });
   return [r.status, new Uint8Array(await r.arrayBuffer())];
 }
 
@@ -199,6 +206,7 @@ try {
   };
   const kWA_tasks = listen(kWA, "tasks/*");
   const kWA_hdr = listen(kWA, `tasks/*${opts({ headers: { x_tm_key_workspace: "" } })}`);
+  const kWA_dot = listen(kWA, `tasks/*${opts({ headers: { "X.Tm.Key.Workspace": "" } })}`);
   const kP1_items = listen(kP1, `rt:project_items:${WA}`);
   const kWA_itemsB = listen(kWA, `rt:project_items:${WB}`);
   const kP1_comments = listen(kP1, "comments/*");
@@ -241,6 +249,7 @@ try {
     () =>
       has(kWA_tasks, "create", TA) &&
       has(kWA_hdr, "create", TA) &&
+      has(kWA_dot, "create", TA) &&
       has(kP1_items, "update", F1) &&
       has(kP1_comments, "delete", C1) &&
       has(kAll_tasks, "create", TB) &&
@@ -257,6 +266,14 @@ try {
     tup(
       has(kWA_hdr, "create", TA),
       kWA_hdr.absent_count(kWA_hdr.events.filter((e) => e?.record?.workspace !== WA).length),
+    ),
+    tup(true, 0),
+  );
+  check(
+    "kWA subscribed to tasks/* with options.headers X.Tm.Key.Workspace '' still receives no WB event",
+    tup(
+      has(kWA_dot, "create", TA),
+      kWA_dot.absent_count(kWA_dot.events.filter((e) => e?.record?.workspace !== WA).length),
     ),
     tup(true, 0),
   );
@@ -358,6 +375,42 @@ try {
     (await download(`${file(F2, F2n)}?token=${aliceFileToken}`))[0],
     200,
   );
+
+  console.log(`\n── files under forged reach headers (each ${RUNS} times running) ──`);
+  // PB 0.40.4 reads a header name as inflector.Snakecase: runs of characters outside [A-Za-z0-9] split it.
+  const forgedNames = (last: string): string[] => {
+    const words = ["x", "tm", "key", last];
+    const out = new Set([`X.Tm.Key.${last[0].toUpperCase()}${last.slice(1)}`, `X-Tm_Key.${last}`]);
+    for (const c of "!#$%&'*+-.^_`|~") {
+      const j = words.join(c);
+      for (const n of [j, words.join(c + c), c + j, j + c]) out.add(n);
+    }
+    return [...out];
+  };
+  // Left off for the rest of the run: the room is this suite's own and is deleted with it.
+  check(
+    "(fixture) superuser lifts the room's request rate limit for the sweep",
+    (await api("PATCH", "/api/settings", su, { rateLimits: { enabled: false } }))[0],
+    200,
+  );
+  const wsNames = forgedNames("workspace");
+  const pjNames = forgedNames("projects");
+  for (const [name, token, url, wide] of [
+    ["kWA", kWA, file(F3, F3n), tup(WB, "")],
+    ["kP1", kP1, file(F2, F2n), tup(WA, PA2)],
+  ] as [string, string, string, [string, string]][]) {
+    const leaked = new Set<string>();
+    for (let i = 0; i < wsNames.length; i++)
+      for (let r = 0; r < RUNS; r++) {
+        const f = { [wsNames[i]]: r % 2 ? wide[0] : "", [pjNames[i]]: r % 2 ? wide[1] : "" };
+        if ((await download(url, token, f))[0] !== 404) leaked.add(`${wsNames[i]} / ${pjNames[i]}`);
+      }
+    check(
+      `${name} downloads an out-of-reach attachment under ${wsNames.length} forged spelling pairs → 404 every run`,
+      [...leaked],
+      [],
+    );
+  }
 } finally {
   for (const l of listeners) l.stop = true;
   if (server !== null) await roomkit.stop(server);
