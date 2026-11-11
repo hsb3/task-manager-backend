@@ -106,6 +106,7 @@ describe("validators", () => {
   test("name", () => {
     expect(validateName("   ")).toBe("Cannot be blank.");
     expect(validateName("x".repeat(256))).toBe("Use at most 255 characters.");
+    expect(validateName(`${" ".repeat(10)}${"x".repeat(250)}`)).toBeUndefined();
   });
   test("password", () => {
     expect(validatePassword("1234567")).toBe("Use at least 8 characters.");
@@ -174,6 +175,14 @@ describe("pendingStatus", () => {
 });
 
 describe("errorResult", () => {
+  test("a 5xx without a JSON answer still names a message", () => {
+    const r = errorResult(
+      new ClientResponseError({ status: 502, response: {} }),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok)
+      expect(typeof r.message === "string" && r.message !== "").toBe(true);
+  });
   test("429 is the rate-limit message", () => {
     const r = errorResult(
       new ClientResponseError({

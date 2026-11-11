@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "pocketbase-notes-app",
+      "name": "account-app",
       "dependencies": {
         "@radix-ui/react-label": "2.1.15",
         "@radix-ui/react-separator": "1.1.15",

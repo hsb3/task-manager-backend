@@ -157,7 +157,7 @@ export function validatePasswordConfirm(
 
 export function validateName(v: string): string | undefined {
   if (!v.trim()) return MESSAGES.nameBlank;
-  return v.length > 255 ? MESSAGES.nameTooLong : undefined;
+  return v.trim().length > 255 ? MESSAGES.nameTooLong : undefined;
 }
 
 export function validateKeyName(v: string): string | undefined {
@@ -241,7 +241,7 @@ export function errorResult(err: unknown): Result<never> {
   const fields: Record<string, string> = {};
   for (const [key, value] of Object.entries(err.response.data ?? {}))
     fields[key] = (value as { message: string }).message;
-  return failed(err.response.message, err.status, fields);
+  return failed(err.response.message || err.message, err.status, fields);
 }
 
 export function client(url: string, store?: BaseAuthStore): PocketBase {

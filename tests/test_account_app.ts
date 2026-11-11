@@ -6,6 +6,7 @@
  */
 
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { py_repr, run_checked } from "../scripts/_py.ts";
@@ -37,6 +38,45 @@ async function req(method: string, p: string): Promise<Response> {
   } catch (e) {
     return roomkit.die_no_server(BASE_URL, e);
   }
+}
+
+const NOT_FOUND = '{"data":{},"message":"File not found.","status":404}';
+
+// fetch() normalises %2e%2e segments away (WHATWG URL), so these requests go over a raw socket.
+function raw(
+  method: string,
+  p: string,
+): Promise<{ status: number; headers: Record<string, string>; body: string }> {
+  return new Promise((resolve, reject) => {
+    const sock = net.connect({ host: "127.0.0.1", port: PORT });
+    const chunks: Buffer[] = [];
+    sock.on("data", (c: Buffer) => chunks.push(c));
+    sock.on("error", reject);
+    sock.on("end", () => {
+      const text = Buffer.concat(chunks).toString("utf8");
+      const [head = "", ...rest] = text.split("\r\n\r\n");
+      const [line = "", ...lines] = head.split("\r\n");
+      const headers: Record<string, string> = {};
+      for (const l of lines) {
+        const i = l.indexOf(":");
+        headers[l.slice(0, i).trim().toLowerCase()] = l.slice(i + 1).trim();
+      }
+      let body = rest.join("\r\n\r\n");
+      if (headers["transfer-encoding"] === "chunked") {
+        let out = "";
+        while (body) {
+          const nl = body.indexOf("\r\n");
+          const size = Number.parseInt(body.slice(0, nl), 16);
+          if (!size) break;
+          out += body.slice(nl + 2, nl + 2 + size);
+          body = body.slice(nl + 2 + size + 2);
+        }
+        body = out;
+      }
+      resolve({ status: Number(line.split(" ")[1]), headers, body: body.trim() });
+    });
+    sock.write(`${method} ${p} HTTP/1.1\r\nHost: 127.0.0.1:${PORT}\r\nConnection: close\r\n\r\n`);
+  });
 }
 
 const S = fs.mkdtempSync(path.join(os.tmpdir(), "pb-account-app-test-"));
@@ -144,6 +184,50 @@ try {
   check("11 GET /account/index.html → 301", r.status, 301);
   check("11 location /account/", r.headers.get("location"), "/account/");
   check("11 the redirect carries the policy", csp(r), CSP);
+
+  // A dot segment the static handler would resolve answers as a server without the app does.
+  const DOT_PATHS = [
+    "/api/..%2faccount/",
+    "/oauth/..%2faccount/",
+    "/api/%2e%2e/account/",
+    "/api/%2E%2E/account/",
+    "/api/health/%2e%2e/%2e%2e/account/",
+    "/api/%2e%2e/account/assets/app.js",
+    "/x/..%2Faccount/assets/app.js",
+    "/account/%2e/",
+    "/account/assets/%2e%2e/",
+    "/account/%2e%2e/account/",
+  ];
+  for (const p of DOT_PATHS) {
+    const g = await raw("GET", p);
+    check(
+      `12 GET ${p} → main's 404`,
+      [g.status, g.body, g.headers["content-security-policy"] ?? null],
+      [404, NOT_FOUND, null],
+    );
+    const h = await raw("HEAD", p);
+    check(
+      `12 HEAD ${p} → 404, no policy`,
+      [h.status, h.headers["content-security-policy"] ?? null],
+      [404, null],
+    );
+  }
+
+  const route = await raw("GET", "/api/collections/%2e%2e/records");
+  check(
+    "13 a dot segment a route matches is still the route's answer",
+    [route.status, route.body.includes("File not found.")],
+    [404, false],
+  );
+
+  r = await req("GET", "/account/assets/missing.js");
+  check("14 GET /account/assets/missing.js → 404", r.status, 404);
+  check(
+    "14 a missing asset is not cached as immutable",
+    r.headers.get("cache-control"),
+    "no-cache",
+  );
+  check("14 it carries the policy", csp(r), CSP);
 } finally {
   if (server !== null) await roomkit.stop(server);
   fs.rmSync(S, { recursive: true, force: true });
