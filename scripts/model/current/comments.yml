@@ -5,23 +5,30 @@ entity: comments
 kind: base
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) || (document.workspace.owner
-      = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && document.workspace.workspace_members_via_workspace.status ?= "active")) || (decision.workspace.owner
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && ((task.workspace.owner = @request.auth.id
+      || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status
+      ?= "active")) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) ||
+      (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= "active")))
+      && (task = "" || (task.trashed = "" && (task.project = "" || (task.project.created != "" && task.project.trashed
+      = "")) && task.workspace.trashed = "")) && (document = "" || (document.trashed = "" && (document.project
+      = "" || (document.project.created != "" && document.project.trashed = "")) && document.workspace.trashed
+      = "")) && (decision = "" || (decision.trashed = "" && (decision.project = "" || (decision.project.created
+      != "" && decision.project.trashed = "")) && decision.workspace.trashed = "")) && (document = ""
+      || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id
+      || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role
+      ?= "admin" && document.workspace.workspace_members_via_workspace.status ?= "active")) && (decision
+      = "" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner
       = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && decision.workspace.workspace_members_via_workspace.status ?= "active"))) && (task = "" || (task.trashed
-      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = "")) && (document = "" || (document.trashed = "" && (document.project = "" || (document.project.created
-      != "" && document.project.trashed = "")) && document.workspace.trashed = "")) && (decision = ""
-      || (decision.trashed = "" && (decision.project = "" || (decision.project.created != "" && decision.project.trashed
-      = "")) && decision.workspace.trashed = "")) && (document = "" || document.draft = false || document.author
-      = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= "admin" && document.workspace.workspace_members_via_workspace.status
-      ?= "active")) && (decision = "" || decision.draft = false || decision.author = @request.auth.id
-      || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status
-      ?= "active"))'
+      && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project))))'
     actors:
     - custom-compound(workspace-owner || active-workspace-member)
     - custom-compound(workspace-owner || active-workspace-member)
@@ -44,24 +51,38 @@ capabilities:
       "" && document.project.trashed = "")) && document.workspace.trashed = "")
     - decision = "" || (decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")
+    - '@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project)))'
   view:
-    verbatim: '@request.auth.id != "" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) || (document.workspace.owner
-      = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && document.workspace.workspace_members_via_workspace.status ?= "active")) || (decision.workspace.owner
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && ((task.workspace.owner = @request.auth.id
+      || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status
+      ?= "active")) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) ||
+      (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= "active")))
+      && (task = "" || (task.trashed = "" && (task.project = "" || (task.project.created != "" && task.project.trashed
+      = "")) && task.workspace.trashed = "")) && (document = "" || (document.trashed = "" && (document.project
+      = "" || (document.project.created != "" && document.project.trashed = "")) && document.workspace.trashed
+      = "")) && (decision = "" || (decision.trashed = "" && (decision.project = "" || (decision.project.created
+      != "" && decision.project.trashed = "")) && decision.workspace.trashed = "")) && (document = ""
+      || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id
+      || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role
+      ?= "admin" && document.workspace.workspace_members_via_workspace.status ?= "active")) && (decision
+      = "" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner
       = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && decision.workspace.workspace_members_via_workspace.status ?= "active"))) && (task = "" || (task.trashed
-      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = "")) && (document = "" || (document.trashed = "" && (document.project = "" || (document.project.created
-      != "" && document.project.trashed = "")) && document.workspace.trashed = "")) && (decision = ""
-      || (decision.trashed = "" && (decision.project = "" || (decision.project.created != "" && decision.project.trashed
-      = "")) && decision.workspace.trashed = "")) && (document = "" || document.draft = false || document.author
-      = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= "admin" && document.workspace.workspace_members_via_workspace.status
-      ?= "active")) && (decision = "" || decision.draft = false || decision.author = @request.auth.id
-      || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status
-      ?= "active"))'
+      && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project))))'
     actors:
     - custom-compound(workspace-owner || active-workspace-member)
     - custom-compound(workspace-owner || active-workspace-member)
@@ -84,10 +105,17 @@ capabilities:
       "" && document.project.trashed = "")) && document.workspace.trashed = "")
     - decision = "" || (decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")
+    - '@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project)))'
   create:
-    verbatim: '@request.auth.id != "" && (parent = "" || (parent.parent = "" && parent.task = task &&
-      parent.document = document && parent.decision = decision)) && ((task != "" && document = "" && decision
-      = "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (parent = "" || (parent.parent = ""
+      && parent.task = task && parent.document = document && parent.decision = decision)) && ((task !=
+      "" && document = "" && decision = "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?!= "viewer" && task.workspace.workspace_members_via_workspace.status
       ?= "active"))) || (document != "" && task = "" && decision = "" && (document.workspace.owner = @request.auth.id
       || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role
@@ -105,7 +133,13 @@ capabilities:
       ?= "active")) && (decision = "" || decision.draft = false || decision.author = @request.auth.id
       || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status
-      ?= "active"))'
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project))))'
     actors:
     - custom-compound(task != "" && document = "" && decision = "" && (workspace-owner || active-workspace-writer))
     - custom-compound(document != "" && task = "" && decision = "" && (workspace-owner || active-workspace-writer))
@@ -130,17 +164,24 @@ capabilities:
       "" && document.project.trashed = "")) && document.workspace.trashed = "")
     - decision = "" || (decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")
+    - '@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project)))'
   update:
-    verbatim: '@request.auth.id != "" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) || (document.workspace.owner
-      = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && document.workspace.workspace_members_via_workspace.status ?= "active")) || (decision.workspace.owner
-      = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && decision.workspace.workspace_members_via_workspace.status ?= "active"))) && @request.body.task:isset
-      = false && @request.body.document:isset = false && @request.body.decision:isset = false && @request.body.author:isset
-      = false && @request.body.parent:isset = false && (author = @request.auth.id || task.workspace.owner
-      = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id &&
-      task.workspace.workspace_members_via_workspace.role ?= "admin" && task.workspace.workspace_members_via_workspace.status
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && ((task.workspace.owner = @request.auth.id
+      || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status
+      ?= "active")) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) ||
+      (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= "active")))
+      && @request.body.task:isset = false && @request.body.document:isset = false && @request.body.decision:isset
+      = false && @request.body.author:isset = false && @request.body.parent:isset = false && (author =
+      @request.auth.id || task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?= "admin" && task.workspace.workspace_members_via_workspace.status
       ?= "active") || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= "admin" && document.workspace.workspace_members_via_workspace.status
       ?= "active") || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
@@ -165,7 +206,13 @@ capabilities:
       = "" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner
       = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id
       && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status
-      ?= "active"))'
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project))))'
     actors:
     - custom-compound(workspace-owner || active-workspace-member)
     - custom-compound(workspace-owner || active-workspace-member)
@@ -215,14 +262,21 @@ capabilities:
       "" && document.project.trashed = "")) && document.workspace.trashed = "")
     - decision = "" || (decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")
+    - '@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project)))'
   delete:
-    verbatim: '@request.auth.id != "" && ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) || (document.workspace.owner
-      = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && document.workspace.workspace_members_via_workspace.status ?= "active")) || (decision.workspace.owner
-      = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id
-      && decision.workspace.workspace_members_via_workspace.status ?= "active"))) && (author = @request.auth.id
-      || task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && ((task.workspace.owner = @request.auth.id
+      || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status
+      ?= "active")) || (document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) ||
+      (decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= "active")))
+      && (author = @request.auth.id || task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role ?= "admin" && task.workspace.workspace_members_via_workspace.status
       ?= "active") || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= "admin" && document.workspace.workspace_members_via_workspace.status
@@ -239,7 +293,13 @@ capabilities:
       ?= "active")) && (decision = "" || decision.draft = false || decision.author = @request.auth.id
       || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status
-      ?= "active"))'
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project))))'
     actors:
     - custom-compound(workspace-owner || active-workspace-member)
     - custom-compound(workspace-owner || active-workspace-member)
@@ -269,6 +329,13 @@ capabilities:
       "" && document.project.trashed = "")) && document.workspace.trashed = "")
     - decision = "" || (decision.trashed = "" && (decision.project = "" || (decision.project.created !=
       "" && decision.project.trashed = "")) && decision.workspace.trashed = "")
+    - '@request.headers.x_tm_key_workspace = "" || (task != "" && task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project))) || (document != "" && document.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (document.project != "" && @request.headers.x_tm_key_projects
+      ~ document.project))) || (decision != "" && decision.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (decision.project != "" && @request.headers.x_tm_key_projects
+      ~ decision.project)))'
 relations:
 - field: task
   target: tasks

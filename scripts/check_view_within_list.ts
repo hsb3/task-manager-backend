@@ -50,7 +50,6 @@ export const ALLOWLIST = new Map<string, string>([
     ]),
     TRASH_BRANCH_RULING,
   ],
-  [JSON.stringify(["project_items", '@request.auth.id != ""']), TRASH_BRANCH_RULING],
   [JSON.stringify(["project_items", "project_trashed = 0"]), TRASH_BRANCH_RULING],
   [JSON.stringify(["project_items", 'trashed = ""']), TRASH_BRANCH_RULING],
   [JSON.stringify(["project_items", "workspace_trashed = 0"]), TRASH_BRANCH_RULING],

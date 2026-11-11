@@ -128,7 +128,10 @@ with_scratch((scratch) => {
   let data = make_dir(scratch, "data_bad");
   let [ok, out] = migrate_up(PB_BIN, data, bad);
   check("a listRule the guard refuses -> ok False", ok === false);
-  check("...output names the guard's refusal", out.includes("may reference @request.auth.id only"));
+  check(
+    "...output names the guard's refusal",
+    out.includes("may reference @request.auth.id and the API-key reach headers only"),
+  );
   check("...and the rule is not stored", stored_rule(data) === null);
 
   const good = write_migrations(scratch, "good", {

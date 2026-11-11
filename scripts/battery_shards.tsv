@@ -131,6 +131,7 @@
 2	1	test_notifications_suspended
 2	1	test_route_errors
 3	1	test_mcp_cimd
+3	1	test_key_reach
 3	0	test_app_docs_down_up_checker
 3	0	test_app_docs_history_checker
 3	0	test_app_docs_quotes_checker

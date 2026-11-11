@@ -5,10 +5,12 @@ entity: task_subscribers
 kind: base
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
-      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = ""'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (task.workspace.owner = @request.auth.id
+      || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status
+      ?= "active")) && task.trashed = "" && (task.project = "" || (task.project.created != "" && task.project.trashed
+      = "")) && task.workspace.trashed = "") && (@request.headers.x_tm_key_workspace = "" || (task.workspace
+      = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects = "" || (task.project
+      != "" && @request.headers.x_tm_key_projects ~ task.project))))'
     actors:
     - workspace-owner
     - active-workspace-member
@@ -17,11 +19,16 @@ capabilities:
     - task.trashed = ""
     - task.project = "" || (task.project.created != "" && task.project.trashed = "")
     - task.workspace.trashed = ""
+    - '@request.headers.x_tm_key_workspace = "" || (task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project)))'
   view:
-    verbatim: '@request.auth.id != "" && (task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
-      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = ""'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (task.workspace.owner = @request.auth.id
+      || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status
+      ?= "active")) && task.trashed = "" && (task.project = "" || (task.project.created != "" && task.project.trashed
+      = "")) && task.workspace.trashed = "") && (@request.headers.x_tm_key_workspace = "" || (task.workspace
+      = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects = "" || (task.project
+      != "" && @request.headers.x_tm_key_projects ~ task.project))))'
     actors:
     - workspace-owner
     - active-workspace-member
@@ -30,12 +37,17 @@ capabilities:
     - task.trashed = ""
     - task.project = "" || (task.project.created != "" && task.project.trashed = "")
     - task.workspace.trashed = ""
+    - '@request.headers.x_tm_key_workspace = "" || (task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project)))'
   create:
-    verbatim: '@request.auth.id != "" && user = @request.auth.id && (task.workspace.owner = @request.auth.id
-      || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.role
-      ?!= "viewer" && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed
-      = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed
-      = ""'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && user = @request.auth.id && (task.workspace.owner
+      = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id &&
+      task.workspace.workspace_members_via_workspace.role ?!= "viewer" && task.workspace.workspace_members_via_workspace.status
+      ?= "active")) && task.trashed = "" && (task.project = "" || (task.project.created != "" && task.project.trashed
+      = "")) && task.workspace.trashed = "") && (@request.headers.x_tm_key_workspace = "" || (task.workspace
+      = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects = "" || (task.project
+      != "" && @request.headers.x_tm_key_projects ~ task.project))))'
     actors:
     - custom(user = @request.auth.id)
     - workspace-owner
@@ -45,16 +57,25 @@ capabilities:
     - task.trashed = ""
     - task.project = "" || (task.project.created != "" && task.project.trashed = "")
     - task.workspace.trashed = ""
+    - '@request.headers.x_tm_key_workspace = "" || (task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project)))'
   update:
     verbatim: null
     actors:
     - superuser-only
     authRequired: superuser
   delete:
-    verbatim: user = @request.auth.id
+    verbatim: '@request.auth.id != "" && (user = @request.auth.id) && (@request.headers.x_tm_key_workspace
+      = "" || (task.workspace = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects
+      = "" || (task.project != "" && @request.headers.x_tm_key_projects ~ task.project))))'
     actors:
     - custom(user = @request.auth.id)
-    authRequired: absent
+    authRequired: guard
+    record_state:
+    - '@request.headers.x_tm_key_workspace = "" || (task.workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects
+      ~ task.project)))'
 relations:
 - field: task
   target: tasks

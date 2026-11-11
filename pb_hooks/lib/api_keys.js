@@ -123,6 +123,43 @@ function reachHeaders(info) {
   };
 }
 
+// decision:api-key-reach-and-levels: requests that act for the whole account, refused to a limited key.
+const ACCOUNT_WIDE = [
+  "GET /api/tracker/me/landing",
+  "GET /api/tracker/workspaces/{id}/switch",
+  "GET /api/tracker/invitations/mine",
+  "POST /api/tracker/invitations/{id}/accept",
+  "POST /api/tracker/invitations/{id}/decline",
+  "PATCH /api/tracker/users/{id}/settings",
+  "POST /api/files/token",
+];
+
+function accountWide(method, route, collection) {
+  return (
+    ACCOUNT_WIDE.indexOf(method + " " + route) !== -1 ||
+    (collection === "workspaces" && method === "POST") ||
+    (collection === "user_settings" && method !== "GET" && method !== "HEAD")
+  );
+}
+
+const REACH_MESSAGE =
+  "This API key is limited to part of the tracker, so it cannot be used for this endpoint.";
+
+// PB reads a header as a rule token lower-cased with "-" as "_", so every "-"/"_" choice at the three separators reaches it; del canonicalizes case.
+function stripReachHeaders(header) {
+  for (const parts of [
+    ["x", "tm", "key", "workspace"],
+    ["x", "tm", "key", "projects"],
+  ]) {
+    for (let m = 0; m < 8; m++) {
+      let name = parts[0];
+      for (let i = 1; i < parts.length; i++)
+        name += ((m >> (i - 1)) & 1 ? "_" : "-") + parts[i];
+      header.del(name);
+    }
+  }
+}
+
 module.exports = {
   namesApiKeys,
   keyInfo,
@@ -134,4 +171,8 @@ module.exports = {
   levelMessage,
   keyReach,
   reachHeaders,
+  ACCOUNT_WIDE,
+  accountWide,
+  REACH_MESSAGE,
+  stripReachHeaders,
 };

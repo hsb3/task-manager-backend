@@ -5,11 +5,13 @@ entity: project_items
 kind: view
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && ((type = "task" && (workspace_owner = @request.auth.id || active_members
-      ~ @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id || active_members
-      ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id
-      || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0 && workspace_trashed
-      = 0'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && ((type = "task" && (workspace_owner
+      = @request.auth.id || active_members ~ @request.auth.id)) || (type != "task" && (workspace_owner
+      = @request.auth.id || active_members ~ @request.auth.id) && (draft = false || author = @request.auth.id
+      || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))) && trashed = "" &&
+      project_trashed = 0 && workspace_trashed = 0) && (@request.headers.x_tm_key_workspace = "" || (workspace
+      = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects = "" || (project !=
+      "" && @request.headers.x_tm_key_projects ~ project))))'
     actors:
     - custom(type = "task" && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id))
     - custom(type != "task" && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id)
@@ -20,14 +22,20 @@ capabilities:
     - trashed = ""
     - project_trashed = 0
     - workspace_trashed = 0
+    - '@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace &&
+      (@request.headers.x_tm_key_projects = "" || (project != "" && @request.headers.x_tm_key_projects
+      ~ project)))'
   view:
-    verbatim: (@request.auth.id != "" && ((type = "task" && (workspace_owner = @request.auth.id || active_members
-      ~ @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id || active_members
-      ~ @request.auth.id) && (draft = false || author = @request.auth.id || workspace_owner = @request.auth.id
-      || active_admins ~ @request.auth.id))) && trashed = "" && project_trashed = 0 && workspace_trashed
-      = 0) || (@request.auth.id != "" && trashed != "" && workspace_trashed = 0 && (workspace_owner =
-      @request.auth.id || active_members ~ @request.auth.id) && (type = "task" || draft = false || author
-      = @request.auth.id || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))
+    verbatim: '@request.auth.id != "" && ((@request.auth.id != "" && ((type = "task" && (workspace_owner
+      = @request.auth.id || active_members ~ @request.auth.id)) || (type != "task" && (workspace_owner
+      = @request.auth.id || active_members ~ @request.auth.id) && (draft = false || author = @request.auth.id
+      || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))) && trashed = "" &&
+      project_trashed = 0 && workspace_trashed = 0) || (@request.auth.id != "" && trashed != "" && workspace_trashed
+      = 0 && (workspace_owner = @request.auth.id || active_members ~ @request.auth.id) && (type = "task"
+      || draft = false || author = @request.auth.id || workspace_owner = @request.auth.id || active_admins
+      ~ @request.auth.id))) && (@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || (project != "" && @request.headers.x_tm_key_projects
+      ~ project))))'
     actors:
     - custom(@request.auth.id != "" && ((type = "task" && (workspace_owner = @request.auth.id || active_members
       ~ @request.auth.id)) || (type != "task" && (workspace_owner = @request.auth.id || active_members
@@ -37,7 +45,11 @@ capabilities:
     - custom(@request.auth.id != "" && trashed != "" && workspace_trashed = 0 && (workspace_owner = @request.auth.id
       || active_members ~ @request.auth.id) && (type = "task" || draft = false || author = @request.auth.id
       || workspace_owner = @request.auth.id || active_admins ~ @request.auth.id))
-    authRequired: absent
+    authRequired: guard
+    record_state:
+    - '@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace &&
+      (@request.headers.x_tm_key_projects = "" || (project != "" && @request.headers.x_tm_key_projects
+      ~ project)))'
   create:
     verbatim: null
     actors:

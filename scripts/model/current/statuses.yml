@@ -5,45 +5,52 @@ entity: statuses
 kind: base
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && (workspace.trashed
-      = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?=
-      @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
-      ?= "active"))'
-    actors:
-    - workspace-owner
-    - active-workspace-member
-    - custom(workspace.trashed = "")
-    - workspace-owner
-    - active-workspace-admin
-    authRequired: guard
-  view:
-    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && (workspace.trashed
-      = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?=
-      @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
-      ?= "active"))'
-    actors:
-    - workspace-owner
-    - active-workspace-member
-    - custom(workspace.trashed = "")
-    - workspace-owner
-    - active-workspace-admin
-    authRequired: guard
-  create:
-    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (workspace.owner = @request.auth.id
+      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
+      ?= "active")) && (workspace.trashed = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
-      ?= "active")) && workspace.trashed = ""'
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
+    actors:
+    - workspace-owner
+    - active-workspace-member
+    - custom(workspace.trashed = "")
+    - workspace-owner
+    - active-workspace-admin
+    authRequired: guard
+    record_state:
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
+  view:
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (workspace.owner = @request.auth.id
+      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
+      ?= "active")) && (workspace.trashed = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
+    actors:
+    - workspace-owner
+    - active-workspace-member
+    - custom(workspace.trashed = "")
+    - workspace-owner
+    - active-workspace-admin
+    authRequired: guard
+    record_state:
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
+  create:
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (workspace.owner = @request.auth.id
+      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role
+      ?= "admin" && workspace.workspace_members_via_workspace.status ?= "active")) && workspace.trashed
+      = "") && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
     actors:
     - workspace-owner
     - active-workspace-admin
     authRequired: guard
     record_state:
     - workspace.trashed = ""
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
   update:
-    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
-      ?= "active")) && @request.body.workspace:isset = false && workspace.trashed = ""'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (workspace.owner = @request.auth.id
+      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role
+      ?= "admin" && workspace.workspace_members_via_workspace.status ?= "active")) && @request.body.workspace:isset
+      = false && workspace.trashed = "") && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
     actors:
     - workspace-owner
     - active-workspace-admin
@@ -54,16 +61,19 @@ capabilities:
     - '@request.body.workspace:isset = false'
     record_state:
     - workspace.trashed = ""
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
   delete:
-    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
-      ?= "active")) && workspace.trashed = ""'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (workspace.owner = @request.auth.id
+      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role
+      ?= "admin" && workspace.workspace_members_via_workspace.status ?= "active")) && workspace.trashed
+      = "") && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
     actors:
     - workspace-owner
     - active-workspace-admin
     authRequired: guard
     record_state:
     - workspace.trashed = ""
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
 relations:
 - field: workspace
   target: workspaces

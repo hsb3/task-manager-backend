@@ -759,7 +759,8 @@ phase's code change, quote the failing line in the pull request, then make it pa
     "...output names the guard's refusal".
 - **Tests** (`tests/test_key_reach.ts`, port 8211; Alice owns WA (projects PA1, PA2; tasks T1 in
   PA1, T2 in PA2, T0 under no project, so in WA's container; a comment by Alice on T1 and one on
-  T2, which also create task_activity rows; a pending invitation of x@example.com to WA) and WB
+  T2, and a title edit of each, which creates their task_activity rows (build correction: a
+  comment creates none); a pending invitation of x@example.com to WA) and WB
   (project PB1; task T3 in it; a pending invitation of y@example.com to WB); keys: `kAll` write
   all, `kWA` write workspace WA, `kP1` write projects [PA1]):
   - "kWA lists tasks → only WA's, totalItems = WA's count" (RED first: WB's tasks listed).

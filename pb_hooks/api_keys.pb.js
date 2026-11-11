@@ -110,6 +110,8 @@ onRecordCreateRequest((e) => {
 require(`${__hooks}/lib/routes.js`).use(
   new Middleware(
     (e) => {
+      // Only this middleware sets the reach headers the collection rules read, in any spelling (decision:api-key-reach-and-levels).
+      require(`${__hooks}/lib/api_keys.js`).stripReachHeaders(e.request.header);
       const p = e.request.url.path;
       if (p.startsWith("/oauth/") || p.startsWith("/.well-known/"))
         return e.next();
@@ -204,6 +206,11 @@ require(`${__hooks}/lib/routes.js`).use(
           api_key: new ValidationError("api_key_scope", msg),
         });
       };
+      const reach = lib.keyReach(keyInfo);
+      if (reach && lib.accountWide(method, route, coll))
+        throw new ApiError(403, lib.REACH_MESSAGE, {
+          api_key: new ValidationError("api_key_reach", lib.REACH_MESSAGE),
+        });
       if (need !== null && !lib.levelAtLeast(have, need)) refuseLevel(need);
 
       // A purge or leaving needs a higher level; decided only when the key may delete the record, so one out of reach still answers 404.
@@ -256,6 +263,14 @@ require(`${__hooks}/lib/routes.js`).use(
         });
       }
 
+      if (reach) {
+        e.request.header.set("X-Tm-Key-Workspace", reach.workspace);
+        if (reach.projects)
+          e.request.header.set(
+            "X-Tm-Key-Projects",
+            reach.projects.length ? reach.projects.join(",") : "-",
+          );
+      }
       e.set("tmApiKey", keyInfo);
       e.auth = owner;
       return e.next();

@@ -598,7 +598,8 @@ console.log(
 // status = "active" in the SAME conjunct as the user grant, which the scanner already accepts
 // with no exemption. ALLOWLIST_RULES is empty for exactly this reason.
 const WS_MEM = "workspace_members_via_workspace";
-const SHIPPED_VIEW = `${AUTH} != "" && (owner = ${AUTH} || (${WS_MEM}.user ?= ${AUTH} && ${WS_MEM}.status ?= "active")) && trashed = ""`;
+const KW = "@request.headers.x_tm_key_workspace";
+const SHIPPED_VIEW = `${AUTH} != "" && (${AUTH} != "" && (owner = ${AUTH} || (${WS_MEM}.user ?= ${AUTH} && ${WS_MEM}.status ?= "active")) && trashed = "") && (${KW} = "" || id = ${KW})`;
 const EXEMPTION_CASES: Record<string, [string, string[]]> = {
   "the shipped active-only view rule needs NO allowlist entry": [SHIPPED_VIEW, []],
   "a view rule with NO status term is a finding": [

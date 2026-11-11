@@ -1,7 +1,7 @@
 {
-  "listRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.status ?= \"active\")) && trashed = \"\"",
-  "viewRule": "@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.status ?= \"active\")) && trashed = \"\"",
+  "listRule": "@request.auth.id != \"\" && (@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.status ?= \"active\")) && trashed = \"\") && (@request.headers.x_tm_key_workspace = \"\" || id = @request.headers.x_tm_key_workspace)",
+  "viewRule": "@request.auth.id != \"\" && (@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.status ?= \"active\")) && trashed = \"\") && (@request.headers.x_tm_key_workspace = \"\" || id = @request.headers.x_tm_key_workspace)",
   "createRule": "@request.auth.id != \"\" && (owner = \"\" || owner = @request.auth.id)",
-  "updateRule": "(@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.role ?= \"admin\" && workspace_members_via_workspace.status ?= \"active\"))) && @request.body.owner:isset = false",
-  "deleteRule": "owner = @request.auth.id"
+  "updateRule": "@request.auth.id != \"\" && ((@request.auth.id != \"\" && (owner = @request.auth.id || (workspace_members_via_workspace.user ?= @request.auth.id && workspace_members_via_workspace.role ?= \"admin\" && workspace_members_via_workspace.status ?= \"active\"))) && @request.body.owner:isset = false) && (@request.headers.x_tm_key_workspace = \"\" || id = @request.headers.x_tm_key_workspace)",
+  "deleteRule": "@request.auth.id != \"\" && (owner = @request.auth.id) && (@request.headers.x_tm_key_workspace = \"\" || id = @request.headers.x_tm_key_workspace)"
 }
