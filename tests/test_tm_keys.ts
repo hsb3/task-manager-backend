@@ -176,9 +176,9 @@ try {
   );
   o = await tm(["keys", "create"]);
   check(
-    "keys create → exit 2 until it exists",
+    "keys create → exit 2 keys create needs --name",
     tup(o.code, o.stderr.split("\n")[0]),
-    tup(2, 'tm: unknown keys verb "create"; one of list, revoke'),
+    tup(2, "tm: keys create needs --name"),
   );
   o = await tm(["keys", "revoke"]);
   check(

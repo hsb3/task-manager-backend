@@ -743,7 +743,9 @@ form `8112/8113 = test_file_storage` uses).
     order, the first failure reported: `--name`, `--scope`, `--expires`, then the URL; `--expires`
     `YYYY-MM-DD` → `<date>T00:00:00Z`, refused (exit 2, the unparseable message) unless
     `new Date(<that>).toISOString().slice(0, 10)` equals the input (so `2026-02-30` is refused), else `Date.parse` must succeed on a value carrying `Z` or
-    `±hh:mm`, converted with `toISOString().replace(/\.\d{3}Z$/, "Z")`; not later than now → exit
+    `±hh:mm` (correction, build: its date part passes the same read-back and its hour is at most
+    23, because `Date.parse` rolls `2027-02-30T10:00:00Z` and `T24:00` forward and the contract
+    refuses a date that does not exist), converted with `toISOString().replace(/\.\d{3}Z$/, "Z")`; not later than now → exit
     2. URL from `--url` ‖ `TM_URL` ‖ saved, else exit 2 `keys create needs --url or a saved
     login`. `sign_in(url, { scope, key_name: name, key_expires, keys: false, ... })`;
     then `GET /api/tracker/me` with the new key for `id`, `scope`, `expires`; print the secret

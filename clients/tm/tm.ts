@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // tm — the task tracker from the command line. Exit 0 ok · 1 the server refused · 2 usage.
 
+import os from "node:os";
 import { parseArgs } from "node:util";
 import {
   api,
@@ -15,6 +16,7 @@ import {
   UsageError,
 } from "./src/api.ts";
 import * as keys from "./src/keys.ts";
+import { sign_in } from "./src/oauth.ts";
 import * as verbs from "./src/verbs.ts";
 
 const HELP = `usage: tm <verb> [options]
@@ -130,6 +132,141 @@ async function read_secret(prompt: string): Promise<string> {
   return line.trim();
 }
 
+function level_of(raw: string): string {
+  if (!["read", "write", "manage", "own"].includes(raw))
+    throw new UsageError("--scope wants read, write, manage or own");
+  return raw;
+}
+
+/** `--expires` as the UTC date-time key_expires carries; a day means 00:00 UTC that day. */
+function expires_of(raw: string): string {
+  const bad = new UsageError("--expires wants YYYY-MM-DD or a date-time with a time zone");
+  const m =
+    /^(\d{4}-\d{2}-\d{2})(?:[Tt ](\d{2}):\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2}))?$/.exec(
+      raw,
+    );
+  if (!m) throw bad;
+  const day = new Date(`${m[1]}T00:00:00Z`);
+  // a day or hour that does not exist (2026-02-30, T24:00) rolls over, so it no longer reads back the same
+  if (isNaN(day.getTime()) || day.toISOString().slice(0, 10) !== m[1] || Number(m[2] ?? 0) > 23)
+    throw bad;
+  const d = m[2] === undefined ? day : new Date(raw.replace(" ", "T"));
+  if (isNaN(d.getTime())) throw bad;
+  if (d.getTime() <= Date.now()) throw new UsageError("--expires must be in the future");
+  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function server_url(raw: string): string {
+  const url = raw.replace(/\/+$/, "");
+  try {
+    new URL(url);
+  } catch {
+    throw new ConfigError(`the server URL "${url}" is not a URL`);
+  }
+  return url;
+}
+
+/** `tm login` without --with-key: signs in through the browser and saves the minted key. */
+async function browser_login(v: {
+  url?: string;
+  scope?: string;
+  "no-browser": boolean;
+  json: boolean;
+}): Promise<number> {
+  const scope = level_of(v.scope ?? "write");
+  const previous = await saved_login(false);
+  const raw = v.url || process.env.TM_URL || previous?.url;
+  if (!raw) throw new UsageError("login needs --url the first time");
+  const url = server_url(raw);
+  const { key } = await sign_in(url, {
+    scope,
+    key_name: "tm on " + os.hostname(),
+    keys: true,
+    open_browser: !v["no-browser"],
+  });
+  const { file, store } = await save_config({ url, key });
+  await retire(previous, key);
+  const me = await api({ url, key }, "GET /api/tracker/me", {});
+  const k = me.key!;
+  if (v.json)
+    console.log(
+      JSON.stringify({
+        saved: file,
+        store,
+        url,
+        user: { id: me.user.id, name: me.user.name },
+        key: {
+          id: k.id,
+          scope: k.scope,
+          expires: k.expires,
+          client_id: k.client_id,
+          manage_keys: k.manage_keys,
+        },
+      }),
+    );
+  else
+    console.log(
+      `logged in to ${url} as ${keys.escaped(me.user.name)}; key ${k.id} saved in ${store === "os" ? "the system credential store" : file}`,
+    );
+  if (process.env.TM_API_KEY) console.error("tm: note: TM_API_KEY is set and overrides this login");
+  return 0;
+}
+
+/** `tm keys create`: every flag checked before any network; the key is printed once and saved nowhere. */
+async function keys_create(v: {
+  url?: string;
+  name?: string;
+  scope?: string;
+  expires?: string;
+  "no-browser": boolean;
+  json: boolean;
+}): Promise<number> {
+  if (v.name === undefined) throw new UsageError("keys create needs --name");
+  const name = v.name.trim();
+  if (!name || [...name].length > 200) throw new UsageError("--name wants 1 to 200 characters");
+  if (v.scope === undefined) throw new UsageError("keys create needs --scope");
+  const scope = level_of(v.scope);
+  const key_expires = v.expires === undefined ? undefined : expires_of(v.expires);
+  const raw = v.url || process.env.TM_URL || (await saved_login(false))?.url;
+  if (!raw) throw new UsageError("keys create needs --url or a saved login");
+  const url = server_url(raw);
+  const { key } = await sign_in(url, {
+    scope,
+    key_name: name,
+    key_expires,
+    keys: false,
+    open_browser: !v["no-browser"],
+  });
+  if (!v.json) console.log(key); // before the lookup below: a failure there must not lose the key
+  let k: NonNullable<Awaited<ReturnType<typeof api<"GET /api/tracker/me">>>["key"]>;
+  try {
+    k = (await api({ url, key }, "GET /api/tracker/me", {})).key!;
+  } catch (e) {
+    if (v.json) console.log(JSON.stringify({ key }));
+    console.error("tm: note: the key was created, but its details could not be read");
+    throw e;
+  }
+  if (v.json)
+    console.log(
+      JSON.stringify({
+        id: k.id,
+        name,
+        scope: k.scope,
+        expires: k.expires,
+        client_id: k.client_id,
+        manage_keys: k.manage_keys,
+        key,
+      }),
+    );
+  else {
+    const until = k.expires ? `${k.expires.slice(0, 16)} UTC` : "never";
+    console.error(
+      `created key ${k.id} "${keys.escaped(name)}" (${k.scope}, expires ${until}); it is shown only this once`,
+    );
+  }
+  return 0;
+}
+
 async function login(url: string | undefined): Promise<{ file: string; store: string }> {
   const pasted = await read_secret("Paste your API key: ");
   if (!pasted) throw new UsageError("no key was pasted");
@@ -189,15 +326,18 @@ async function logout(json: boolean): Promise<number> {
   return code;
 }
 
-/** `keys list` and `keys revoke`; the sub-verb is checked before any login is read. */
-async function keys_verb(rest: string[], all: boolean, json: boolean): Promise<number> {
+/** `keys create`, `keys list` and `keys revoke`; the sub-verb is checked before any login is read. */
+async function keys_verb(
+  rest: string[],
+  v: Parameters<typeof keys_create>[0] & { all: boolean },
+): Promise<number> {
+  const { all, json } = v;
   const [sub, id] = rest;
   if (!sub) throw new UsageError("missing <create|list|revoke>");
   if (sub === "revoke" && !id) throw new UsageError("missing <id>");
+  if (sub === "create") return keys_create(v);
   if (sub !== "list" && sub !== "revoke")
-    throw new UsageError(
-      `unknown keys verb "${sub}"; one of ${sub === "create" ? "list, revoke" : "create, list, revoke"}`,
-    );
+    throw new UsageError(`unknown keys verb "${sub}"; one of create, list, revoke`);
   const cfg = await load_config();
   if (sub === "list") {
     const rows = await keys.list_keys(cfg, all);
@@ -228,6 +368,7 @@ async function main(argv: string[]): Promise<number> {
   if (verb === "login") {
     if (v["with-key"] && (v.scope !== undefined || v["no-browser"]))
       throw new UsageError("--with-key cannot be combined with --scope or --no-browser");
+    if (!v["with-key"]) return browser_login(v);
     const { file, store } = await login(v.url);
     const where = store === "os" ? " (key in the system credential store)" : "";
     console.log(v.json ? JSON.stringify({ saved: file, store }) : `saved to ${file}${where}`);
@@ -236,7 +377,7 @@ async function main(argv: string[]): Promise<number> {
   // before the shared load_config: logout must run with no usable credential
   if (verb === "logout") return logout(v.json);
   // before the shared load_config: keys create needs no usable credential
-  if (verb === "keys") return keys_verb(rest, v.all, v.json);
+  if (verb === "keys") return keys_verb(rest, v);
   if (!Object.hasOwn(NEEDS, verb)) throw new UsageError(`unknown verb "${verb}"`);
   const [n, what] = NEEDS[verb];
   if (rest.length < n) throw new UsageError(`missing ${what}`);
