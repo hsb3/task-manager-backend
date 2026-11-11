@@ -56,6 +56,7 @@
 2	5	test_user_settings_font
 3	5	test_workspace_save_tx
 1	5	test_key_reach_live
+1	5	test_tm_keys
 1	4	test_counts_type_trash
 1	4	test_due_window
 2	4	test_next_milestone
@@ -96,6 +97,7 @@
 1	3	test_view_within_list_checker
 2	3	test_delete_impact
 4	3	test_tm_oauth_client
+3	3	test_tm_login_browser
 2	2	test_field_help_checker
 2	2	test_battery_copy
 3	2	test_check_migration_citations
@@ -158,3 +160,4 @@
 3	0	test_openapi_routes
 4	0	test_universal_touches_checker
 4	0	test_app_docs_seed_digest
+1	0	test_tm_store

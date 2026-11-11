@@ -26,10 +26,14 @@ write, expirable and revocable, and a revoked or expired one is refused on its n
 - Gap: none.
 
 **AC-2** A key cannot reach operator-only surfaces or read other keys.
-- Verdict: met.
+- Verdict: met, with one deliberate exception: a key carrying the manage-keys permission lists
+  and revokes its own user's keys (never their secrets) through `GET /api/tracker/keys` and
+  `POST /api/tracker/keys/{id}/revoke`, and a workspace- or project-limited key reaches only
+  itself there (decision:api-key-manages-keys).
 - Evidence: `pb_hooks/api_keys.pb.js` allowlist (`/api/files/`, `/api/realtime`, `/api/tracker/`
   except `/api/tracker/admin/`; collections other than system ones and `api_keys`) answering 403
-  `api_key_path`; decision:api-key-reads-refused.
+  `api_key_path`; decision:api-key-reads-refused, superseded in part by
+  decision:api-key-manages-keys; `tests/test_key_management.ts`.
 - Gap: none.
 
 **AC-3** A key can be limited to a workspace or project.
@@ -83,14 +87,13 @@ writes.
 
 **AC-9** The operator can mint, list and revoke keys through a documented client command,
 without hand-written HTTP.
-- Verdict: partly.
-- Evidence: `README.md` "What a client does" mints with `curl` against
-  `/api/collections/api_keys/records` using a password session; `clients/tm/tm.ts` verbs are
-  `login`, `list`, `show`, `search`, `create`, `edit`, `comment`, `mcp`. A key cannot mint a
-  key (403 `api_key_path`, AC-2). Minting needs a verified, approved user
-  (decision:signup-approval, decision:verified-login), so the first key needs a person at a
-  mailbox.
-- Gap: no client command for mint, list or revoke.
+- Verdict: met.
+- Evidence: `tm login` (browser sign-in, saves a key that may list and revoke its user's keys),
+  `tm keys create|list|revoke` (`clients/tm/tm.ts`); `tests/test_tm_keys.ts`,
+  `tests/test_tm_login_browser.ts`, `tests/test_key_management.ts`. A key still cannot mint a
+  key (403 `api_key_path`, AC-2): `tm keys create` mints through the browser sign-in. Minting
+  needs a verified, approved user (decision:signup-approval, decision:verified-login), so the
+  first key needs a person at a mailbox.
 
 **AC-10** The CLI and MCP tools cover an agent's whole work loop, not only items and comments.
 - Verdict: partly.

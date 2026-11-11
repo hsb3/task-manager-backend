@@ -246,6 +246,33 @@ async function probe_oauth_scopes(): Promise<void> {
   ]);
 }
 
+async function probe_key_routes_need_sign_in(): Promise<void> {
+  const list = await fetch(BASE_URL + "/api/tracker/keys");
+  const revoke = await fetch(BASE_URL + "/api/tracker/keys/x/revoke", { method: "POST" });
+  check(
+    "GET /api/tracker/keys and POST /api/tracker/keys/x/revoke without a credential: 401 each",
+    [list.status, revoke.status],
+    [401, 401],
+  );
+}
+
+async function probe_tm_client_registered(): Promise<void> {
+  const q = new URLSearchParams({
+    response_type: "code",
+    client_id: "tm",
+    redirect_uri: "http://127.0.0.1:53123/callback",
+    code_challenge: "A".repeat(43),
+    code_challenge_method: "S256",
+    state: "s",
+  });
+  const r = await fetch(`${BASE_URL}/oauth/authorize?${q}`, { redirect: "manual" });
+  check(
+    "GET /oauth/authorize for client tm on a loopback port: 200 text/html",
+    [r.status, (r.headers.get("Content-Type") ?? "").startsWith("text/html")],
+    [200, true],
+  );
+}
+
 // Without the edge, the counted address is the Docker gateway that publishes the port.
 async function probe_forged_client_address(): Promise<void> {
   const signin = (headers: Record<string, string> = {}) =>
@@ -469,6 +496,8 @@ const PROBES = [
   probe_mcp_to_pb_wiring,
   probe_oauth_refusals,
   probe_oauth_code_stage_blind,
+  probe_key_routes_need_sign_in,
+  probe_tm_client_registered,
   probe_mcp_anon_limit,
   probe_signup_rate_limit,
 ];
