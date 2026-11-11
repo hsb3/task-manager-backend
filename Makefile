@@ -38,16 +38,16 @@ endef
 help: ## list targets
 	@grep -E '^[a-z][a-zA-Z0-9_-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
 
-local-up: ## build and run the production image on 127.0.0.1:8090+PB_PORT_OFFSET (deploy/local)
-	PB_PORT=$$(( $(PB_PORT) + $${PB_PORT_OFFSET:-0} )) docker compose -f deploy/local/compose.yaml up -d --build
+local-up: ## build and run the production images on 127.0.0.1:8090+PB_PORT_OFFSET (API) and 8089+PB_PORT_OFFSET (MCP) (deploy/local)
+	PB_PORT=$$(( $(PB_PORT) + $${PB_PORT_OFFSET:-0} )) MCP_PORT=$$(( 8089 + $${PB_PORT_OFFSET:-0} )) docker compose -f deploy/local/compose.yaml up -d --build
 
-local-down: ## stop and remove the local container; keeps its pb_data volume
+local-down: ## stop and remove the local containers; keeps the pb_data volume
 	docker compose -f deploy/local/compose.yaml down
 
 local-logs: ## follow the local container's log
 	docker compose -f deploy/local/compose.yaml logs -f
 
-smoke: ## probe the production image in Docker (e2e/smoke.ts): throwaway project, volume and port; never pb-local/8090
+smoke: ## probe the production images in Docker (e2e/smoke.ts): throwaway project, volume and ports; never pb-local/8090
 	bun e2e/smoke.ts
 
 dev: pocketbase env ## boot PocketBase http://127.0.0.1:8090 in the foreground; seeds a fresh DB

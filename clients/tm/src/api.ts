@@ -92,6 +92,8 @@ export async function request<T = any>(
   const url = new URL(cfg.url + route);
   for (const [k, v] of Object.entries(query))
     if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
+  // The hosted service's config carries headers, and its URL is private.
+  const server = cfg.headers ? "the server" : cfg.url;
   let r: Response;
   try {
     r = await fetch(url, {
@@ -102,7 +104,7 @@ export async function request<T = any>(
   } catch {
     throw new ApiError({
       status: 0,
-      message: `cannot reach ${cfg.url}: the server did not answer`,
+      message: `cannot reach ${server}: the server did not answer`,
       data: {},
     });
   }
@@ -123,7 +125,7 @@ export async function request<T = any>(
   if (!parsed || typeof parsed !== "object") {
     throw new ApiError({
       status: r.status,
-      message: `${cfg.url} did not answer as the API does (${method} ${route})`,
+      message: `${server} did not answer as the API does (${method} ${route})`,
       data: {},
     });
   }

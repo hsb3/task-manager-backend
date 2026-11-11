@@ -5,9 +5,10 @@
  * malformed request answers an error page or an error redirect.
  *
  * Fully self-contained clean-room server. Port 8202 + PB_PORT_OFFSET; SMTP sink on
- * 8203 + PB_PORT_OFFSET.
+ * 8203 + PB_PORT_OFFSET; a stub of the MCP service's private listener on 8204 + PB_PORT_OFFSET.
  */
 
+import { createHmac, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -32,6 +33,7 @@ const SMTP_SINK = path.join(REPO_ROOT, "scripts", "smtp_sink.ts");
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
 const PORT = 8202 + PORT_OFFSET;
 const SINK_PORT = 8203 + PORT_OFFSET;
+const STUB_PORT = 8204 + PORT_OFFSET;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const SU_EMAIL = "probe@example.com";
 const SU_PASSWORD = "probe123456";
@@ -160,9 +162,92 @@ for (const name of fs.readdirSync(MIG_DIR)) {
   if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_DIR, name));
 }
 
+const CC_URL = "https://claude.ai/oauth/claude-code-client-metadata";
+const LOOP_CB = ["http://localhost/callback"];
+const doc_client = (client_id: string, client_name: string, redirect_uris = LOOP_CB) => ({
+  client: { client_id, client_name, redirect_uris },
+  max_age: 0,
+});
+// A Cyrillic "с" in place of the Latin "c"; the stub answers it as a pre-fix service would.
+const SPOOF_URL = "https://\u0441laude.ai/oauth/claude-code-client-metadata";
+const PUNY_URL = "https://xn--laude-0ye.ai/meta";
+const SWAP_URL = "https://swap.example/meta";
+const STUB_ANSWERS: Record<string, [number, object | string]> = {
+  [SPOOF_URL]: [200, doc_client(SPOOF_URL, "Claude Code")],
+  [PUNY_URL]: [200, doc_client(PUNY_URL, "Puny")],
+  [SWAP_URL]: [200, doc_client(CC_URL, "Swap")],
+  "https://notjson.example/meta": [200, "not json"],
+  "https://empty.example/meta": [200, {}],
+  "https://nouris.example/meta": [
+    200,
+    { client: { client_id: "https://nouris.example/meta", client_name: "N" }, max_age: 0 },
+  ],
+  "https://long.example/meta": [200, doc_client("https://long.example/meta", "A".repeat(10240))],
+  "https://idnredirect.example/meta": [
+    200,
+    doc_client("https://idnredirect.example/meta", "I", ["https://\u0441laude.ai/cb"]),
+  ],
+  "https://bsredirect.example/meta": [
+    200,
+    doc_client("https://bsredirect.example/meta", "B", ["https://evil.example\\@claude.ai/cb"]),
+  ],
+  "https://jsredirect.example/meta": [
+    200,
+    doc_client("https://jsredirect.example/meta", "J", ["javascript:alert(1)//"]),
+  ],
+  "https://evil.example\\@claude.ai/meta": [
+    200,
+    doc_client("https://evil.example\\@claude.ai/meta", "Claude Code"),
+  ],
+  "https://numredirect.example/meta": [
+    200,
+    doc_client("https://numredirect.example/meta", "N", ["https://0x7f.1/cb"]),
+  ],
+  "https://[2606:4700::1]/meta": [200, doc_client("https://[2606:4700::1]/meta", "V6")],
+  "https://noname.example/meta": [200, doc_client("https://noname.example/meta", "")],
+  "https://ctlredirect.example/meta": [
+    200,
+    doc_client("https://ctlredirect.example/meta", "T", ["https://x.exa\tmple/cb"]),
+  ],
+  [CC_URL]: [
+    200,
+    {
+      client: {
+        client_id: CC_URL,
+        client_name: "Claude Code",
+        redirect_uris: ["http://localhost/callback", "http://127.0.0.1/callback"],
+      },
+      max_age: 300,
+    },
+  ],
+  "https://bad.example/meta": [422, { error: "client_id does not match the URL" }],
+  "https://flaky.example/meta": [503, { error: "host did not answer" }],
+};
+const stub_seen: { client_id: string; secret: string | null }[] = [];
+const FLOW_SECRET = randomBytes(20).toString("hex");
+/** A flow token signed as pb_hooks/lib/oauth.js sign_flow signs one, with the pinned secret. */
+const sign_flow = (stage: string, q: string, uid: string, otp: string, exp: number) => {
+  const payload = [stage, q, uid, otp, exp].join("|");
+  return payload + "|" + createHmac("sha256", FLOW_SECRET).update(payload).digest("hex");
+};
+
 let server: roomkit.Room | null = null;
 let sink: Bun.Subprocess | null = null;
+let stub: ReturnType<typeof Bun.serve> | null = null;
 try {
+  await roomkit.require_free_port(STUB_PORT);
+  stub = Bun.serve({
+    hostname: "127.0.0.1",
+    port: STUB_PORT,
+    async fetch(req) {
+      const id = String(((await req.json().catch(() => ({}))) as any).client_id);
+      stub_seen.push({ client_id: id, secret: req.headers.get("X-TM-Internal") });
+      const [status, body] = STUB_ANSWERS[id] ?? [404, { error: "not_found" }];
+      return typeof body === "string"
+        ? new Response(body, { status })
+        : Response.json(body, { status });
+    },
+  });
   run_checked(
     [
       PB_BIN,
@@ -178,7 +263,15 @@ try {
     { cwd: REPO_ROOT, capture_output: true },
   );
   process.env.MCP_PUBLIC_URL = "http://mcp.test";
-  server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, roomkit.hooks_dir(S));
+  process.env.MCP_INTERNAL_URL = `http://127.0.0.1:${STUB_PORT}`;
+  process.env.MCP_INTERNAL_SECRET = "s3cret";
+  // A private hooks copy (the battery shares one) whose test-only hook pins the flow secret to this run's value.
+  const hooks = copy_tree(roomkit.hooks_dir(S), path.join(S, "pb_hooks_pinned"));
+  fs.writeFileSync(
+    path.join(hooks, "zz_test_flow_secret.pb.js"),
+    `routerUse((e) => { e.app.store().set("oauthFlowSecret", ${JSON.stringify(FLOW_SECRET)}); return e.next(); });\n`,
+  );
+  server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, hooks);
   const [, su_r] = await api("POST", "/api/collections/_superusers/auth-with-password", null, {
     identity: SU_EMAIL,
     password: SU_PASSWORD,
@@ -211,6 +304,7 @@ try {
     return r.id;
   }
   const alice_id = await user("Alice", true, true);
+  const ann_id = await user("Ann", true, true);
   await user("Una", true, false);
   await user("Vic", false, true);
 
@@ -404,6 +498,11 @@ try {
       ),
       tup(302, "http://localhost:5555/callback", true, "xyz", BASE_URL),
     );
+    check(
+      "approve_redirect_headers: the 302 carries Cache-Control no-store, Referrer-Policy no-referrer",
+      tup(ap.headers.get("Cache-Control"), ap.headers.get("Referrer-Policy")),
+      tup("no-store", "no-referrer"),
+    );
     const ex = await exchange(BASE_URL, u?.searchParams.get("code") ?? "none", base);
     check(
       "password_consent_approve: the code exchanges → 200, scope read write",
@@ -439,6 +538,33 @@ try {
     tup(a.status, a.text.includes('value="approve"'), a.headers.get("Location")),
     tup(200, true, null),
   );
+  {
+    const consent = await consent_page(base, { email: "ann@example.com", password: PASSWORD });
+    const [s_un] = await api("PATCH", `/api/collections/users/records/${ann_id}`, su, {
+      approved: false,
+    });
+    a = await post(consent, { action: "approve", access: "write" });
+    check(
+      "approve_rechecks_account: unapproved after sign-in → sign-in 'waiting for approval', no code",
+      tup(
+        s_un,
+        a.status,
+        a.text.includes("waiting for approval"),
+        a.text.includes('value="password"'),
+        a.headers.get("Location"),
+        await codes_of(ann_id),
+      ),
+      tup(200, 200, true, true, null, 0),
+    );
+  }
+  {
+    const { location } = await sign_in_and_approve(BASE_URL, { ...base, state: "a&b" }, ALICE);
+    check(
+      "state_encoded: state a&b → the Location carries state=a%26b and reads back a&b",
+      tup(location.includes("state=a%26b"), new URL(location).searchParams.get("state")),
+      tup(true, "a&b"),
+    );
+  }
 
   console.log("\n── flow token ──");
   const other = await consent_page({ ...base, state: "other" });
@@ -469,6 +595,49 @@ try {
     tup(a.status, a.text.includes(START_AGAIN), a.headers.get("Location")),
     tup(200, true, null),
   );
+  {
+    const consent = await consent_page();
+    const parts = (field(consent, "flow") ?? "").split("|");
+    const forged = (i: number, value: string) =>
+      parts.map((p, j) => (j === i ? value : p)).join("|");
+    const tampered: [string, Record<string, string>][] = [
+      ["the user id changed, signature kept", { flow: forged(2, "zzzzzzzzzzzzzzz") }],
+      ["the expiry extended, signature kept", { flow: forged(4, String(Date.now() + 86400000)) }],
+      ["redirect_uri changed to another port", { redirect_uri: "http://localhost:6666/callback" }],
+      ["code_challenge changed", { code_challenge: "A".repeat(43) }],
+    ];
+    for (const [what, extra] of tampered) {
+      a = await post(consent, { action: "approve", access: "write", ...extra });
+      check(
+        `flow_tampered: ${what} → 200 'Start again', no redirect`,
+        tup(a.status, a.text.includes(START_AGAIN), a.headers.get("Location")),
+        tup(200, true, null),
+      );
+    }
+  }
+  {
+    const signin = (await get(base)).text;
+    const q = (field(signin, "flow") ?? "").split("|")[1] ?? "";
+    const pw = { action: "password", ...ALICE };
+    const fresh = await post(signin, {
+      ...pw,
+      flow: sign_flow("signin", q, "", "", Date.now() + 600000),
+    });
+    const expired = await post(signin, {
+      ...pw,
+      flow: sign_flow("signin", q, "", "", Date.now() - 1000),
+    });
+    check(
+      "flow_expired: a self-signed fresh token → consent (pin holds); signed but expired → 'Start again'",
+      tup(
+        fresh.text.includes('value="approve"'),
+        expired.status,
+        expired.text.includes(START_AGAIN),
+        expired.text.includes('value="approve"'),
+      ),
+      tup(true, 200, true, false),
+    );
+  }
   a = await post((await get(base)).text, { action: "nonsense" });
   check(
     "flow_wrong_stage: an unknown action → 200 'Start again'",
@@ -489,11 +658,18 @@ try {
     ),
     tup(200, true, 1, true),
   );
+  const known_flow = field(a.text, "flow");
   let v = await post(a.text, { action: "verify_code", code: alice_code ?? "" });
   check(
     "code_sign_in: verify_code with it → consent page",
     tup(v.status, v.text.includes('value="approve"')),
     tup(200, true),
+  );
+  v = await post(a.text, { action: "verify_code", code: alice_code ?? "" });
+  check(
+    "code_single_use: the same correct code again → 'wrong or has expired', no consent",
+    tup(v.status, v.text.includes("wrong or has expired"), v.text.includes('value="approve"')),
+    tup(200, true, false),
   );
   a = await post((await get(base)).text, { action: "send_code", email: ALICE.email });
   const right = (await nth_code(ALICE.email, 2)) ?? "";
@@ -530,6 +706,16 @@ try {
     ),
     tup(200, true, 0),
   );
+  const shape = (flow: string | null) =>
+    (flow ?? "")
+      .split("|")
+      .slice(2, 4)
+      .map((id) => /^[a-z0-9]{15}$/.test(id));
+  check(
+    "code_flow_same_shape: known and unknown email → user and code ids both 15 characters",
+    tup(shape(known_flow), shape(field(a.text, "flow"))),
+    tup([true, true], [true, true]),
+  );
   v = await post(a.text, { action: "verify_code", code: "12345678" });
   check(
     "code_unknown_email: any code → refused",
@@ -542,10 +728,160 @@ try {
     code: (await nth_code("una@example.com", 1)) ?? "",
   });
   check(
-    "code_unapproved: Una's correct code → 'waiting for approval', no consent",
-    tup(v.status, v.text.includes("waiting for approval"), v.text.includes('value="approve"')),
-    tup(200, true, false),
+    "code_unapproved: Una's correct code → 'waiting for approval', no consent, token keeps its ids",
+    tup(
+      v.status,
+      v.text.includes("waiting for approval"),
+      v.text.includes('value="approve"'),
+      shape(field(v.text, "flow")),
+    ),
+    tup(200, true, false, [true, true]),
   );
+
+  console.log("\n── metadata-document clients ──");
+  {
+    const cc = authorize_params({
+      client_id: CC_URL,
+      redirect_uri: "http://localhost:7777/callback",
+    });
+    const consent = await consent_page(cc);
+    const { code } = await sign_in_and_approve(BASE_URL, cc, ALICE);
+    const ex = await exchange(BASE_URL, code, cc);
+    const [, me] = await api("GET", "/api/tracker/me", ex.body?.access_token ?? "tmk_none");
+    check(
+      "cimd_claude_code: consent names Claude Code and claude.ai; exchange 200; key client_id the URL",
+      tup(
+        consent.includes("Claude Code wants to use your Task Tracker account."),
+        consent.includes("It identifies itself as claude.ai."),
+        ex.status,
+        me?.key?.client_id,
+      ),
+      tup(true, true, 200, CC_URL),
+    );
+    const before = stub_seen.filter((r) => r.client_id === CC_URL).length;
+    a = await get(cc);
+    check(
+      "cimd_cached: a second GET → 200 sign-in, stub not asked again",
+      tup(a.status, stub_seen.filter((r) => r.client_id === CC_URL).length),
+      tup(200, before),
+    );
+    a = await get({ ...cc, redirect_uri: "https://claude.ai/other" });
+    check(
+      "cimd_redirect_not_listed: redirect_uri https://claude.ai/other → 400 'has not registered'",
+      tup(a.status, a.text.includes("has not registered")),
+      tup(400, true),
+    );
+    a = await get({ ...cc, client_id: "https://bad.example/meta" });
+    check(
+      "cimd_invalid_page: 422 from the service → 400 'could not be verified.'",
+      tup(a.status, a.text.includes("could not be verified."), a.text.includes("right now")),
+      tup(400, true, false),
+    );
+    a = await get({ ...cc, client_id: "https://flaky.example/meta" });
+    check(
+      "cimd_unavailable_page: 503 from the service → 400 'right now'",
+      tup(a.status, a.text.includes("could not be verified right now")),
+      tup(400, true),
+    );
+    check(
+      "cimd_secret_sent: every stub request carried X-TM-Internal s3cret",
+      tup(
+        stub_seen.length > 0,
+        stub_seen.every((r) => r.secret === "s3cret"),
+      ),
+      tup(true, true),
+    );
+    {
+      const asked = stub_seen.length;
+      a = await get({ ...cc, client_id: SPOOF_URL });
+      check(
+        "non_ascii_client_id: Cyrillic lookalike → 400 'could not be verified.', no consent, service not asked",
+        tup(
+          a.status,
+          a.text.includes("could not be verified."),
+          a.text.includes("right now"),
+          field(a.text, "flow"),
+          stub_seen.length - asked,
+        ),
+        tup(400, true, false, null, 0),
+      );
+    }
+    for (const [label, id, redirect] of [
+      ["redirect_non_ascii", "https://idnredirect.example/meta", "https://\u0441laude.ai/cb"],
+      ["redirect_control", "https://ctlredirect.example/meta", "https://x.exa\tmple/cb"],
+      [
+        "redirect_backslash",
+        "https://bsredirect.example/meta",
+        "https://evil.example\\@claude.ai/cb",
+      ],
+      ["redirect_scheme", "https://jsredirect.example/meta", "javascript:alert(1)//"],
+      ["redirect_numeric_host", "https://numredirect.example/meta", "https://0x7f.1/cb"],
+      ["client_id_ip_literal", "https://[2606:4700::1]/meta", "http://localhost/callback"],
+      ["client_id_backslash", "https://evil.example\\@claude.ai/meta", "http://localhost/callback"],
+    ]) {
+      a = await get({ ...cc, client_id: id!, redirect_uri: redirect! });
+      check(
+        `${label}: an id or returned redirect URI outside the URL rule → 400 'could not be verified.'`,
+        tup(a.status, a.text.includes("could not be verified."), a.text.includes("right now")),
+        tup(400, true, false),
+      );
+    }
+    {
+      const pc = { ...cc, client_id: PUNY_URL };
+      const consent = await consent_page(pc);
+      check(
+        "punycode_client: consent shows the punycode host",
+        consent.includes("It identifies itself as xn--laude-0ye.ai."),
+        true,
+      );
+    }
+    {
+      const sc = { ...cc, client_id: SWAP_URL };
+      const consent = await consent_page(sc);
+      const { code } = await sign_in_and_approve(BASE_URL, sc, ALICE);
+      const ex = await exchange(BASE_URL, code, sc);
+      const [, me] = await api("GET", "/api/tracker/me", ex.body?.access_token ?? "tmk_none");
+      check(
+        "requested_client_id_kept: service answers another client_id → consent names swap.example; key client_id the requested URL",
+        tup(
+          consent.includes("It identifies itself as swap.example."),
+          consent.includes("claude.ai"),
+          ex.status,
+          me?.key?.client_id,
+        ),
+        tup(true, false, 200, SWAP_URL),
+      );
+    }
+    for (const id of [
+      "https://notjson.example/meta",
+      "https://empty.example/meta",
+      "https://nouris.example/meta",
+      "https://noname.example/meta",
+    ]) {
+      a = await get({ ...cc, client_id: id });
+      check(
+        `malformed_200: ${id} → 400 'right now'`,
+        tup(a.status, a.text.includes("could not be verified right now")),
+        tup(400, true),
+      );
+    }
+    {
+      const consent = await consent_page({ ...cc, client_id: "https://long.example/meta" });
+      check(
+        "client_name_bounded: a 10240-character name renders at most 200 characters",
+        tup(consent.includes("A".repeat(200)), consent.includes("A".repeat(201))),
+        tup(true, false),
+      );
+    }
+    await stub.stop(true);
+    stub = null;
+    a = await get({ ...cc, client_id: "https://down.example/meta" });
+    check(
+      "cimd_unavailable_page: service down, uncached URL → 400 'right now'",
+      tup(a.status, a.text.includes("could not be verified right now")),
+      tup(400, true),
+    );
+  }
 
   console.log("\n── code purge ──");
   const [s_old, old] = await api("POST", CODES, su, {
@@ -565,6 +901,7 @@ try {
     tup(200, 404),
   );
 } finally {
+  if (stub !== null) await stub.stop(true);
   if (server !== null) await roomkit.stop(server);
   await stop_sink(sink);
   fs.rmSync(S, { recursive: true, force: true });

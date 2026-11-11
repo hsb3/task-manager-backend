@@ -12,8 +12,9 @@ what that file does not say. Where a README section covers a point, it is named,
 
 ## Topology
 
-- One Railway service, `pocketbase` (API + `/_/` dashboard), in one standing environment,
-  `production`, deploying from `main`. `staging` no longer exists; the `legacy` branch is history.
+- Two Railway services: `pocketbase` (API + `/_/` dashboard) and `mcp` (the hosted MCP endpoint,
+  `services/mcp/`), in one standing environment, `production`, deploying from `main`. `staging`
+  no longer exists; the `legacy` branch is history.
 - The topology is code: `deploy/railway/railway.ts` (watch patterns, domain, healthcheck, the
   pb_data volume, the `pb-backups` and `pb-files` buckets, every variable NAME as `preserve()`,
   values never in git). `railway config plan` diffs it against live; it no longer declares the
@@ -22,8 +23,10 @@ what that file does not say. Where a README section covers a point, it is named,
   re-issuable via `railway bucket credentials`, the rest only in the Railway dashboard), DNS
   CNAMEs, and the GitHub/Google OAuth callbacks (the Google pair is in the IaC, not yet set in
   prod). New project, in order: `deploy/README.md`, "Bootstrapping a new Railway project".
-- Pushes to `main` are CI-gated, and the service deploys only when a watch pattern is touched;
-  how that gate fails open and closed: `deploy/README.md`, "Deploy gating".
+- Pushes to `main` are CI-gated, and a service deploys only when one of its watch patterns is touched;
+  how that gate fails open and closed: `deploy/README.md`, "Deploy gating". Watch patterns are
+  gitignore-style: anchor a root file with a leading `/` (`/Dockerfile`), or it may also match a
+  same-named file deeper in the tree.
 - PR environments are DISABLED (owner, 2026-09-21, sign-off record 6vpz): each PR env copied
   production's CONFIGURATION, bucket names and S3 credentials included (c25c). Do not re-enable
   them without a safe base environment (no S3, no Resend, no OAuth, no cron). A refused-boot

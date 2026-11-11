@@ -353,8 +353,11 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
     });
   }
   if (v.page) return lib.render(e, 400, { Stage: "error", Message: v.page });
-  const back = (pair) =>
-    e.redirect(
+  // The Location can carry the code.
+  const back = (pair) => {
+    e.response.header().set("Cache-Control", "no-store");
+    e.response.header().set("Referrer-Policy", "no-referrer");
+    return e.redirect(
       302,
       lib.with_query(p.redirect_uri, [
         pair,
@@ -362,6 +365,7 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
         ["iss", lib.issuer()],
       ]),
     );
+  };
   if (v.redirect) return back(["error", v.redirect]);
   const client = v.ok;
   const show = (stage, message, uid, otp) =>
@@ -407,7 +411,13 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
 
     if (p.action === "send_code") {
       const u = find_user(p.email);
-      if (!u) return show("code", "", "", "");
+      // Random ids, as PocketBase's request-otp does: the token never tells whether the email has an account.
+      const blind = () =>
+        $security.randomStringWithAlphabet(
+          15,
+          "abcdefghijklmnopqrstuvwxyz0123456789",
+        );
+      if (!u) return show("code", "", blind(), blind());
       const code = $security.randomStringWithAlphabet(8, "0123456789");
       const otp = new Record($app.findCollectionByNameOrId("_otps"));
       otp.set("collectionRef", u.collection().id);
@@ -426,7 +436,7 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
           "The code could not be sent. Try again in a minute, or sign in with your password.",
         );
       }
-      return show("code", "", "", otp.id);
+      return show("code", "", blind(), otp.id);
     }
 
     if (p.action === "verify_code") {
@@ -462,25 +472,24 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
         $app.store().remove("oauth_otp_tries:" + otp.id);
         uid = u.id;
       });
-      if (!uid) return show("code", WRONG_CODE, "", flow.otp);
+      if (!uid) return show("code", WRONG_CODE, flow.uid, flow.otp);
       const refusal = lib.sign_in_refusal(
         $app,
         $app.findRecordById("users", uid),
       );
-      return refusal ? show("code", refusal, "", "") : show("consent", "", uid);
+      return refusal
+        ? show("code", refusal, flow.uid, flow.otp)
+        : show("consent", "", uid);
     }
 
     if (p.action === "deny") return back(["error", "access_denied"]);
 
+    const u = $app.findRecordById("users", flow.uid);
+    const refusal = lib.sign_in_refusal($app, u);
+    if (refusal) return show("signin", refusal);
     if (p.access !== "read" && p.access !== "write")
       return show("consent", "", flow.uid);
-    const code = lib.issue_code(
-      $app,
-      $app.findRecordById("users", flow.uid),
-      client,
-      p,
-      p.access,
-    );
+    const code = lib.issue_code($app, u, client, p, p.access);
     return back(["code", code]);
   } catch (err) {
     $app.logger().error("oauth authorize failed", "error", String(err));

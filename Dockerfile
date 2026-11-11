@@ -38,4 +38,4 @@ CMD ["/bin/sh", "-c", "\
   if [ -n \"$PB_SUPERUSER_EMAIL\" ] && [ -n \"$PB_SUPERUSER_PASSWORD\" ]; then \
     /pb/pocketbase superuser create \"$PB_SUPERUSER_EMAIL\" \"$PB_SUPERUSER_PASSWORD\" --dir /pb/pb_data --migrationsDir /pb/pb_migrations 2>&1 | grep -v 'must be unique' || true; \
   fi; \
-  exec /pb/pocketbase serve --http=0.0.0.0:${PORT:-8080} --dir /pb/pb_data --migrationsDir /pb/pb_migrations --hooksDir /pb/pb_hooks --origins=${PB_CORS_ORIGINS:-*}"]
+  exec /pb/pocketbase serve --http=[::]:${PORT:-8080} --dir /pb/pb_data --migrationsDir /pb/pb_migrations --hooksDir /pb/pb_hooks --origins=${PB_CORS_ORIGINS:-*}"]

@@ -1,20 +1,22 @@
 #!/usr/bin/env bun
-/**Smoke suite: live probes against the production image (repo-root Dockerfile) booted by deploy/local/compose.yaml.
+/**Smoke suite: live probes against the production images (Dockerfile, services/mcp/Dockerfile) booted by deploy/local/compose.yaml.
 
 Usage: `make smoke`, or `bun e2e/smoke.ts [--root DIR]` (DIR: the tree to build, default this repo).
-Each run builds the image, publishes it on a Docker-picked 127.0.0.1 port under its own compose
+Each run builds the images, publishes them on Docker-picked 127.0.0.1 ports under its own compose
 project `pb-smoke-<pid>` with a fresh volume, runs the probes in order, and always ends with
 `down -v --rmi local`. It never touches the developer's `pb-local` project or port 8090.
 A later behaviour probe is one async function in PROBES; a 429 masks signup for 60s, so the
 rate-limit probe stays last.
 
-Not covered: OAuth sign-in (needs a live provider). Mail (signup verification, OTP): it would
+Not covered: OAuth sign-in (needs a live provider). Anything needing an API key: the image's
+superuser requires MFA, so no key can be minted here and the keyed paths stay battery-only. Mail (signup verification, OTP): it would
 take an SMTP host/port env override in pb_hooks/mail.pb.js (today it hardcodes smtp.resend.com
 behind RESEND_API_KEY), scripts/smtp_sink.ts listening on a host-gateway address instead of
 127.0.0.1, and `extra_hosts: host-gateway` in the compose file.
 */
 
 import path from "node:path";
+import { authorize_params, field } from "../tests/oauthkit.ts";
 
 const args = process.argv.slice(2);
 const ROOT = path.resolve(
@@ -33,7 +35,11 @@ const HEALTH_TIMEOUT_MS = 120_000;
 const SIGNUP_LIMIT = 5; // settings rateLimits rule "POST /api/collections/users/records"
 const SIGNIN_LIMIT = 10; // settings rateLimits rule "POST /api/collections/users/auth-with-password"
 
+// The host ports compose publishes (0: Docker picks); compose builds the public URLs from them.
+const PUBLISH = { PB_PORT: "0", MCP_PORT: "0" };
+const MCP_RESOURCE = `http://127.0.0.1:${PUBLISH.MCP_PORT}/mcp`;
 let BASE_URL = "";
+let MCP_URL = "";
 let failures = 0;
 
 function check(label: string, got: unknown, expected: unknown): void {
@@ -145,12 +151,191 @@ async function probe_signup_rate_limit(): Promise<void> {
   check(`direct signups x${SIGNUP_LIMIT + 1}`, statuses, expected);
 }
 
+const PRM_PATH = "/.well-known/oauth-protected-resource/mcp";
+
+async function probe_mcp_challenge(): Promise<void> {
+  const r = await fetch(MCP_URL + "/mcp", { method: "POST" });
+  const challenge = r.headers.get("WWW-Authenticate") ?? "";
+  // The configured public URL carries port 0 under MCP_PORT=0, so only the ends are fixed.
+  check(
+    "MCP POST /mcp without a credential: 401 application/json, challenge names the PRM and both scopes",
+    [
+      r.status,
+      r.headers.get("Content-Type"),
+      challenge.startsWith('Bearer resource_metadata="'),
+      challenge.endsWith(`${PRM_PATH}", scope="read write"`),
+    ],
+    [401, "application/json", true, true],
+  );
+}
+
+async function probe_mcp_metadata(): Promise<void> {
+  const prm: any = await fetch(MCP_URL + PRM_PATH).then((r) => r.json());
+  const as: any = await fetch(BASE_URL + "/.well-known/oauth-authorization-server").then((r) =>
+    r.json(),
+  );
+  check(
+    "PRM authorization_servers[0] equals the authorization server's issuer",
+    prm.authorization_servers?.[0],
+    as.issuer,
+  );
+  check(
+    "authorization server metadata lists S256 and none, and metadata-document clients",
+    [
+      as.code_challenge_methods_supported?.includes("S256"),
+      as.token_endpoint_auth_methods_supported?.includes("none"),
+      as.client_id_metadata_document_supported,
+    ],
+    [true, true, true],
+  );
+  check("PRM resource is the compose file's MCP public URL plus /mcp", prm.resource, MCP_RESOURCE);
+}
+
+// PocketBase -> the mcp private listener: a refused document is "could not be verified." only when the secret, URL and listener all work.
+async function probe_pb_to_mcp_wiring(): Promise<void> {
+  const q = new URLSearchParams(
+    authorize_params({
+      client_id: "https://localhost/meta",
+      redirect_uri: "https://localhost/cb",
+    }),
+  );
+  const r = await fetch(`${BASE_URL}/oauth/authorize?${q}`);
+  const text = await r.text();
+  check(
+    "PocketBase -> mcp: a localhost metadata URL gets 'could not be verified.', not 'right now'",
+    [r.status, text.includes("could not be verified."), text.includes("right now")],
+    [400, true, false],
+  );
+}
+
+// mcp -> PocketBase: an unknown key is 401 only when the service reaches PocketBase's /me (503 otherwise).
+async function probe_mcp_to_pb_wiring(): Promise<void> {
+  const r = await fetch(MCP_URL + "/mcp", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer tmk_bogus",
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "X-Real-IP": "198.51.100.78",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+  });
+  check(
+    "mcp -> PocketBase: Bearer tmk_bogus is 401 invalid_token",
+    [r.status, ((await r.json().catch(() => null)) as any)?.error?.code],
+    [401, "invalid_token"],
+  );
+}
+
+async function probe_mcp_refusals(): Promise<void> {
+  const get = await fetch(MCP_URL + "/mcp");
+  const nope = await fetch(MCP_URL + "/nope");
+  const origin = await fetch(MCP_URL + "/mcp", {
+    method: "POST",
+    headers: { Origin: "https://attacker.example" },
+  });
+  check(
+    "MCP GET /mcp 405, GET /nope 404, unlisted Origin 403",
+    [get.status, nope.status, origin.status],
+    [405, 404, 403],
+  );
+}
+
+async function probe_oauth_refusals(): Promise<void> {
+  const form = (path: string, body: string) =>
+    fetch(BASE_URL + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+  const page = await fetch(BASE_URL + "/oauth/authorize?client_id=nope&redirect_uri=x");
+  check(
+    "GET /oauth/authorize for an unknown client: 400 HTML page",
+    [page.status, (page.headers.get("Content-Type") ?? "").startsWith("text/html")],
+    [400, true],
+  );
+  const token = await form("/oauth/token", "grant_type=password");
+  check(
+    "POST /oauth/token grant_type=password: 400 unsupported_grant_type",
+    [token.status, ((await token.json()) as any).error],
+    [400, "unsupported_grant_type"],
+  );
+  const revoke = await form("/oauth/revoke", "token=x&client_id=cursor");
+  const unknown = await form("/oauth/revoke", "token=x&client_id=y");
+  check(
+    "POST /oauth/revoke: known client 200, unknown client 400 invalid_client",
+    [revoke.status, unknown.status, ((await unknown.json()) as any).error],
+    [200, 400, "invalid_client"],
+  );
+  const { code_challenge: _, ...no_pkce } = authorize_params();
+  const back = await fetch(BASE_URL + "/oauth/authorize", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(no_pkce).toString(),
+    redirect: "manual",
+  });
+  check(
+    "POST /oauth/authorize without PKCE: 302 error redirect, no-store, no-referrer",
+    [back.status, back.headers.get("Cache-Control"), back.headers.get("Referrer-Policy")],
+    [302, "no-store", "no-referrer"],
+  );
+}
+
+async function probe_oauth_code_stage_blind(): Promise<void> {
+  const params = authorize_params();
+  const page = await (
+    await fetch(`${BASE_URL}/oauth/authorize?${new URLSearchParams(params)}`)
+  ).text();
+  const body = new URLSearchParams({
+    ...params,
+    flow: field(page, "flow") ?? "",
+    action: "send_code",
+    email: "nobody@example.com",
+  });
+  const code = await fetch(BASE_URL + "/oauth/authorize", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  const ids = (field(await code.text(), "flow") ?? "").split("|").slice(2, 4);
+  check(
+    "send_code for an unknown email: the code page's flow carries two 15-character ids",
+    [code.status, ids.map((id) => /^[a-z0-9]{15}$/.test(id))],
+    [200, [true, true]],
+  );
+}
+
+async function probe_mcp_anon_limit(): Promise<void> {
+  const statuses: number[] = [];
+  let last: Response | null = null;
+  for (let i = 0; i < 31; i++) {
+    last = await fetch(MCP_URL + "/mcp", {
+      method: "POST",
+      headers: { "X-Real-IP": "198.51.100.77" },
+    });
+    statuses.push(last.status);
+  }
+  check(
+    "MCP: 30 unauthenticated POSTs from one address are 401, the 31st 429 with Retry-After",
+    [statuses, Number(last?.headers.get("Retry-After")) > 0],
+    [[...Array(30).fill(401), 429], true],
+  );
+}
+
 const PROBES = [
   probe_health,
   probe_batch_create,
   probe_batch_upsert,
   probe_password_signup,
   probe_forged_client_address,
+  probe_mcp_challenge,
+  probe_mcp_metadata,
+  probe_mcp_refusals,
+  probe_pb_to_mcp_wiring,
+  probe_mcp_to_pb_wiring,
+  probe_oauth_refusals,
+  probe_oauth_code_stage_blind,
+  probe_mcp_anon_limit,
   probe_signup_rate_limit,
 ];
 
@@ -186,41 +371,49 @@ async function main(): Promise<number> {
   }
   try {
     console.log(`building and booting ${ROOT} as compose project ${PROJECT}`);
-    const up = run([...COMPOSE, "up", "-d", "--build"], { PB_PORT: "0" });
+    const up = run([...COMPOSE, "up", "-d", "--build"], PUBLISH);
     if (up.code !== 0) {
       console.error(`❌ compose up failed:\n${up.out}`);
       return 1;
     }
-    const port = Number(
-      run([...COMPOSE, "port", "pocketbase", "8080"])
-        .out.trim()
-        .split(":")
-        .pop(),
-    );
-    if (!port || port === 8090) {
-      console.error(
-        `❌ refusing published port ${port}: expected a Docker-picked port other than 8090`,
+    const published = (service: string) =>
+      Number(
+        run([...COMPOSE, "port", service, "8080"])
+          .out.trim()
+          .split(":")
+          .pop(),
       );
-      return 1;
-    }
-    BASE_URL = `http://127.0.0.1:${port}`;
-    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
-    while (
-      (await fetch(BASE_URL + "/api/health").then(
-        (r) => r.status,
-        () => 0,
-      )) !== 200
-    ) {
-      if (Date.now() > deadline) {
+    const port = published("pocketbase");
+    const mcp_port = published("mcp");
+    for (const p of [port, mcp_port]) {
+      if (!p || p === 8090 || p === 8089) {
         console.error(
-          `❌ no healthy /api/health within ${HEALTH_TIMEOUT_MS / 1000}s; container log:`,
+          `❌ refusing published port ${p}: expected a Docker-picked port other than 8090 and 8089`,
         );
-        console.error(run([...COMPOSE, "logs", "--no-color"]).out);
         return 1;
       }
-      await Bun.sleep(500);
     }
-    console.log(`healthy at ${BASE_URL}`);
+    BASE_URL = `http://127.0.0.1:${port}`;
+    MCP_URL = `http://127.0.0.1:${mcp_port}`;
+    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+    for (const url of [BASE_URL + "/api/health", MCP_URL + PRM_PATH]) {
+      while (
+        (await fetch(url).then(
+          (r) => r.status,
+          () => 0,
+        )) !== 200
+      ) {
+        if (Date.now() > deadline) {
+          console.error(
+            `❌ no 200 from ${url} within ${HEALTH_TIMEOUT_MS / 1000}s; container log:`,
+          );
+          console.error(run([...COMPOSE, "logs", "--no-color"]).out);
+          return 1;
+        }
+        await Bun.sleep(500);
+      }
+    }
+    console.log(`healthy at ${BASE_URL} and ${MCP_URL}`);
     for (const probe of PROBES) await probe();
   } finally {
     cleanup();

@@ -444,6 +444,50 @@ try {
     [x.status, x.json?.error?.code],
     [403, "insufficient_scope"],
   );
+  {
+    const r = await fetch(`${MCP}/mcp`, {
+      method: "POST",
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Accept: ACCEPT,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${W}`,
+        "MCP-Protocol-Version": "2026-07-28",
+        "Mcp-Method": "subscriptions/listen",
+      },
+      body: JSON.stringify(msg("subscriptions/listen", { notifications: {}, _meta: META_2026() })),
+    });
+    const type = r.headers.get("Content-Type");
+    const body: any = type === "application/json" ? await r.json() : await r.body?.cancel();
+    check(
+      "no_sse_stream_2026: subscriptions/listen → 404 application/json, JSON-RPC -32601",
+      [r.status, type, body?.error?.code],
+      [404, "application/json", -32601],
+    );
+  }
+  {
+    const { id: _, ...note } = msg("subscriptions/listen", {
+      notifications: {},
+      _meta: META_2026(),
+    });
+    const r = await fetch(`${MCP}/mcp`, {
+      method: "POST",
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Accept: ACCEPT,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${W}`,
+        "MCP-Protocol-Version": "2026-07-28",
+        "Mcp-Method": "subscriptions/listen",
+      },
+      body: JSON.stringify(note),
+    });
+    check(
+      "listen_notification_202: subscriptions/listen without an id → 202, empty body",
+      [r.status, await r.text()],
+      [202, ""],
+    );
+  }
 
   console.log("\n── scope gate and tool results ──");
   x = await call_2025(R, "tm_create", { title: "t", project: PROJECT });
@@ -493,8 +537,14 @@ try {
     [x.status, x.json?.error?.code],
     [406, -32600],
   );
+  const accept_type = x.headers.get("Content-Type");
   x = await raw("/api/tracker/me", { method: "GET", key: W });
   check("stray_path_404: 404 not_found", [x.status, x.json?.error?.code], [404, "not_found"]);
+  check(
+    "error_content_type: a JSON-RPC refusal and an error object → exactly application/json",
+    [accept_type, x.headers.get("Content-Type")],
+    ["application/json", "application/json"],
+  );
 
   console.log("\n── Origin ──");
   x = await list_2025(W, { Origin: "https://attacker.example" });
@@ -517,6 +567,10 @@ try {
     [x.status, ...cors(x)],
     [401, ...CORS],
   );
+  for (const o of ["null", "https://Claude.ai"]) {
+    x = await list_2025(W, { Origin: o });
+    check(`origin_refused: Origin ${o} → 403 origin_not_allowed`, x.status, 403);
+  }
   x = await list_2025(W);
   check("no_origin_served: 200", x.status, 200);
   x = await raw("/mcp", { method: "OPTIONS", headers: { Origin: "https://claude.ai" } });
@@ -552,6 +606,19 @@ try {
   );
   check(
     "bad_key_limit_429: 30 × 401, then 429",
+    [run.slice(0, 30).every((y) => y.status === 401), run[30]?.status],
+    [true, 429],
+  );
+  run = await statuses(
+    31,
+    (() => {
+      let i = 0;
+      return () =>
+        raw("/mcp", { headers: { "X-Real-IP": `203.0.113.${++i}, 198.51.100.9` }, body: init });
+    })(),
+  );
+  check(
+    "address_is_rightmost: X-Real-IP with a changing leftmost token → 31st 429",
     [run.slice(0, 30).every((y) => y.status === 401), run[30]?.status],
     [true, 429],
   );
@@ -600,6 +667,12 @@ try {
   });
   check("fixture: the /api/ rule is 5 per 60 s", s, 200);
   const via_service = await statuses(10, () => list_2025(F));
+  const via_calls = await statuses(10, () => call_2025(F, "tm_show", { id: item?.id }));
+  check(
+    "pb_exempt_tool_calls: 10 × tm_show over the service → 200, none isError",
+    via_calls.map((y) => [y.status, y.json?.result?.isError ?? false]),
+    Array(10).fill([200, false]),
+  );
   const direct: number[] = [];
   for (let i = 0; i < 10; i++) {
     const [ds] = await api("GET", "/api/tracker/me", F, null, { "X-Real-IP": "198.51.100.4" });

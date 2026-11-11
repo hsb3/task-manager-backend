@@ -116,9 +116,18 @@ Request: `POST {MCP_INTERNAL_URL}/internal/client-metadata`, headers
 Rules, in order (each failure is 422 with the quoted reason unless marked 503):
 
 1. URL (`check_client_id_url`), checked on the **raw string** before any parsing normalises it:
+   the host, which the consent page shows, is a DNS name of letters, digits, hyphens and dots
+   whose last label begins with a letter (optional trailing dot), with an optional `:port` (so
+   no IP literal, since a numeric host such as `0x7f.1` parses to an address the page would not
+   name, and no Unicode, `%`, `\` or userinfo: an
+   internationalised host is accepted only as punycode and shown as punycode; a Unicode host
+   would be fetched as punycode but shown raw, so `https://сlaude.ai/...` with a Cyrillic `с`
+   would read as `claude.ai`), and every other character is printable ASCII (`\x21`-`\x7e`)
+   other than `#` and `\` (a URL parser reads `\` as `/`, so `https://evil.example\@claude.ai/`
+   would reach `evil.example` while a reader sees `claude.ai`);
    starts with `https://`; contains no `#`, no `?`, and no `@` before the first `/` after the
    scheme; the raw path (from the first `/` after `https://`) is not empty or `/`; no raw path
-   segment, compared case-insensitively, is `.`, `..`, `%2e` or `%2e%2e`; and `new URL(raw)`
+   segment, compared case-insensitively, is `.`, `..`, `%2e`, `%2e%2e`, `.%2e` or `%2e.`; and `new URL(raw)`
    succeeds, and the raw string is at most 2000 characters. Any failure: "client_id is not a
    valid metadata URL". The raw string is what
    rule 6 compares; the parsed URL supplies host, port and path for rules 2-3.
@@ -135,7 +144,8 @@ Rules, in order (each failure is 422 with the quoted reason unless marked 503):
 6. JSON object, else "document is not a JSON object". `client_id` must equal the URL string
    exactly ("client_id does not match the URL"). `client_name` a non-empty string, cut to 200
    characters ("client_name missing or invalid" when absent, empty or not a string).
-   `redirect_uris` a non-empty array of strings, each parsing with `new URL()` to
+   `redirect_uris` a non-empty array of strings, each following rule 1's host and character rule
+   (so no `#`: RFC 6749 3.1.2, a redirection endpoint has no fragment), and parsing with `new URL()` to
    protocol `https:`, or to protocol `http:` with hostname exactly `localhost` or `127.0.0.1`,
    and each at most 2000 characters ("redirect_uris missing or invalid").
    `token_endpoint_auth_method` absent or `"none"`; `client_secret` absent ("client is not a
@@ -237,6 +247,11 @@ the same reading the API uses), else Bun's `server.requestIP(req).address`. Sing
    `Content-Type` whose media type is not `application/json` (parameters allowed), unparsable
    JSON, a JSON array, or a non-object: 400 JSON-RPC `{"jsonrpc":"2.0","id":null,"error":
    {"code":-32600,"message":"The body must be one JSON-RPC message."}}`.
+   Then a `subscriptions/listen` notification (no `id` member) answers 202 with no body; a
+   `subscriptions/listen` request answers JSON-RPC `-32601` "Method not found" with its
+   `id` (404 on a 2026-07-28 request, 200 on the 2025 leg) before the SDK, so no SSE stream is
+   ever opened (slice-2 review item D); for that one method this answers ahead of the SDK's
+   protocol-header checks (`-32020`, `-32022`).
 8. `method` `tools/call` naming a catalog tool whose `annotations.readOnlyHint` is not `true`,
    under a `read` key: 403 `insufficient_scope`, "This credential is read-only; this tool needs
    write access.", header `WWW-Authenticate: Bearer error="insufficient_scope", scope="read
@@ -287,9 +302,9 @@ without the `Authorization` value. The service never reads a credential from the
 
 | Service | Variable | Value on Railway | Missing |
 | --- | --- | --- | --- |
-| mcp | `PORT` | Railway-provided | 8080 |
+| mcp | `PORT` | `8080`, set explicitly (the public domain targets it) | 8080 |
 | mcp | `MCP_HOST` | unset (listens on `::`) | `::`; suites set `127.0.0.1` |
-| mcp | `MCP_INTERNAL_PORT` | `8081` | 8081 |
+| mcp | `MCP_INTERNAL_PORT` | `8081`; pocketbase's `MCP_INTERNAL_URL` names the same port, so change both or neither | 8081 |
 | mcp | `PB_INTERNAL_URL` | `http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:<pocketbase PORT>` | exit 1 |
 | mcp | `PB_PUBLIC_URL` | `${{pocketbase.PB_PUBLIC_URL}}` ({API}) | exit 1 |
 | mcp | `MCP_PUBLIC_URL` | `https://mcp.<API host>` ({MCP}) | exit 1 |
@@ -431,6 +446,15 @@ oauth_codes WHERE expires < {:now}` through `$app.db().newQuery(...).bind({ now 
 no cron is added.
 
 Metadata documents are cached in `$app.store()` under `cimd:<client_id>` as `{ client, exp }`.
+PocketBase does not rely on the service for what the consent page shows: an `https://`
+`client_id` breaking D5 rule 1's host and character rule (or over 2000 characters) is refused as
+"could not be verified." before any call to the service; a 200 whose `client` lacks a non-empty
+string `client_name` or a non-empty `redirect_uris` array of strings is "right now" (and is not
+cached); a returned redirect URI that is not `https://` or loopback `http://`, breaks the same
+host and character rule, or is over 2000 characters makes the client "could not be verified.";
+the client keeps the `client_id` PocketBase asked for, whatever id the service returns; and
+`client_name` is cut to 200 characters on the PocketBase side too. The two URL shapes are one
+pair of literals in `services/mcp/src/cimd.ts` and `pb_hooks/lib/oauth.js` (`KEEP IN SYNC`).
 OTP wrong-guess counts live under `oauth_otp_tries:<otp id>`. The page-signing secret is
 `oauthFlowSecret`, set once per boot with `$security.randomString(40)` in `onBootstrap`, the
 pattern of `pb_hooks/mail.pb.js:19` (`signupMailSecret`).
@@ -483,7 +507,7 @@ Go `html/template` escaping was proven on text and attribute contexts):
 | --- | --- | --- | --- |
 | (GET) | none | validate | `signin` |
 | `password` | `signin` | `$app.findAuthRecordByEmail("users", email)` (throws when unknown), `validatePassword`, then the users `authRule` via `$app.canAccessRecord(u, new RequestInfo({ auth: u }), u.collection().authRule)` | `consent`, or `signin` with a message |
-| `send_code` | `signin` | known email: create a `_otps` record (`collectionRef`, `recordRef`, `sentTo`, `setPassword(code)`) with an 8-digit code from `$security.randomStringWithAlphabet(8, "0123456789")`, then `$mails.sendRecordOTP($app, u, otp.id, code)`; unknown email: nothing | `code` (otp id in the token, `""` when unknown) |
+| `send_code` | `signin` | known email: create a `_otps` record (`collectionRef`, `recordRef`, `sentTo`, `setPassword(code)`) with an 8-digit code from `$security.randomStringWithAlphabet(8, "0123456789")`, then `$mails.sendRecordOTP($app, u, otp.id, code)`; unknown email: nothing | `code` (a random 15-character id in the user-id slot and the otp id in the token; an unknown email gets a random 15-character id in both, as PocketBase's own `request-otp` does. Correction: this cell first said `""` when unknown, which told a reader of the token whether the email has an account.) |
 | `verify_code` | `code` | inside `$app.runInTransaction`: `findOTPById`, `hasExpired(u.collection().otp.durationTime())`, `validatePassword(code)`, delete on success; a wrong guess increments `oauth_otp_tries:<id>` and at 5 deletes the OTP; then the `authRule` check | `consent`, or `code` with a message |
 | `approve` | `consent` | issue a code (D15) | 302 to `redirect_uri?code=&state=&iss=` |
 | `deny` | `consent` | nothing | 302 to `redirect_uri?error=access_denied&state=&iss=` |
@@ -1354,7 +1378,9 @@ and removes scratch, exit 1 on any failure.
     "X-TM-Internal": secret, "Content-Type": "application/json" }, body: JSON.stringify({
     client_id: id }), timeout: 8 })`; 200: store `{ client: res.json.client, exp: Date.now() +
     res.json.max_age * 1000 }` when `max_age > 0`, return it; 422: "could not be verified"; any
-    other status or a thrown error: "right now".
+    other status or a thrown error: "right now". The guards of D13's last paragraph (the URL
+    shapes of the id and redirect URIs, the 200's shape, the requested id kept, the
+    200-character name) wrap this branch.
 - **Tests** (`tests/test_mcp_cimd.ts`, no port; fake `lookup` and `fetch`; write
   `refuses_private_address` first):
   - `url_rules`: `http://x/a`, `https://u@x/a`, `https://x`, `https://x/`, `https://x/a#f`,
@@ -1507,29 +1533,66 @@ command is exact; a step that cannot run as written stops the runbook and is rep
 4. `railway add --service mcp --repo hsb3/task-manager-backend --branch main --variables
    "MCP_INTERNAL_SECRET=$S" --variables 'PB_PUBLIC_URL=${{pocketbase.PB_PUBLIC_URL}}' --variables
    'PB_INTERNAL_URL=http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:${{pocketbase.PORT}}'
-   --variables "MCP_PUBLIC_URL=https://mcp.<API host from step 2>"`
+   --variables "MCP_PUBLIC_URL=https://mcp.<API host from step 2>" --variables PORT=8080`
+   (`PORT` is set explicitly because the service listens on two ports, `PORT` and
+   `MCP_INTERNAL_PORT` 8081, and step 7's domain must target `PORT`; `railway.ts` declares
+   `PORT` on `mcp` (`preserve()`), so step 11's plan sees it; `MCP_INTERNAL_PORT` stays
+   unset at its 8081 default, the port step 6's `MCP_INTERNAL_URL` names: change both or
+   neither).
 5. `railway environment edit --service-config mcp build.builder DOCKERFILE --service-config mcp
    build.dockerfilePath services/mcp/Dockerfile --service-config mcp deploy.healthcheckPath
-   /.well-known/oauth-protected-resource` (no `--stage`, so the edit commits at once); set `build.watchPatterns` to Phase 9's list in the dashboard (Settings,
-   Build, Watch Paths) if the CLI refuses an array value.
+   /.well-known/oauth-protected-resource --service-config mcp deploy.healthcheckTimeout 60` (no
+   `--stage`, so the edit commits at once); set `build.watchPatterns` to the `mcp` list in
+   `deploy/railway/railway.ts` in the dashboard (Settings, Build, Watch Paths) if the CLI refuses
+   an array value, and the healthcheck timeout (Settings, Deploy, Healthcheck Timeout) if it
+   refuses that path (R3). In the same Watch Paths field of `pocketbase`, replace `Dockerfile`
+   with `/Dockerfile` and add `/.dockerignore`, matching its `railway.ts` list. Railway, "Configure
+   watch paths" (https://docs.railway.com/builds/build-configuration#configure-watch-paths):
+   "Watch paths are gitignore-style patterns that can be used to trigger a new deployment based
+   on what file paths have changed"; the page's examples anchor at the repository root with a
+   leading `/` (`/*.go`, root only). Unverified: whether the unanchored `Dockerfile` also matched
+   `services/mcp/Dockerfile` (the page does not say; gitignore rules would match it); the
+   anchored form makes the question moot.
+5a. Region and replicas: `railway scale --service mcp us-east4-eqdc4a=1` (the region of
+   `pocketbase`, since every MCP request calls `/me`). Railway, "railway scale"
+   (https://docs.railway.com/cli/scale): usage `railway scale [OPTIONS] [REGION=REPLICAS]...`,
+   accepting a Railway region id. Fallback if the CLI refuses: dashboard, `mcp` Settings, Deploy,
+   Regions: `us-east4-eqdc4a`, 1 replica.
+5b. Wait for CI (`checkSuites: true` in `railway.ts`): dashboard only, `mcp` Settings, Source,
+   "Wait for CI" on. Railway, "Wait for CI"
+   (https://docs.railway.com/deployments/github-autodeploys#wait-for-ci): "If your workflow
+   satisfies the requirements above, you will see the `Wait for CI` flag in service settings"
+   (the requirement: a GitHub Actions workflow with an `on: push` trigger, which
+   `.github/workflows/ci.yml` has). The page names no CLI or config field for it.
 6. `railway variable set --service pocketbase "MCP_INTERNAL_SECRET=$S"
    'MCP_INTERNAL_URL=http://${{mcp.RAILWAY_PRIVATE_DOMAIN}}:8081'
    "MCP_PUBLIC_URL=https://mcp.<API host>"` (this redeploys pocketbase).
-7. `railway domain "mcp.<API host>" --service mcp`; give the printed CNAME and TXT records to
+7. `railway domain "mcp.<API host>" --service mcp --port 8080`; give the printed CNAME and TXT records to
    the owner to add at the DNS provider; repeat `railway domain status "mcp.<API host>" --service mcp` until the
-   certificate is issued.
+   certificate is issued. Railway, "railway domain" (https://docs.railway.com/cli/domain): option
+   "-p, --port <PORT>", "Port to connect to the domain when creating a domain", and `railway
+   domain update <domain> --port 8080` to change it later; Railway, "Target ports"
+   (https://docs.railway.com/networking/domains/working-with-domains#target-ports): "If your app
+   listens on multiple ports, you're provided with a list to choose from". Unverified: whether
+   Railway would pick `PORT` unprompted (the page does not say); the explicit `--port` and the
+   check in step 8 make it moot. Fallback if the CLI refuses `--port`: dashboard, `mcp` Settings,
+   Networking, the domain's edit icon, target port 8080.
 8. Verify (read-only, no key): `curl -s https://mcp.<API host>/.well-known/oauth-protected-resource/mcp`
    (200, `authorization_servers[0]` equals `PB_PUBLIC_URL`); `curl -s -o /dev/null -w
    '%{http_code}' -X POST https://mcp.<API host>/mcp` (401); `curl -s
    <PB_PUBLIC_URL>/.well-known/oauth-authorization-server` (200, `issuer` equals
-   `PB_PUBLIC_URL`).
+   `PB_PUBLIC_URL`); `curl -s -X POST https://mcp.<API host>/internal/client-metadata` (404 with
+   the public listener's body, `"message":"Nothing is served at this path."`, never the private
+   listener's `{"error":"not_found"}`: the domain reaches `PORT`, not 8081).
 9. Verify the private network: `railway ssh --service mcp -- bun -e "fetch(process.env.PB_INTERNAL_URL+'/api/health').then(r=>console.log(r.status))"` prints 200.
 10. Verify a sign-in end to end with Claude Code from the owner's machine: `claude mcp add
     --transport http tracker https://mcp.<API host>/mcp`, run `/mcp` in Claude Code, complete
     the browser sign-in, and list tools (expect the write set). Then revoke the minted key in
     the key list and confirm the next call asks to sign in again.
 11. `railway config plan --source-tree "$(git rev-parse HEAD:)" --out /tmp/plan.json` and
-    confirm the plan proposes no change to `mcp` (read only; never `apply`, per
+    confirm the plan proposes no change to `mcp` and none to `pocketbase`'s watch patterns
+    (steps 4, 5, 5a and 5b set every value the `mcp` entry declares; a diff on one of them is
+    the step that did not take: set it by that step's dashboard fallback and plan again; read only; never `apply`, per
     `deploy/railway/README.md`).
 12. Edit `docs/readiness/agent-clients.md`: AC-6 and AC-7 `met`, evidence "steps 8-10 of the
     hosted-mcp-endpoint runbook on <date>"; commit through a PR.

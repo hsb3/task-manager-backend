@@ -1,4 +1,4 @@
-# The production image (repo-root Dockerfile) on a local port; pb_data persists in a named volume.
+# The production images (Dockerfile, services/mcp/Dockerfile) on local ports; pb_data persists in a named volume.
 name: pb-local
 services:
   pocketbase:
@@ -7,7 +7,25 @@ services:
     platform: linux/amd64 # the Dockerfile fetches the amd64 PocketBase binary
     ports:
       - "127.0.0.1:${PB_PORT:-8090}:8080"
+    environment:
+      PB_PUBLIC_URL: http://127.0.0.1:${PB_PORT:-8090}
+      MCP_PUBLIC_URL: http://127.0.0.1:${MCP_PORT:-8089}
+      MCP_INTERNAL_URL: http://mcp:8081
+      MCP_INTERNAL_SECRET: local-only-not-a-secret
     volumes:
       - pb_data:/pb/pb_data
+  mcp:
+    build:
+      context: ../..
+      dockerfile: services/mcp/Dockerfile
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:${MCP_PORT:-8089}:8080"
+    environment:
+      PB_INTERNAL_URL: http://pocketbase:8080
+      PB_PUBLIC_URL: http://127.0.0.1:${PB_PORT:-8090}
+      MCP_PUBLIC_URL: http://127.0.0.1:${MCP_PORT:-8089}
+      MCP_INTERNAL_SECRET: local-only-not-a-secret
+    depends_on: [pocketbase]
 volumes:
   pb_data:
