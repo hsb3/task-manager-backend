@@ -325,6 +325,7 @@ onRealtimeSubscribeRequest((e) => {
     "key_hash",
     $security.sha256(header),
   );
+  e.client.set("apiKeyHash", key.getString("key_hash"));
   const reach = lib.keyReach(lib.keyInfo(key));
   if (reach) {
     // PB checks expansions with the subscription's own headers (no reach); any spelling of expand refuses, a filter value naming it too.
@@ -339,8 +340,33 @@ onRealtimeSubscribeRequest((e) => {
   return e.next();
 });
 
-// A limited key's stream carries only records in its reach; a subscription's own headers cannot widen it.
+// A key's stream ends with the key, and a limited key's stream carries only records in its reach; a subscription's own headers cannot widen it.
 onRealtimeMessageSend((e) => {
+  // decision:key-revocation-ends-open-streams: the subscribing token is re-checked as the middleware checks it, at every message.
+  const hash = e.client.get("apiKeyHash");
+  if (hash) {
+    let key = null;
+    let owner = null;
+    try {
+      key = $app.findFirstRecordByData("api_keys", "key_hash", hash);
+      owner = $app.findRecordById("users", key.get("user"));
+    } catch (_) {}
+    const expires = key ? key.getDateTime("expires") : null;
+    if (
+      !owner ||
+      key.getBool("revoked") ||
+      (!expires.isZero() && !expires.after(new DateTime())) ||
+      !$app.canAccessRecord(
+        owner,
+        new RequestInfo({ auth: owner }),
+        owner.collection().authRule,
+      )
+    ) {
+      e.client.unsubscribe();
+      e.client.discard();
+      return;
+    }
+  }
   const lib = require(`${__hooks}/lib/api_keys.js`);
   const raw = e.client.get("apiKeyReach");
   if (!raw) return e.next();
