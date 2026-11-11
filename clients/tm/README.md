@@ -7,18 +7,28 @@ so it works as well inside a script or an agent as it does by hand.
 ## Set up once
 
 Run `bun install` from the repo root before first use; it installs the MCP SDK the `mcp` verb
-needs. Then mint an API key: sign in and create an `api_keys` record, whose response shows the
-key once ([What a client does](../../README.md#what-a-client-does) has the call, the levels and
-the reach). A `read` key only reads; `write` or above can also create, edit and comment. Paste it:
+needs. To call it as plain `tm`, link `clients/tm/tm.ts` into a directory on `PATH` once. Then
+sign in through the browser:
 
 ```bash
-bun clients/tm/tm.ts login --url https://tm.example.com
+tm login --url https://tm.example.com
 ```
 
-To call it as plain `tm`, link `clients/tm/tm.ts` into a directory on `PATH` once.
+A browser opens on the server's sign-in page; approve there, choosing the level and the workspaces
+the key reaches ([What a client does](../../README.md#what-a-client-does) has the levels and the
+reach). A `read` key only reads; `write` or above can also create, edit and comment. `--scope
+LEVEL` sets the highest level offered (default `write`); `--no-browser` only prints the page's
+address; open it in a browser on the same machine, because the sign-in returns to it.
 
-The key is saved to a file only its owner can read, and the command prints where. To skip the file,
-set `TM_URL` and `TM_API_KEY` in the environment instead; they win over the saved login. `TM_API_KEY` holds an API key (`tmk_...`), not a login token; any other value is refused.
+On a machine with no browser, mint a key elsewhere (`tm keys create`, below) and paste it:
+`tm login --with-key --url https://tm.example.com`.
+
+The key is kept in the system credential store (the macOS keychain, or the secret service on
+Linux); where there is none, or under Node, it goes into `~/.config/tm/config.json`, readable only
+by its owner. `TM_CREDENTIAL_STORE=file` always uses the file. To skip both, set `TM_URL` and
+`TM_API_KEY` in the environment instead; they win over the saved login. `TM_API_KEY` holds an API
+key (`tmk_...`), not a login token; any other value is refused. `tm logout` revokes the saved key
+where it may and removes the saved login.
 
 ## Use it
 
@@ -42,6 +52,19 @@ example `--set draft=true`), a number field takes a number, and anything else is
 Add `--json` to any verb to get the server's answer as JSON with the field names the API uses,
 plus a `kind` naming the kind (a `search` hit on a project is kind `project`). `list` and
 `search` print each item's id first; that id is what `show`, `edit` and `comment` take.
+
+## Keys
+
+```bash
+tm keys list [--all]                     # your keys; active ones unless --all; * marks this login's
+tm keys create --name "ci bot" --scope read --expires 2030-01-01   # prints the key once
+tm keys revoke <id>
+```
+
+`keys create` signs in through the browser like `login`, prints the new key alone on stdout and
+saves nothing. LEVEL is `read`, `write`, `manage` or `own`; `--expires` takes `YYYY-MM-DD` (00:00
+UTC) or a date-time with a time zone. `keys list` and `keys revoke` need a key that may manage
+keys (the one `tm login` saves, unless its box was unticked on the approval page); a key limited to some workspaces lists and revokes only itself.
 
 ## As an MCP server
 
@@ -73,10 +96,11 @@ per-field details.
 ## When something goes wrong
 
 - Exit code 0: it worked.
-- Exit code 1: the server refused, or no usable key is configured (none saved or set, or one not
+- Exit code 1: the server or the browser sign-in refused, or no usable key is configured (none saved or set, or one not
   starting with `tmk_`). The message is on stderr, with details when the server named the
   offending fields. A read-only key that tries to write exits this way.
 - Exit code 2: the command line was wrong; the usage text follows the message.
+- Exit code 130: interrupted (Ctrl-C).
 
 Nothing is printed on stdout when a command fails, so `--json` output is either complete or absent.
 

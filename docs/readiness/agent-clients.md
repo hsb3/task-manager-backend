@@ -83,14 +83,13 @@ writes.
 
 **AC-9** The operator can mint, list and revoke keys through a documented client command,
 without hand-written HTTP.
-- Verdict: partly.
-- Evidence: `README.md` "What a client does" mints with `curl` against
-  `/api/collections/api_keys/records` using a password session; `clients/tm/tm.ts` verbs are
-  `login`, `list`, `show`, `search`, `create`, `edit`, `comment`, `mcp`. A key cannot mint a
-  key (403 `api_key_path`, AC-2). Minting needs a verified, approved user
-  (decision:signup-approval, decision:verified-login), so the first key needs a person at a
-  mailbox.
-- Gap: no client command for mint, list or revoke.
+- Verdict: met.
+- Evidence: `tm login` (browser sign-in, saves a key that may list and revoke its user's keys),
+  `tm keys create|list|revoke` (`clients/tm/tm.ts`); `tests/test_tm_keys.ts`,
+  `tests/test_tm_login_browser.ts`, `tests/test_key_management.ts`. A key still cannot mint a
+  key (403 `api_key_path`, AC-2): `tm keys create` mints through the browser sign-in. Minting
+  needs a verified, approved user (decision:signup-approval, decision:verified-login), so the
+  first key needs a person at a mailbox.
 
 **AC-10** The CLI and MCP tools cover an agent's whole work loop, not only items and comments.
 - Verdict: partly.

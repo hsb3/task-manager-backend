@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// tm — the task tracker from the command line. Exit 0 ok · 1 the server refused · 2 usage.
+// tm — the task tracker from the command line. Exit 0 ok · 1 refused · 2 usage · 130 interrupted.
 
 import os from "node:os";
 import { parseArgs } from "node:util";
@@ -21,10 +21,14 @@ import * as verbs from "./src/verbs.ts";
 
 const HELP = `usage: tm <verb> [options]
 
-  login --with-key [--url URL]      paste an API key; saves it for the next runs
-  keys list [--all]                 your API keys; active ones unless --all
-  keys revoke <id>                  revokes one of your API keys
+  login [--url URL] [--scope LEVEL] [--no-browser]
+                                    sign in through the browser; saves the key for the next runs
+  login --with-key [--url URL]      paste an API key instead (a machine with no browser)
   logout                            revokes the saved key where it may; removes the saved login
+  keys list [--all]                 your API keys; active ones unless --all
+  keys create --name NAME --scope LEVEL [--expires DATE]
+                                    mints a key through the browser; prints it once, saves nothing
+  keys revoke <id>                  revokes one of your API keys
   list [--project ID] [--workspace ID] [--kind KIND] [--limit N] [--page N]
   show <id>
   search <text>
@@ -33,10 +37,12 @@ const HELP = `usage: tm <verb> [options]
   comment <id> <text>
   mcp                               serve the verbs as tools to an AI agent over stdio
 
+  LEVEL is read, write (default for login), manage or own; DATE is YYYY-MM-DD or a date-time with a zone.
   KIND is task (default), document, decision or milestone.
   --limit is the page size (default 50); --page picks the page (default 1).
   --json prints the server's answer as JSON; errors go to stderr and exit 1.
-  TM_URL and TM_API_KEY override what login saved.`;
+  TM_URL and TM_API_KEY override what login saved; TM_CREDENTIAL_STORE=file keeps the key in a file.
+  Exit 0 ok · 1 refused · 2 usage · 130 interrupted`;
 
 const OPTIONS = {
   json: { type: "boolean", default: false },
