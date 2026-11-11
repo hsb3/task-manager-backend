@@ -5,11 +5,11 @@ entity: workspace_members
 kind: base
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && (user = @request.auth.id || workspace.owner = @request.auth.id
-      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (user = @request.auth.id || workspace.owner
+      = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
       ?= "active")) && (workspace.trashed = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
-      ?= "active"))'
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
     actors:
     - custom(user = @request.auth.id)
     - workspace-owner
@@ -18,12 +18,15 @@ capabilities:
     - workspace-owner
     - active-workspace-admin
     authRequired: guard
+    record_state:
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
   view:
-    verbatim: '@request.auth.id != "" && (user = @request.auth.id || workspace.owner = @request.auth.id
-      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (user = @request.auth.id || workspace.owner
+      = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
       ?= "active")) && (workspace.trashed = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
       ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
-      ?= "active")) && (@request.query.workspace:isset = false || workspace = @request.query.workspace)'
+      ?= "active")) && (@request.query.workspace:isset = false || workspace = @request.query.workspace))
+      && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
     actors:
     - custom(user = @request.auth.id)
     - workspace-owner
@@ -34,20 +37,22 @@ capabilities:
     authRequired: guard
     record_state:
     - '@request.query.workspace:isset = false || workspace = @request.query.workspace'
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
   create:
     verbatim: null
     actors:
     - superuser-only
     authRequired: superuser
   update:
-    verbatim: (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?=
-      @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
+    verbatim: '@request.auth.id != "" && ((workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
       ?= "active" && @request.body.role:isset = false)) && @request.body.workspace:isset = false && @request.body.user:isset
-      = false && workspace.trashed = "" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)
+      = false && workspace.trashed = "" && (@request.query.workspace:isset = false || workspace = @request.query.workspace))
+      && (@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace)'
     actors:
     - workspace-owner
     - custom-compound(active-workspace-admin && @request.body.role:isset = false)
-    authRequired: absent
+    authRequired: guard
     body_guards:
     - '@request.body.role:isset'
     - '@request.body.user:isset'
@@ -58,19 +63,22 @@ capabilities:
     record_state:
     - workspace.trashed = ""
     - '@request.query.workspace:isset = false || workspace = @request.query.workspace'
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
   delete:
-    verbatim: (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?=
-      @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
+    verbatim: '@request.auth.id != "" && ((workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
+      ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?= "admin" && workspace.workspace_members_via_workspace.status
       ?= "active") || (user = @request.auth.id && workspace.owner != @request.auth.id)) && workspace.trashed
-      = "" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)
+      = "" && (@request.query.workspace:isset = false || workspace = @request.query.workspace)) && (@request.headers.x_tm_key_workspace
+      = "" || workspace = @request.headers.x_tm_key_workspace)'
     actors:
     - workspace-owner
     - active-workspace-admin
     - custom(user = @request.auth.id && workspace.owner != @request.auth.id)
-    authRequired: absent
+    authRequired: guard
     record_state:
     - workspace.trashed = ""
     - '@request.query.workspace:isset = false || workspace = @request.query.workspace'
+    - '@request.headers.x_tm_key_workspace = "" || workspace = @request.headers.x_tm_key_workspace'
 relations:
 - field: workspace
   target: workspaces

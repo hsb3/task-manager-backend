@@ -113,7 +113,7 @@ const ROUTES = {
     },
     responses: {
       400: "The workspace is missing or blank, or projects or collections is neither null nor a list of strings.",
-      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member. An API key limited to another workspace gets the same 404.",
     },
     response: {
       status: 200,
@@ -275,7 +275,7 @@ const ROUTES = {
                 counts: {
                   type: ["object", "null"],
                   description:
-                    "{projects, open_items}; null for a suspended membership.",
+                    "{projects, open_items}; null for a suspended membership. Under an API key limited to projects, only those projects and their open tasks are counted.",
                 },
                 capabilities: {
                   type: "object",
@@ -295,14 +295,28 @@ const ROUTES = {
           key: {
             type: "object",
             description:
-              'Present only under an API key: the key\'s id, scope, expiry ("" for never) and client ("" for a key minted by hand).',
+              'Present only under an API key: the key\'s id, level (scope), expiry ("" for never), client ("" for a key minted by hand), reach (all, workspace or projects), workspace ("" for reach all) and projects ([] unless reach is projects).',
             properties: {
               id: { type: "string" },
-              scope: { type: "string", enum: ["read", "write"] },
+              scope: {
+                type: "string",
+                enum: ["read", "write", "manage", "own"],
+              },
               expires: { type: "string" },
               client_id: { type: "string" },
+              reach: { type: "string", enum: ["all", "workspace", "projects"] },
+              workspace: { type: "string" },
+              projects: { type: "array", items: { type: "string" } },
             },
-            required: ["id", "scope", "expires", "client_id"],
+            required: [
+              "id",
+              "scope",
+              "expires",
+              "client_id",
+              "reach",
+              "workspace",
+              "projects",
+            ],
           },
         },
         required: ["user", "unread_notifications", "workspaces"],
@@ -520,7 +534,7 @@ const ROUTES = {
     responses: {
       400: "The workspace is missing or blank, or the filter, sort, group or time zone is refused: a filter longer than 3500 characters, a filter or sort that reaches past the items' own fields, a group outside the listed ones, or a time zone that is not an IANA name.",
       403: "The caller is a superuser, who is no member of any workspace; the same refusal the other member-only workspace routes answer.",
-      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member; its owner gets 404 for a trashed workspace too.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active member; its owner gets 404 for a trashed workspace too. An API key limited to another workspace gets the same 404.",
       500: "The trashed items could not be read for a reason other than the filter or sort.",
     },
     response: {
@@ -736,7 +750,7 @@ const ROUTES = {
     auth: "any",
     docs: "route:workspaces-deletion-impact",
     responses: {
-      404: "The workspace does not exist or the caller is not its owner; an admin and a superuser get 404 too.",
+      404: "The workspace does not exist or the caller is not its owner; an admin and a superuser get 404 too. An API key limited to another workspace, or to projects, gets the same 404.",
     },
     response: {
       status: 200,
@@ -783,7 +797,7 @@ const ROUTES = {
     },
     responses: {
       400: "The email is missing or blank, the role is not admin, member or viewer, a caller who is not the owner asked for an admin or a viewer, or the body carries expected_updated_at.",
-      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin. An API key limited to another workspace gets the same 404.",
       409: "The address recently declined an invitation to this workspace; invite it again later.",
       429: "The daily invitation limit of the inviter is reached, or the same pending invitation was sent again less than a minute ago; wait before inviting again.",
       500: "The invitation could not be saved for a reason other than the address already being invited.",
@@ -854,7 +868,7 @@ const ROUTES = {
     },
     responses: {
       400: "The user is missing, already the owner, not an active member, or a viewer; the workspace is in the trash; or a superuser named no current owner or the wrong one.",
-      404: "The workspace does not exist or the caller is neither its owner nor a superuser.",
+      404: "The workspace does not exist or the caller is neither its owner nor a superuser. An API key limited to another workspace gets the same 404.",
       500: "A write failed at the database, so the ownership was not transferred and nothing changed.",
     },
     response: {
@@ -925,7 +939,7 @@ const ROUTES = {
     },
     responses: {
       400: "A workspace field, status or label is refused, or the call would delete a status a task still uses or a core label; nothing is saved.",
-      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin.",
+      404: "The workspace does not exist, is in the trash, or the caller is neither its owner nor an active admin. An API key limited to another workspace gets the same 404.",
     },
     response: {
       status: 200,

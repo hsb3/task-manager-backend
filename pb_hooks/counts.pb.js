@@ -98,6 +98,8 @@ require(`${__hooks}/lib/routes.js`).add(
     for (let i = 0; i < matched.length; i++)
       if (
         matched[i] !== "@request.auth.id" &&
+        matched[i] !== "@request.headers.x_tm_key_workspace" &&
+        matched[i] !== "@request.headers.x_tm_key_projects" &&
         offending.indexOf(matched[i]) === -1
       )
         offending.push(matched[i]);
@@ -106,7 +108,7 @@ require(`${__hooks}/lib/routes.js`).add(
         500,
         "project_items listRule carries " +
           offending.join(", ") +
-          ", which GET /api/tracker/project-items/counts cannot bind",
+          ", which GET /api/tracker/project-items/counts cannot bind (it binds @request.auth.id, @request.headers.x_tm_key_workspace and @request.headers.x_tm_key_projects)",
         null,
       );
     // Blanking the literals is what makes the count comparable: a mention only inside one is
@@ -125,10 +127,14 @@ require(`${__hooks}/lib/routes.js`).add(
         "project_items listRule carries a {: bound-parameter token, which GET /api/tracker/project-items/counts cannot bind",
         null,
       );
-    // Safe only because the sole surviving token outside a literal is the one being replaced.
+    // Safe only because the surviving tokens outside a literal are exactly the ones being replaced.
     const substituted = String(rule)
       .split("@request.auth.id")
-      .join("{:authId}");
+      .join("{:authId}")
+      .split("@request.headers.x_tm_key_workspace")
+      .join("{:keyWorkspace}")
+      .split("@request.headers.x_tm_key_projects")
+      .join("{:keyProjects}");
 
     const combined = filter
       ? "(" + substituted + ") && (" + filter + ")"
@@ -139,6 +145,8 @@ require(`${__hooks}/lib/routes.js`).add(
     try {
       rows = e.app.findRecordsByFilter("project_items", combined, "", 0, 0, {
         authId: e.auth.id,
+        keyWorkspace: String(e.request.header.get("X-Tm-Key-Workspace") || ""),
+        keyProjects: String(e.request.header.get("X-Tm-Key-Projects") || ""),
       });
     } catch (err) {
       // PB prefixes every filter it cannot apply this way; a database failure stays a failure.
@@ -227,12 +235,14 @@ function refuseUnbindableListRule(e) {
   for (let i = 0; i < matched.length; i++)
     if (
       matched[i] !== "@request.auth.id" &&
+      matched[i] !== "@request.headers.x_tm_key_workspace" &&
+      matched[i] !== "@request.headers.x_tm_key_projects" &&
       offending.indexOf(matched[i]) === -1
     )
       offending.push(matched[i]);
   if (offending.length)
     throw new BadRequestError(
-      "project_items listRule may reference @request.auth.id only: " +
+      "project_items listRule may reference @request.auth.id and the API-key reach headers only: " +
         offending.join(", ") +
         " cannot be bound by GET /api/tracker/project-items/counts, which reads this rule per request",
       null,

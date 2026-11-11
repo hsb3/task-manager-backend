@@ -68,7 +68,7 @@ export const REGISTRY = new Map<string, (Rule | Prose | Alias)[]>([
       new Rule("task_subscribers.deleteRule"),
       new Prose(
         "user = @request.auth.id",
-        "self-subscribe clause of createRule, textually identical to the whole deleteRule",
+        "self-subscribe clause of createRule, the first clause of the deleteRule",
         "task_subscribers.createRule",
       ),
     ],

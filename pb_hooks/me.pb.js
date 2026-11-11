@@ -6,6 +6,12 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
       "This route answers for a signed-in user's own workspaces, and a superuser has none.",
     );
   const uid = e.auth.id;
+  const k = e.get("tmApiKey");
+  const lib = require(`${__hooks}/lib/api_keys.js`);
+  const level = k ? k.scope : "own";
+  const reach = lib.keyReach(k);
+  const kp =
+    reach && reach.projects ? "," + reach.projects.join(",") + "," : "";
   const rows = arrayOf(
     new DynamicModel({ id: "", name: "", owner: "", role: "", status: "" }),
   );
@@ -15,9 +21,11 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
     .newQuery(
       "SELECT w.id AS id, w.name AS name, w.owner AS owner, COALESCE(m.role, '') AS role, COALESCE(m.status, '') AS status" +
         " FROM workspaces w LEFT JOIN workspace_members m ON m.workspace = w.id AND [[m.user]] = {:u}" +
-        " WHERE w.trashed = '' AND (w.owner = {:u} OR m.id IS NOT NULL) ORDER BY w.created, w.id",
+        " WHERE w.trashed = '' AND (w.owner = {:u} OR m.id IS NOT NULL)" +
+        (reach ? " AND w.id = {:kw}" : "") +
+        " ORDER BY w.created, w.id",
     )
-    .bind({ u: uid })
+    .bind({ u: uid, kw: reach ? reach.workspace : "" })
     .all(rows);
 
   const workspaces = [];
@@ -33,18 +41,23 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
       e.app
         .db()
         .newQuery(
-          "SELECT (SELECT COUNT(*) FROM projects p WHERE p.workspace = {:w} AND p.trashed = '' AND p.shadow = 0) AS projects," +
+          "SELECT (SELECT COUNT(*) FROM projects p WHERE p.workspace = {:w} AND p.trashed = '' AND p.shadow = 0" +
+            (kp ? " AND instr({:kp}, ',' || p.id || ',') > 0" : "") +
+            ") AS projects," +
             " (SELECT COUNT(*) FROM tasks k WHERE k.workspace = {:w} AND k.trashed = ''" +
+            (kp
+              ? " AND k.project != '' AND instr({:kp}, ',' || k.project || ',') > 0"
+              : "") +
             // Mirrors tasks.listRule's project leg: a task in a trashed or missing project is listable by nobody.
             " AND (k.project = '' OR EXISTS (SELECT 1 FROM projects kp WHERE kp.id = k.project AND kp.trashed = ''))" +
             // KEEP IN SYNC: open items: STATUS_CATEGORIES' resolved half, `completed` and `canceled`, as schema/project_items.view.json reads it (scripts/check_constants.ts).
             " AND NOT EXISTS (SELECT 1 FROM statuses ks WHERE ks.id = k.status AND ks.workspace = k.workspace AND ks.category IN ('completed', 'canceled'))) AS open_items",
         )
-        .bind({ w: w.id })
+        .bind({ w: w.id, kp: kp })
         .one(res);
       counts = { projects: res.projects, open_items: res.open_items };
     }
-    // decision:role-tiers: write = items and projects, manage = settings, vocabulary, invites and purge, own = roles, transfer, workspace delete.
+    // decision:role-tiers: write = items and projects, manage = settings, vocabulary, invites and purge, own = roles, transfer, workspace delete; a key holds at most its level.
     workspaces.push({
       id: w.id,
       // A suspended member cannot read the workspace, so its name is withheld here too.
@@ -53,9 +66,13 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
       status: owner ? "active" : w.status,
       counts: counts,
       capabilities: {
-        write: active && role !== "viewer",
-        manage: active && (role === "owner" || role === "admin"),
-        own: owner,
+        write: active && role !== "viewer" && lib.levelAtLeast(level, "write"),
+        manage:
+          active &&
+          (role === "owner" || role === "admin") &&
+          lib.levelAtLeast(level, "manage") &&
+          !(reach && reach.projects),
+        own: owner && level === "own" && !(reach && reach.projects),
       },
     });
   }
@@ -80,7 +97,6 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
     unread_notifications: unread,
     workspaces: workspaces,
   };
-  const k = e.get("tmApiKey");
   if (k) answer.key = k;
   return e.json(200, answer);
 });

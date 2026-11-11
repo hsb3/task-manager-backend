@@ -83,6 +83,22 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785190500_seed_app_docs.js", "collection:notifications", "**Read.** Access is recipient-only, and list and view share "]',
+    "decision:api-key-reach-and-levels: the quoted rule now carries the key reach clause; the record quotes the rule as it stands",
+  ],
+  [
+    '["1785190500_seed_app_docs.js", "collection:projects", "**Create.** The createRule is: @request.auth.id != \\"\\" && (ow"]',
+    "decision:api-key-reach-and-levels: the quoted rule now carries the key reach clause; the record quotes the rule as it stands",
+  ],
+  [
+    '["1785190500_seed_app_docs.js", "collection:task_subscribers", "MANUAL: an ACTIVE non-viewer member (or the workspace owner)"]',
+    "decision:api-key-reach-and-levels: the quoted rule now carries the key reach clause; the record quotes the rule as it stands",
+  ],
+  [
+    '["1785190300_seed_app_docs.js", "collection:api_keys", "Fields: user (relation to users, required, removed with the "]',
+    "decision:api-key-reach-and-levels: scope gained manage and own; the field list now says so",
+  ],
+  [
     '["1785189200_seed_app_docs.js", "collection:users", "**Verification email.** A signup through POST /api/collectio"]',
     "decision:password-signup-verify-first (fr92): the signup mail now sets the password and its resend is request-password-reset; the record now says so",
   ],

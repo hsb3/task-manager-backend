@@ -9,7 +9,7 @@ export interface ApiKeysListResult {
   totalPages: number;
 }
 
-/** One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read or write), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool).
+/** One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional), revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100).
 
 **Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.
 
@@ -17,7 +17,9 @@ export interface ApiKeysListResult {
 
 A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.
 
-**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is "" for a key minted by hand; a value sent at create is replaced with "", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is "" for a key minted by hand. */
+**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is "" for a key minted by hand; a value sent at create is replaced with "", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is "" for a key minted by hand.
+
+**Reach and level.** Both are chosen at create and fixed: a change to reach, workspace or projects is refused with 404, as for scope. A create is refused with 400 when the reach is incoherent, the workspace is not one the user belongs to, a project is not a live project of it, or a projects key asks for manage or own (decision:api-key-reach-and-levels). */
 export interface ApiKeysRecord {
   client_id?: string;
   created?: string;
@@ -25,13 +27,16 @@ export interface ApiKeysRecord {
   id: string;
   key_hash?: string;
   name: string;
+  projects?: string[];
+  reach?: "all" | "workspace" | "projects";
   refresh_expires?: string;
   refresh_hash?: string;
   refresh_prev_hash?: string;
   revoked?: boolean;
-  scope: "read" | "write";
+  scope: "read" | "write" | "manage" | "own";
   updated?: string;
   user: string;
+  workspace?: string;
 }
 
 /** Paginated list of `app_docs` records. */
@@ -367,7 +372,7 @@ export interface NotificationsListResult {
 
 **Row shapes.** A commented row, and a mentioned row raised by a comment, carry comment and comment_preview. A mentioned row raised by item prose carries neither and names its item through task, document or decision. A status_done row carries status_label, the name of the status the task moved into. An assigned row carries none of the three. comment_preview is a snapshot, at most the first 140 characters of the comment body when the row is written, so a later edit of the comment never rewrites it. An ownership_transferred row carries no task and no comment: it names the workspace whose ownership moved, and the route writes exactly TWO per completed transfer, one to the outgoing owner and one to the incoming one, inside the same transaction as the handover. Every notification about a task, document or decision carries workspace, the workspace of its item (for a comment, the workspace of its task).
 
-**Read.** Access is recipient-only, and list and view share ONE rule, byte for byte: user = @request.auth.id && (workspace = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && (task = "" || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed = "")) && (document = "" || ((document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) && document.trashed = "" && (document.project = "" || (document.project.created != "" && document.project.trashed = "")) && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= "active")) && decision.trashed = "" && (decision.project = "" || (decision.project.created != "" && decision.project.trashed = "")) && decision.workspace.trashed = "")) && (document = "" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= "admin" && document.workspace.workspace_members_via_workspace.status ?= "active")) && (decision = "" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status ?= "active")) && dismissed = false
+**Read.** Access is recipient-only, and list and view share ONE rule, byte for byte: @request.auth.id != "" && (user = @request.auth.id && (workspace = "" || workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active")) && (task = "" || ((task.workspace.owner = @request.auth.id || (task.workspace.workspace_members_via_workspace.user ?= @request.auth.id && task.workspace.workspace_members_via_workspace.status ?= "active")) && task.trashed = "" && (task.project = "" || (task.project.created != "" && task.project.trashed = "")) && task.workspace.trashed = "")) && (document = "" || ((document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.status ?= "active")) && document.trashed = "" && (document.project = "" || (document.project.created != "" && document.project.trashed = "")) && document.workspace.trashed = "")) && (decision = "" || ((decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.status ?= "active")) && decision.trashed = "" && (decision.project = "" || (decision.project.created != "" && decision.project.trashed = "")) && decision.workspace.trashed = "")) && (document = "" || document.draft = false || document.author = @request.auth.id || document.workspace.owner = @request.auth.id || (document.workspace.workspace_members_via_workspace.user ?= @request.auth.id && document.workspace.workspace_members_via_workspace.role ?= "admin" && document.workspace.workspace_members_via_workspace.status ?= "active")) && (decision = "" || decision.draft = false || decision.author = @request.auth.id || decision.workspace.owner = @request.auth.id || (decision.workspace.workspace_members_via_workspace.user ?= @request.auth.id && decision.workspace.workspace_members_via_workspace.role ?= "admin" && decision.workspace.workspace_members_via_workspace.status ?= "active")) && dismissed = false) && (@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects = "" || (task != "" && task.project != "" && @request.headers.x_tm_key_projects ~ task.project) || (document != "" && document.project != "" && @request.headers.x_tm_key_projects ~ document.project) || (decision != "" && decision.project != "" && @request.headers.x_tm_key_projects ~ decision.project))))
 
 So a notification stays visible only while its item is still readable by its recipient: a notification whose task, document or decision is trashed, whose item sits in a trashed project, whose draft the recipient cannot read, or whose workspace the recipient has left (removed or suspended) leaves the inbox and answers 404 by id, then comes back when the item or the access is restored. That clause is load-bearing: comment_preview carries comment text, and a task_subscribers row outlives suspension and removal, so without it a departed member would keep receiving what colleagues write. A row that names a workspace lists only while its recipient owns that workspace or holds an active membership in it, so a member suspended from or removed from a workspace also stops seeing the ownership_transferred rows that name it. A notification naming no workspace, task, document or decision always lists. The list rule does not narrow to one workspace; a caller filters on workspace to show one workspace, including the rows that carry none.
 
@@ -541,7 +546,7 @@ export interface ProjectsListResult {
 
 **Read.** List and view are open to the workspace OWNER and its ACTIVE members; a suspended membership reads nothing. A trashed project is hidden from a plain member on list, view and update, while the workspace owner and an active admin keep all three, because the trashed projects of a workspace are enumerated through this listRule (projects have no trash route of their own). update carries the same predicate because PocketBase returns the whole record on a successful PATCH whatever the viewRule says, so restoring a project is the same actor set as trashing one.
 
-**Create.** The createRule is: @request.auth.id != "" && (owner = "" || owner = @request.auth.id) && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status ?= "active")) && (workspace = "" || workspace.trashed = "") && @request.body.shadow:isset = false
+**Create.** The createRule is: @request.auth.id != "" && (@request.auth.id != "" && (owner = "" || owner = @request.auth.id) && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.role ?!= "viewer" && workspace.workspace_members_via_workspace.status ?= "active")) && (workspace = "" || workspace.trashed = "") && @request.body.shadow:isset = false) && (@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects = "" || @request.headers.x_tm_key_projects ~ id)))
 
 So the caller is EITHER the workspace OWNER (who needs no workspace_members row) OR an active member whose role is not viewer; the workspace must not be in the trash; and a create that carries the shadow marker at all is refused, so no member can mint an invisible project. owner may be omitted: the server stamps the signed-in caller. A submitted owner must be the caller; naming anyone else is refused with a 400 error. A superuser keeps the owner it submits. A name made only of whitespace is refused with a 400 error.
 
@@ -684,7 +689,7 @@ export interface TaskSubscribersListResult {
 
 /** The subscription join between a task and a user. Fields: task (relation, required, removed with its task) and user (relation, required, removed with the user). A UNIQUE index on task and user keeps the auto-subscribe upsert idempotent.
 
-**How rows appear.** AUTO: the server subscribes the creator on task create (and the assignee when set), a new assignee on an assign, and the commenter on a task comment. MANUAL: an ACTIVE non-viewer member (or the workspace owner) may subscribe THEMSELVES, since the createRule requires the row to name the caller, and anyone may unsubscribe by deleting their own row: the deleteRule is exactly user = @request.auth.id. Unsubscribing stops all future fan-out for that user on that task.
+**How rows appear.** AUTO: the server subscribes the creator on task create (and the assignee when set), a new assignee on an assign, and the commenter on a task comment. MANUAL: an ACTIVE non-viewer member (or the workspace owner) may subscribe THEMSELVES, since the createRule requires the row to name the caller, and anyone may unsubscribe by deleting their own row: the deleteRule is exactly @request.auth.id != "" && (user = @request.auth.id) && (@request.headers.x_tm_key_workspace = "" || (task.workspace = @request.headers.x_tm_key_workspace && (@request.headers.x_tm_key_projects = "" || (task.project != "" && @request.headers.x_tm_key_projects ~ task.project)))). Unsubscribing stops all future fan-out for that user on that task.
 
 **Access.** list and view are active-member-read, the same scope as comments, so a suspended membership sees nothing. list, view and create also carry the trash exclusion of the task, so a subscription is unreadable and cannot be created while its task, the project of its task, or its workspace is in the trash. update is null. Deleting your own subscription stays open at all times, even to a suspended member, because user = @request.auth.id is record-relative rather than membership-derived, so anyone can stop being notified about work they cannot see any more.
 
@@ -1039,7 +1044,15 @@ export interface Paths {
   };
   "GET /api/tracker/me": {
     response: {
-      key?: { client_id: string; expires: string; id: string; scope: "read" | "write" };
+      key?: {
+        client_id: string;
+        expires: string;
+        id: string;
+        projects: string[];
+        reach: "all" | "workspace" | "projects";
+        scope: "read" | "write" | "manage" | "own";
+        workspace: string;
+      };
       unread_notifications: number;
       user: { id: string; name: string };
       workspaces: {
@@ -1202,6 +1215,8 @@ export const FIELD_TYPES = {
     id: "string",
     key_hash: "string",
     name: "string",
+    projects: "array",
+    reach: "string",
     refresh_expires: "string",
     refresh_hash: "string",
     refresh_prev_hash: "string",
@@ -1209,6 +1224,7 @@ export const FIELD_TYPES = {
     scope: "string",
     updated: "string",
     user: "string",
+    workspace: "string",
   },
   app_docs: {
     body: "string",

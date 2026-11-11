@@ -5,19 +5,29 @@ entity: project_stats
 kind: view
 capabilities:
   list:
-    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active"))'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (workspace.owner = @request.auth.id
+      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || @request.headers.x_tm_key_projects ~ id)))'
     actors:
     - workspace-owner
     - active-workspace-member
     authRequired: guard
+    record_state:
+    - '@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace &&
+      (@request.headers.x_tm_key_projects = "" || @request.headers.x_tm_key_projects ~ id))'
   view:
-    verbatim: '@request.auth.id != "" && (workspace.owner = @request.auth.id || (workspace.workspace_members_via_workspace.user
-      ?= @request.auth.id && workspace.workspace_members_via_workspace.status ?= "active"))'
+    verbatim: '@request.auth.id != "" && (@request.auth.id != "" && (workspace.owner = @request.auth.id
+      || (workspace.workspace_members_via_workspace.user ?= @request.auth.id && workspace.workspace_members_via_workspace.status
+      ?= "active"))) && (@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace
+      && (@request.headers.x_tm_key_projects = "" || @request.headers.x_tm_key_projects ~ id)))'
     actors:
     - workspace-owner
     - active-workspace-member
     authRequired: guard
+    record_state:
+    - '@request.headers.x_tm_key_workspace = "" || (workspace = @request.headers.x_tm_key_workspace &&
+      (@request.headers.x_tm_key_projects = "" || @request.headers.x_tm_key_projects ~ id))'
   create:
     verbatim: null
     actors:

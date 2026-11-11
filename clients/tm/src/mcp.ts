@@ -244,7 +244,8 @@ export function make_server(cfg: Config, scope_of: () => Promise<Scope>): Server
 function scope_from_me(cfg: Config): () => Promise<Scope> {
   return async () => {
     try {
-      return (await api(cfg, "GET /api/tracker/me", {})).key?.scope ?? "write";
+      // shortcut: a manage or own key gets the read-only tool list until tools_for learns the levels.
+      return ((await api(cfg, "GET /api/tracker/me", {})).key?.scope ?? "write") as Scope;
     } catch {
       return "write";
     }

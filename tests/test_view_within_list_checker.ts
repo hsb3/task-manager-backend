@@ -69,16 +69,13 @@ function rendered(rules_dir: string, allowlist: Map<string, string>): string {
   return buf;
 }
 
-/** Delete `cut` from that collection's viewRule only; -> the mutated viewRule. */
+/** Delete every copy of `cut` from that collection's viewRule only; -> the mutated viewRule. */
 function mutate(rules_dir: string, collection: string, cut: string): string {
   const file = path.join(rules_dir, `${collection}.rules.json`);
   const rules = JSON.parse(read_text(file));
-  check(
-    `${collection}.viewRule contains ${py_repr(cut)} exactly once`,
-    rules.viewRule.split(cut).length - 1,
-    1,
-  );
-  rules.viewRule = rules.viewRule.replace(cut, "");
+  check(`${collection}.viewRule contains ${py_repr(cut)}`, rules.viewRule.includes(cut), true);
+  // A surviving copy (the key-reach rewrite doubles the auth guard) would mask the dropped clause.
+  rules.viewRule = rules.viewRule.replaceAll(cut, "");
   fs.writeFileSync(file, JSON.stringify(rules, null, 2));
   return rules.viewRule;
 }
@@ -281,28 +278,35 @@ try {
 const SHIPPED_ALLOW = new Map(vwl.ALLOWLIST);
 const ALLOWED_COLLECTIONS = sorted([...SHIPPED_ALLOW.keys()].map((k) => JSON.parse(k)[0]));
 check(
-  "the only shipped exceptions are project_items' five trash-branch clauses",
+  "the only shipped exceptions are project_items' four trash-branch clauses",
   ALLOWED_COLLECTIONS,
-  Array(5).fill("project_items"),
+  Array(4).fill("project_items"),
 );
 
 console.log(
   "\n── (c3) widening workspaces.viewRule beyond its listRule is a violation, unexempted ──",
 );
-const MUTANT_WS_VIEW =
-  '@request.auth.id != "" && (owner = @request.auth.id || ' +
-  'workspace_members_via_workspace.user ?= @request.auth.id) && trashed = ""';
+// Derived from the shipped listRule so the membership widening is the ONLY difference.
+const WS_ACTIVE = ' && workspace_members_via_workspace.status ?= "active"';
 [scratch_dir, scratch_schema] = copy_schema("vwl_ws_");
 try {
   const ws_path = path.join(scratch_schema, "workspaces.rules.json");
   const ws_rules = JSON.parse(read_text(ws_path));
-  ws_rules.viewRule = MUTANT_WS_VIEW;
+  check(
+    "workspaces.listRule carries the active-member condition",
+    ws_rules.listRule.split(WS_ACTIVE).length - 1,
+    1,
+  );
+  ws_rules.viewRule = ws_rules.listRule.replace(WS_ACTIVE, "");
   fs.writeFileSync(ws_path, JSON.stringify(ws_rules));
   const wider = vwl.run(scratch_schema);
   check(
-    "the reviewer's wider workspaces viewRule is a violation",
-    wider.violations.map((v: any) => v.collection),
-    ["workspaces"],
+    "the reviewer's wider workspaces viewRule is a violation of the membership clause alone",
+    wider.violations.map((v: any) => [
+      v.collection,
+      v.as_written.includes("workspace_members_via_workspace.status"),
+    ]),
+    [["workspaces", true]],
   );
   check("...so the report is not ok", wider.ok, false);
   check("...and the real checker exits 1 on it", cli("--rules-dir", scratch_schema).returncode, 1);
@@ -379,7 +383,7 @@ try {
     victim_rules.viewRule.startsWith(COMMENTS_CUT),
     true,
   );
-  victim_rules.viewRule = victim_rules.viewRule.replace(COMMENTS_CUT, "");
+  victim_rules.viewRule = victim_rules.viewRule.replaceAll(COMMENTS_CUT, "");
   fs.writeFileSync(victim_path, JSON.stringify(victim_rules, null, 2));
 
   proc = cli("--rules-dir", scratch_schema, "--json");

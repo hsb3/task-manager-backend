@@ -74,9 +74,9 @@ Reads (`GET`, `HEAD`) need `read`. Writes:
 | `task_activity` | (no writes) | | | in reach when its task is; a row with no task when its `workspace` is W, never for a project key |
 | `saved_views`, `templates` | saved views write, templates manage | same | same | in reach when its `workspace` is W and, for a project key, its `project` is in P |
 | `labels`, `statuses`, `cycles` | manage | manage | manage | in reach when its `workspace` is W (a project key reads them all) |
-| `workspace_members` | (no create) | manage; a change of `role` own | manage; removing the key's own user (leaving) own | in reach when its `workspace` is W (a project key reads them all) |
+| `workspace_members` | (no create) | manage, including suspending the key's own user (a status write, not leaving); a change of `role` own | manage; removing the key's own user (leaving) own | in reach when its `workspace` is W (a project key reads them all) |
 | `workspace_invitations` | manage | (no update) | manage | in reach when its `workspace` is W, never for a project key |
-| `workspaces` | write; a limited key 403 `api_key_reach` | manage | own | in reach when it is W (a project key reads it) |
+| `workspaces` | write; a limited key 403 `api_key_reach` | manage, including restoring a trashed workspace | own | in reach when it is W (a project key reads it) |
 | `notifications` | (no create) | write | (no delete) | in reach when its `workspace` is W and, for a project key, its task, document or decision is in P |
 | `user_settings` | write; a limited key 403 `api_key_reach` | same | same | the user's own row, any reach |
 | `users` | 403 `api_key_path` (unchanged) | same | same | readable under any reach (unchanged: any signed-in user lists users) |
@@ -224,9 +224,10 @@ both by the key's level and by another rule of the server may answer either refu
 Unchanged: a key is presented as `Authorization: Bearer tmk_...` (or bare) and acts as its user,
 now narrowed by its reach and level. A user session, OAuth sign-in and superusers are unaffected.
 The reach is carried to the collection rules in request headers the server sets itself
-(`X-Tm-Key-Workspace`, `X-Tm-Key-Projects`); the server removes any such header a client sends, in any spelling that differs
-only by `-` or `_` or letter case,
-on every request, so a client can never set them.
+(`X-Tm-Key-Workspace`, `X-Tm-Key-Projects`); PocketBase reads a header name as its letter and digit
+runs joined by `_` and lower-cased (so `X.Tm.Key.Workspace` and `x~tm~key~workspace` read the same),
+and the server removes every header a client sends whose name reads as either one, on every request,
+so a client can never set them.
 
 ## Compatibility
 

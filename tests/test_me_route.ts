@@ -375,8 +375,40 @@ try {
   [s] = await api("POST", "/api/tracker/notifications/read-all", bob);
   check("after read-all → 0", (await me(bob))?.unread_notifications, 0);
 
-  console.log("\n── the key a request carries is reported under key ──");
+  console.log("\n── API keys ──");
   const KEYS = "/api/collections/api_keys/records";
+  const [, read_key] = await api("POST", KEYS, alice, { name: "me caps read", scope: "read" });
+  const [, write_key] = await api("POST", KEYS, alice, { name: "me caps write", scope: "write" });
+  const [, own_key] = await api("POST", KEYS, alice, { name: "me caps own", scope: "own" });
+  const session_me = await me(alice);
+  const read_me = await me(read_key.key ?? "tmk_none");
+  check(
+    "read key me: owner workspace write/manage/own all false",
+    entry(read_me, A_WS)?.capabilities ?? null,
+    { write: false, manage: false, own: false },
+  );
+  check(
+    "read key me: lists the same workspaces as the owner session",
+    (read_me?.workspaces ?? []).map((w: any) => w.id),
+    (session_me?.workspaces ?? []).map((w: any) => w.id),
+  );
+  check(
+    "write key me: write only",
+    entry(await me(write_key.key ?? "tmk_none"), A_WS)?.capabilities ?? null,
+    { write: true, manage: false, own: false },
+  );
+  check(
+    "own key me: owner workspace all true",
+    entry(await me(own_key.key ?? "tmk_none"), A_WS)?.capabilities ?? null,
+    { write: true, manage: true, own: true },
+  );
+  check("session me unchanged", entry(session_me, A_WS)?.capabilities ?? null, {
+    write: true,
+    manage: true,
+    own: true,
+  });
+
+  console.log("\n── the key a request carries is reported under key ──");
   let [, k] = await api("POST", KEYS, alice, { name: "me read", scope: "read" });
   r = await me(k.key ?? "tmk_none");
   check(
