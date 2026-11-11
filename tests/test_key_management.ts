@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 /**
  * decision:api-keys: manage_keys and last_used are server-written key fields.
+ * decision:api-key-manages-keys: the key routes list and revoke the caller's keys; a key never mints.
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, fixtures by name.
  * Port 8220 + PB_PORT_OFFSET.
@@ -113,7 +114,7 @@ try {
     return { id: rec.id ?? "", token: auth.token ?? "" };
   };
   const alice = await person("Alice");
-  await person("Bob");
+  const bob = await person("Bob");
   const view = async (id: string) => (await api("GET", `${KEYS}/${id}`, su))[1];
 
   console.log("\n── manage_keys and last_used ──");
@@ -244,6 +245,148 @@ try {
     "revoked key leaves last_used: 401 api_key_invalid, last_used still empty",
     tup(s5, r5.data?.api_key?.code, (await view(unused.id)).last_used),
     tup(401, "api_key_invalid", ""),
+  );
+
+  console.log("\n── the key routes ──");
+  const LIST = "/api/tracker/keys";
+  const revoke = (id: string, auth: string | null) =>
+    api("POST", `/api/tracker/keys/${id}/revoke`, auth);
+  const code = ([s, r]: [number, any]) => tup(s, r?.data?.api_key?.code ?? null);
+  const suKey = async (body: any): Promise<{ id: string; key: string }> => {
+    const [st, r] = await api("POST", KEYS, su, { user: alice.id, ...body });
+    check(`(fixture) superuser makes Alice key ${body.name}`, st, 200);
+    return { id: r.id ?? "", key: r.key ?? "tmk_none" };
+  };
+  const manage = await suKey({ name: "manage", scope: "write", manage_keys: true });
+  const [, wr] = await api("POST", KEYS, alice.token, { name: "plain write", scope: "write" });
+  const writeKey = { id: wr.id ?? "", key: wr.key ?? "tmk_none" };
+  const [, bk] = await api("POST", KEYS, bob.token, { name: "bob", scope: "read" });
+
+  const [sl, list] = await api("GET", LIST, alice.token);
+  const items: any[] = list.items ?? [];
+  const sorted = [...items].sort((a, b) =>
+    a.created === b.created ? (a.id < b.id ? -1 : 1) : a.created < b.created ? 1 : -1,
+  );
+  check(
+    "session lists keys → 200, her keys only, newest first, no secret, current false",
+    tup(
+      sl,
+      items.length > 0 && items.every((i) => i.id !== bk.id),
+      Bun.deepEquals(
+        items.map((i) => i.id),
+        sorted.map((i) => i.id),
+      ),
+      items.some((i) => "key" in i || "key_hash" in i),
+      items.every((i) => i.current === false),
+    ),
+    tup(200, true, true, false, true),
+  );
+  const [sm, ml] = await api("GET", LIST, manage.key);
+  check(
+    "manage key lists keys → 200, its own item current true",
+    tup(sm, (ml.items ?? []).find((i: any) => i.current)?.id ?? null),
+    tup(200, manage.id),
+  );
+  check(
+    "plain key refused list → 403 api_key_manage",
+    code(await api("GET", LIST, writeKey.key)),
+    tup(403, "api_key_manage"),
+  );
+  check(
+    "plain key refused revoke → 403 api_key_manage, target unchanged",
+    tup(...code(await revoke(manage.id, writeKey.key)), (await view(manage.id)).revoked),
+    tup(403, "api_key_manage", false),
+  );
+  const readManage = await suKey({ name: "read manage", scope: "read", manage_keys: true });
+  const [sr, rr] = await revoke(writeKey.id, readManage.key);
+  check(
+    "read manage key revokes Alice's write key → 200, revoked; that key then 401",
+    tup(sr, rr.revoked, ...code(await api("GET", "/api/tracker/me", writeKey.key))),
+    tup(200, true, 401, "api_key_invalid"),
+  );
+  const [, rk] = await api("POST", KEYS, alice.token, { name: "plain read", scope: "read" });
+  const [, victim] = await api("POST", KEYS, alice.token, { name: "victim", scope: "read" });
+  check(
+    "read key without permission revokes → 403 api_key_manage (not api_key_scope)",
+    code(await revoke(victim.id, rk.key)),
+    tup(403, "api_key_manage"),
+  );
+
+  const [, wl] = await api(
+    "GET",
+    `/api/collections/workspaces/records?filter=${encodeURIComponent(`owner='${alice.id}'`)}`,
+    su,
+  );
+  const WS: string = wl.items?.[0]?.id ?? "";
+  for (const mk of [true, false]) {
+    const lim = await suKey({
+      name: `limited ${mk}`,
+      scope: "read",
+      reach: "workspace",
+      workspace: WS,
+      manage_keys: mk,
+    });
+    const [sll, ll] = await api("GET", LIST, lim.key);
+    check(
+      `limited key (manage_keys ${mk}) lists exactly itself, current true`,
+      tup(
+        sll,
+        (ll.items ?? []).map((i: any) => tup(i.id, i.current)),
+      ),
+      tup(200, [tup(lim.id, true)]),
+    );
+    check(
+      `limited key (manage_keys ${mk}) revoking another key → 404, that key still works`,
+      tup(
+        (await revoke(victim.id, lim.key))[0],
+        (await api("GET", "/api/tracker/me", victim.key))[0],
+      ),
+      tup(404, 200),
+    );
+    if (mk) {
+      const [ss, sr2] = await revoke(lim.id, lim.key);
+      check(
+        "limited key revokes itself → 200, then 401",
+        tup(ss, sr2.revoked, (await api("GET", "/api/tracker/me", lim.key))[0]),
+        tup(200, true, 401),
+      );
+    }
+  }
+
+  const [si, ri] = await revoke(writeKey.id, alice.token);
+  check("revoke idempotent → 200, revoked true", tup(si, ri.revoked), tup(200, true));
+  const self = await suKey({ name: "self", scope: "write", manage_keys: true });
+  check(
+    "manage key revokes itself → 200; its next request 401",
+    tup((await revoke(self.id, self.key))[0], (await api("GET", "/api/tracker/me", self.key))[0]),
+    tup(200, 401),
+  );
+  const [so, ro] = await revoke(bk.id, alice.token);
+  check(
+    "Alice's session revokes Bob's key → 404 with the message; Bob's key still works",
+    tup(so, ro.message, (await api("GET", "/api/tracker/me", bk.key))[0]),
+    tup(404, "No key with that id among yours.", 200),
+  );
+  check("revoke unknown id → 404", (await revoke("zzzzzzzzzzzzzzz", alice.token))[0], 404);
+  check(
+    "anonymous → 401 on both routes",
+    tup((await api("GET", LIST))[0], (await revoke(victim.id, null))[0]),
+    tup(401, 401),
+  );
+  check(
+    "superuser → 403 on both routes",
+    tup((await api("GET", LIST, su))[0], (await revoke(victim.id, su))[0]),
+    tup(403, 403),
+  );
+  check(
+    "manage key still cannot mint → 403 api_key_path",
+    code(await api("POST", KEYS, manage.key, { name: "x", scope: "read" })),
+    tup(403, "api_key_path"),
+  );
+  check(
+    "manage key still cannot name api_keys → 403 api_key_path",
+    code(await api("GET", `${USERS}?expand=api_keys_via_user`, manage.key)),
+    tup(403, "api_key_path"),
   );
 } finally {
   if (server !== null) await roomkit.stop(server);

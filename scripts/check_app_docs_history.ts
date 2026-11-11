@@ -83,6 +83,10 @@ export const BASELINE = "1785185300";
 // JSON([dropping migration basename, slug, span prefix]) -> reason citing the card/decision.
 export const ALLOWLIST = new Map<string, string>([
   [
+    '["1785191200_seed_app_docs.js", "collection:api_keys", "A key cannot reach this collection: every api_keys route ans"]',
+    "A key with manage_keys now lists and revokes keys (decision:api-key-manages-keys); the sentence saying no key can read or revoke keys became false.",
+  ],
+  [
     '["1785190700_seed_app_docs.js", "collection:oauth_codes", "Fields: code_hash (a fingerprint of the code, never the code), "]',
     "decision:api-key-reach-and-levels: oauth_codes gained the manage and own levels and the workspace choice; the field list now says so",
   ],

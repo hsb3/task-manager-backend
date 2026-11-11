@@ -553,8 +553,12 @@ function rate_limit_text(rate: RateRule): string {
 
 // KEEP IN SYNC: pb_hooks/api_keys.pb.js key path allowlist (`/api/tracker/admin/`).
 /** What an API key gets on this route: "refused", or the lowest key level that may call it. */
-function key_access(method: string, p: string): "refused" | "read" | "write" | "manage" | "own" {
+function key_access(
+  method: string,
+  p: string,
+): "refused" | "read" | "write" | "manage" | "own" | "manage_keys" {
   if (!p.startsWith("/api/tracker/") || p.startsWith("/api/tracker/admin/")) return "refused";
+  if (p === "/api/tracker/keys" || p === "/api/tracker/keys/{id}/revoke") return "manage_keys";
   // null is a superuser-only route, whose text the caller blanks.
   return KEY_LIB.requiredLevel(method, p, "") ?? "read";
 }
@@ -566,6 +570,8 @@ const KEY_TEXT = {
   manage:
     "An API key acts as its user and needs the manage level or above here; a lower level gets 403.",
   own: "An API key acts as its user and needs the own level here; a lower level gets 403.",
+  manage_keys:
+    "An API key with reach all needs the manage-keys permission here, whatever its level, else 403; a key limited to part of the tracker sees and revokes only itself.",
 };
 
 function _error_resp(desc: string): any {

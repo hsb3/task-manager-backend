@@ -208,6 +208,25 @@ try {
       400: (c) => call("POST", "/api/tracker/export", c.Alice, {}),
       404: (c) => call("POST", "/api/tracker/export", c.Alice, { workspace: "nope" }),
     },
+    "GET /api/tracker/keys": {
+      403: async (c) => {
+        const [, k] = await call("POST", "/api/collections/api_keys/records", c.Alice, {
+          name: "plain",
+          scope: "read",
+        });
+        return call("GET", "/api/tracker/keys", k.key);
+      },
+    },
+    "POST /api/tracker/keys/{id}/revoke": {
+      403: async (c) => {
+        const [, k] = await call("POST", "/api/collections/api_keys/records", c.Alice, {
+          name: "plain",
+          scope: "read",
+        });
+        return call("POST", `/api/tracker/keys/${k.id}/revoke`, k.key);
+      },
+      404: (c) => call("POST", "/api/tracker/keys/nope/revoke", c.Alice),
+    },
     "GET /api/tracker/inspire": {
       502: (c) => call("GET", "/api/tracker/inspire", c.Alice),
     },

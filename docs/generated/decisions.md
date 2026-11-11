@@ -42,6 +42,23 @@ Assigning a task grants nothing on its own. No rule or route admits a task assig
 - **Assignment is limited to members.** A validation hook in `pb_hooks/main.pb.js` refuses, with a 400, an assignee who is neither the workspace owner nor an active member of the task workspace, which a rule cannot express because an update rule denial answers 404. It checks only a changed assignee, so a task whose assignee is later suspended stays editable on other fields.
 - **Accepting an invitation never reactivates a suspended member**: an existing membership row is left as it is.
 
+## api-key-manages-keys
+
+- **Slug:** `decision:api-key-manages-keys`
+- **Title:** A key minted by tm login may carry a manage-keys permission that lists and revokes its user's keys and never mints.
+- **Ref:** `api_keys`
+
+This supersedes decision:api-key-reads-refused in part: a key with reach all whose manage_keys is true reads its user's key records, through GET /api/tracker/keys only, and revokes them through POST /api/tracker/keys/{id}/revoke. Prior art: GitHub and Linear manage tokens only in the signed-in web app; this server has no web app, and tm holds only a key after browser sign-in. A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5).
+
+- **Granted at consent.** Only the tm client may ask for it, as the scope value keys; the person can untick it. A create request from anyone but a superuser cannot set it.
+- **Never mints.** Every api_keys collection route still answers 403 api_key_path to every key, and a query string or realtime subscription naming api_keys is still refused.
+
+Accepted limits:
+
+- **A leaked manage-keys key can revoke every key of its user**, the owner's agents included; it gains no other power.
+
+`pb_hooks/api_key_manage.pb.js` implements it and `tests/test_key_management.ts` proves it. See route:tracker-keys and collection:api_keys.
+
 ## api-key-reach-and-levels
 
 - **Slug:** `decision:api-key-reach-and-levels`

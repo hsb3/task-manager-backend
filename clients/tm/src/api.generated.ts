@@ -15,7 +15,7 @@ export interface ApiKeysListResult {
 
 **Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.
 
-A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.
+A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint keys. A key with reach all whose manage_keys is true lists and revokes its user's keys through route:tracker-keys (decision:api-key-manages-keys). A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5). An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.
 
 **Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is "" for a key minted by hand; a value sent at create is replaced with "", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is "" for a key minted by hand.
 
@@ -1045,6 +1045,43 @@ export interface Paths {
   "POST /api/tracker/invitations/{id}/decline": {
     path: { id: string };
     response: { declined: boolean };
+  };
+  "GET /api/tracker/keys": {
+    response: {
+      items: {
+        client_id: string;
+        created: string;
+        current: boolean;
+        expires: string;
+        id: string;
+        last_used: string;
+        manage_keys: boolean;
+        name: string;
+        projects: string[];
+        reach: string;
+        revoked: boolean;
+        scope: string;
+        workspace: string;
+      }[];
+    };
+  };
+  "POST /api/tracker/keys/{id}/revoke": {
+    path: { id: string };
+    response: {
+      client_id: string;
+      created: string;
+      current: boolean;
+      expires: string;
+      id: string;
+      last_used: string;
+      manage_keys: boolean;
+      name: string;
+      projects: string[];
+      reach: string;
+      revoked: boolean;
+      scope: string;
+      workspace: string;
+    };
   };
   "GET /api/tracker/me": {
     response: {

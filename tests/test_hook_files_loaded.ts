@@ -476,6 +476,15 @@ try {
     tup(200, true),
   );
 
+  // api_key_manage.pb.js: its key list route is registered (a missing file 404s).
+  let keys_body: any;
+  [status, keys_body] = await api("GET", "/api/tracker/keys", alice);
+  check(
+    "api_key_manage.pb.js: GET /api/tracker/keys is registered",
+    tup(status, Array.isArray(keys_body?.items)),
+    tup(200, true),
+  );
+
   // oauth_server.pb.js: its metadata route is registered (a missing file 404s).
   let as_meta: any;
   [status, as_meta] = await api("GET", "/.well-known/oauth-authorization-server");
@@ -510,6 +519,7 @@ try {
   console.log("\n── §3 every hook file is dispositioned ──");
   const probed = new Set([
     "activity.pb.js",
+    "api_key_manage.pb.js",
     "api_keys.pb.js",
     "auth_identity.pb.js",
     "author.pb.js",
