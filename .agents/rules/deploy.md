@@ -68,6 +68,12 @@ what that file does not say. Where a README section covers a point, it is named,
   writable there either); the MCP `connect-service-source` applies to the service in ALL
   environments, so on a duplicated env it repoints production; the MCP `update-service` excludes
   source changes. Afterwards re-read production's triggers: `main`, `checkSuites: true`.
+- `railway environment edit` with one invalid `--service-config` value applies NONE of the
+  call's values, prints no error and exits 0 (CLI 5.71.0, 2026-11-11): set one value per call
+  and read it back (`railway environment config --json`, keyed by service ID). A healthcheck
+  path takes only letters, digits, `/` and `_` (so `mcp` uses `/health`).
+- `railway add --repo` deploys at once with the default builder, before any Dockerfile path is
+  set; `railway redeploy` reuses the existing image, `--from-source` rebuilds from the source.
 - `railway environment new … --duplicate production` re-links the directory to the NEW
   environment: run `railway environment production` right after.
 - Raw GraphQL answers `403 error code: 1010` (Cloudflare) without a `User-Agent` header

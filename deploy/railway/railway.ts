@@ -41,6 +41,7 @@ export default defineRailway(() => {
       PB_PUBLIC_URL: preserve(),
       PB_SUPERUSER_EMAIL: preserve(),
       PB_SUPERUSER_PASSWORD: preserve(),
+      PORT: preserve(),
       RESEND_API_KEY: preserve(),
     },
   });
@@ -48,7 +49,7 @@ export default defineRailway(() => {
   const mcp = service("mcp", {
     source: github("hsb3/task-manager-backend", { checkSuites: true }),
     build: { builder: "DOCKERFILE", dockerfilePath: "services/mcp/Dockerfile", watchPatterns: ["services/mcp/**", "clients/tm/src/**", "clients/tm/package.json", "package.json", "bun.lock", "/.dockerignore"] },
-    healthcheck: "/.well-known/oauth-protected-resource",
+    healthcheck: "/health",
     healthcheckTimeout: 60,
     replicas: { "us-east4-eqdc4a": 1 },
     domains: ["mcp.admin.tasks-pocketbase.functionform.ai"],

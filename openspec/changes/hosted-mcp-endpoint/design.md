@@ -216,7 +216,11 @@ the same reading the API uses), else Bun's `server.requestIP(req).address`. Sing
 1. Path `/.well-known/oauth-protected-resource` or `/.well-known/oauth-protected-resource/mcp`:
    GET or HEAD answers 200 with the PRM document (D10), `Cache-Control: public, max-age=300`; any
    other method 405, `Allow: GET, HEAD`, empty body. No Origin check, no rate limit (it is
-   public and static; it is also the healthcheck path).
+   public and static). Path `/health`, the healthcheck path: GET answers 200 `Content-Type:
+   application/json`, body exactly `{"status":"ok"}`, HEAD the same with an empty body, any other
+   method 405, `Allow: GET, HEAD`, empty body; no Origin check, no rate limit, no upstream call
+   (Railway refused the PRM path as a healthcheck path: it accepts only letters, digits, `/` and
+   `_`, observed in the Phase 10 run, 2026-11-11).
 2. Any path other than `/mcp`: 404 error object `not_found`, "Nothing is served at this path.".
 3. `Origin` present and not in `MCP_ALLOWED_ORIGINS`: 403 `origin_not_allowed`, "Requests from
    this web origin are not accepted.".
@@ -699,7 +703,7 @@ contract does not, and D15 implements the stricter rule.
   10 runbook) -> key-scoping Phase 1, then Phases 2-6 as one PR, then Phase 7 as the next PR, all
   before key-minting-cli starts -> key-minting-cli -> tm-distribution -> agent-verb-coverage ->
   api-versioning-policy last, and in any case before the hosted MCP address is given to any
-  outside user (release 1.0.0 is cut then). Phase 10's sign-in check (step 10) is the owner's
+  outside user (release 1.0.0 is cut then). Phase 10's sign-in check (step 11) is the owner's
   own; the address goes to no outside user until api-versioning-policy is built. Nothing comes before this change: it
   builds on `origin/main` at `d1b5cf3` as read in this design.
 - This change is built before api-versioning-policy, so it cuts no API release and edits no
@@ -1333,6 +1337,11 @@ and removes scratch, exit 1 on any failure.
     without `Origin`: 204 and no `Access-Control-Allow-Origin`.
   - `accept_406`: W, `Accept: application/json` only: 406, error code `-32600`.
   - `prm_post_405`: POST the PRM URL: 405, `Allow: GET, HEAD`; `prm_head`: HEAD: 200, empty body.
+  - `health_get`: `GET /health`: 200, `Content-Type: application/json`, body exactly
+    `{"status":"ok"}`; `health_head`: HEAD: 200, empty body; `health_post_405`: POST: 405,
+    `Allow: GET, HEAD`, empty body; `health_not_limited`: 31 GETs from `X-Real-IP:
+    198.51.100.10`: all 200, then a no-credential POST `/mcp` from that address: 401 (not
+    counted); `health_without_api` (after `api_down_503`): 200.
   - `unsupported_2026_32022`: raw 2026 `tools/list` with `MCP-Protocol-Version: 2027-01-01` and
     the same `_meta` version: 400, error code `-32022`.
   - `initialized_202`: 2025 `notifications/initialized`: 202, no body.
@@ -1455,7 +1464,7 @@ and removes scratch, exit 1 on any failure.
     `clients/tm/package.json` at run time and its design assumes a full install); `COPY clients/tm/src clients/tm/src`; `COPY
     services/mcp services/mcp`; `EXPOSE 8080`; `HEALTHCHECK --interval=30s --timeout=3s
     --start-period=5s --retries=3 CMD bun -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+
-    '/.well-known/oauth-protected-resource').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"`;
+    '/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"`;
     `USER bun`; `CMD ["bun", "services/mcp/main.ts"]`.
   - `.dockerignore`: keep `*`, `!pb_migrations`, `!pb_hooks`; add `!package.json`, `!bun.lock`,
     `!clients/tm/package.json`, `!clients/tm/src`, `!services/mcp`; first comment line becomes
@@ -1472,7 +1481,8 @@ and removes scratch, exit 1 on any failure.
     `MCP_INTERNAL_SECRET`; `depends_on: [pocketbase]`. Header comment: "The production images
     (Dockerfile, services/mcp/Dockerfile) on local ports; pb_data persists in a named volume.".
   - `e2e/smoke.ts`: run compose with `MCP_PORT=0` beside `PB_PORT=0`; resolve the MCP port with
-    `compose port mcp 8080`; wait until the PRM URL answers 200; add probes, inserted in `PROBES`
+    `compose port mcp 8080`; wait until `/health` answers 200; `probe_health` also asserts the
+    MCP service's `GET /health` (200, `application/json`, `{"status":"ok"}`); add probes, inserted in `PROBES`
     before `probe_signup_rate_limit` (which must stay last): `probe_mcp_challenge` (POST `/mcp`
     no credential: 401; `WWW-Authenticate` starts with `Bearer resource_metadata="` and ends with
     `/.well-known/oauth-protected-resource/mcp", scope="read write"`, since under `MCP_PORT=0`
@@ -1503,11 +1513,12 @@ and removes scratch, exit 1 on any failure.
     github("hsb3/task-manager-backend", { checkSuites: true }), build: { builder: "DOCKERFILE",
     dockerfilePath: "services/mcp/Dockerfile", watchPatterns: ["services/mcp/**",
     "clients/tm/src/**", "clients/tm/package.json", "package.json", "bun.lock"] }, healthcheck:
-    "/.well-known/oauth-protected-resource", healthcheckTimeout: 60, replicas: {
+    "/health", healthcheckTimeout: 60, replicas: {
     "us-east4-eqdc4a": 1 }, domains: [<"mcp." + the pocketbase service's `domains[0]` literal, written out as one string>], env: {
     MCP_INTERNAL_SECRET: preserve(), MCP_PUBLIC_URL: preserve(), PB_INTERNAL_URL: preserve(),
     PB_PUBLIC_URL: preserve() } })`; add `MCP_INTERNAL_SECRET`, `MCP_INTERNAL_URL`,
-    `MCP_PUBLIC_URL` as `preserve()` to `pocketbase`'s `env`; add `mcp` to `resources`.
+    `MCP_PUBLIC_URL` and `PORT` (the runbook's step 2 sets it) as `preserve()` to `pocketbase`'s
+    `env`; add `mcp` to `resources`.
   - `deploy/README.md`: a section "The MCP service" (what it is, its variables from D10, that
     it deploys on the watch patterns above, that it is created by the runbook in
     `openspec/changes/hosted-mcp-endpoint/design.md` Phase 10). `.agents/rules/deploy.md`
@@ -1521,95 +1532,163 @@ and removes scratch, exit 1 on any failure.
 ### Phase 10. Runbook: create the service and the domain (root-run, outward)
 
 Run by root on a clean checkout of `main` with Phases 1-9 merged and CI green. Each step's
-command is exact; a step that cannot run as written stops the runbook and is reported.
+command is exact; a step that cannot run as written stops the runbook and is reported. "Observed"
+marks what the 2026-11-11 run saw (Railway CLI 5.71.0); "unverified" marks what neither a run
+nor a cited page settles. Every CLI flag and subcommand used below is listed by that CLI's own
+`--help` (`link`, `variables --kv`, `variable set`, `add`, `environment edit`/`config`,
+`service list`, `scale`, `redeploy`, `logs`, `domain`/`domain status`, `deployment list`, `ssh
+[COMMAND]...`), read 2026-11-11.
 
 1. `railway link --project task-manager --environment production --service pocketbase`
 2. `railway variables --service pocketbase --kv | grep -E '^(PORT|PB_PUBLIC_URL)='` and record
    both values; `<API host>` below is the pocketbase service's `domains[0]` in
    `deploy/railway/railway.ts`, and the host of `PB_PUBLIC_URL` must equal it (stop and report
    if not); if `PORT` is absent, run `railway variable set --service pocketbase PORT=8080
-   --skip-deploys` (the image's own default, so the listener does not move).
-3. `S=$(openssl rand -hex 32)` (never echoed or stored outside Railway).
-4. `railway add --service mcp --repo hsb3/task-manager-backend --branch main --variables
-   "MCP_INTERNAL_SECRET=$S" --variables 'PB_PUBLIC_URL=${{pocketbase.PB_PUBLIC_URL}}' --variables
+   --skip-deploys` (the image's own default, so the listener does not move; `railway.ts`
+   declares `PORT` on `pocketbase`, so step 12's plan keeps it).
+3. Create the service: `railway add --service mcp --repo hsb3/task-manager-backend --branch main
+   --variables 'PB_PUBLIC_URL=${{pocketbase.PB_PUBLIC_URL}}' --variables
    'PB_INTERNAL_URL=http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:${{pocketbase.PORT}}'
-   --variables "MCP_PUBLIC_URL=https://mcp.<API host from step 2>" --variables PORT=8080`
-   (`PORT` is set explicitly because the service listens on two ports, `PORT` and
-   `MCP_INTERNAL_PORT` 8081, and step 7's domain must target `PORT`; `railway.ts` declares
-   `PORT` on `mcp` (`preserve()`), so step 11's plan sees it; `MCP_INTERNAL_PORT` stays
-   unset at its 8081 default, the port step 6's `MCP_INTERNAL_URL` names: change both or
-   neither).
-5. `railway environment edit --service-config mcp build.builder DOCKERFILE --service-config mcp
-   build.dockerfilePath services/mcp/Dockerfile --service-config mcp deploy.healthcheckPath
-   /.well-known/oauth-protected-resource --service-config mcp deploy.healthcheckTimeout 60` (no
-   `--stage`, so the edit commits at once); set `build.watchPatterns` to the `mcp` list in
-   `deploy/railway/railway.ts` in the dashboard (Settings, Build, Watch Paths) if the CLI refuses
-   an array value, and the healthcheck timeout (Settings, Deploy, Healthcheck Timeout) if it
-   refuses that path (R3). In the same Watch Paths field of `pocketbase`, replace `Dockerfile`
-   with `/Dockerfile` and add `/.dockerignore`, matching its `railway.ts` list. Railway, "Configure
-   watch paths" (https://docs.railway.com/builds/build-configuration#configure-watch-paths):
-   "Watch paths are gitignore-style patterns that can be used to trigger a new deployment based
-   on what file paths have changed"; the page's examples anchor at the repository root with a
-   leading `/` (`/*.go`, root only). Unverified: whether the unanchored `Dockerfile` also matched
-   `services/mcp/Dockerfile` (the page does not say; gitignore rules would match it); the
-   anchored form makes the question moot.
-5a. Region and replicas: `railway scale --service mcp us-east4-eqdc4a=1` (the region of
-   `pocketbase`, since every MCP request calls `/me`). Railway, "railway scale"
-   (https://docs.railway.com/cli/scale): usage `railway scale [OPTIONS] [REGION=REPLICAS]...`,
-   accepting a Railway region id. Fallback if the CLI refuses: dashboard, `mcp` Settings, Deploy,
-   Regions: `us-east4-eqdc4a`, 1 replica.
-5b. Wait for CI (`checkSuites: true` in `railway.ts`): dashboard only, `mcp` Settings, Source,
-   "Wait for CI" on. Railway, "Wait for CI"
-   (https://docs.railway.com/deployments/github-autodeploys#wait-for-ci): "If your workflow
-   satisfies the requirements above, you will see the `Wait for CI` flag in service settings"
-   (the requirement: a GitHub Actions workflow with an `on: push` trigger, which
-   `.github/workflows/ci.yml` has). The page names no CLI or config field for it.
-6. `railway variable set --service pocketbase "MCP_INTERNAL_SECRET=$S"
+   --variables "MCP_PUBLIC_URL=https://mcp.<API host>" --variables PORT=8080` (`PORT` is set
+   explicitly because the service listens on two ports, `PORT` and `MCP_INTERNAL_PORT` 8081, and
+   step 8's domain must target `PORT`; `MCP_INTERNAL_PORT` stays unset at its 8081 default, the
+   port step 6's `MCP_INTERNAL_URL` names: change both or neither). Observed: these flags work
+   together, and `railway add` deploys at once with the default builder, which builds the
+   repository-root `Dockerfile` (an empty PocketBase, reachable only on the private network,
+   since the service has no domain yet). That first deployment is thrown away by step 7; rely on
+   nothing the service serves before step 7. Unverified whether a step 4 or 5 change, or a push
+   to `main` before step 6, starts a deploy; one that builds `services/mcp/Dockerfile` fails at
+   boot for want of `MCP_INTERNAL_SECRET` (set in step 6), which is expected and harmless with no
+   domain attached, and step 7 replaces it.
+4. Service config, one value per call: observed, a `railway environment edit` call holding one
+   invalid value applies none of its values, prints no error and exits 0. With no `--stage`
+   (`--help`: "Stage changes without committing"), each call commits at once:
+   - `railway environment edit --service-config mcp build.builder DOCKERFILE`
+   - `railway environment edit --service-config mcp build.dockerfilePath services/mcp/Dockerfile`
+   - `railway environment edit --service-config mcp deploy.healthcheckPath /health` (observed:
+     Railway accepts only letters, digits, `/` and `_` in a healthcheck path, "Invalid
+     healthcheck path: only letters, numbers, '/' and '_' are allowed", which is why the service
+     serves `/health` (D9) rather than its metadata path; Railway, "Configure the healthcheck
+     path" (https://docs.railway.com/deployments/healthchecks#configure-the-healthcheck-path)
+     shows `/health` and does not state the character rule)
+   - `railway environment edit --service-config mcp deploy.healthcheckTimeout 60` (unverified
+     that the CLI takes a number on this path)
+   - Watch patterns: the `mcp` list in `deploy/railway/railway.ts`, in the dashboard (`mcp`
+     Settings, Build, Watch Paths); unverified that the CLI's dot-path takes an array value. In
+     the same field of `pocketbase`, replace `Dockerfile` with `/Dockerfile` and add
+     `/.dockerignore`, matching its `railway.ts` list. Railway, "Configure watch paths"
+     (https://docs.railway.com/builds/build-configuration#configure-watch-paths): "Watch paths
+     are gitignore-style patterns that can be used to trigger a new deployment based on what
+     file paths have changed"; the page's examples anchor at the repository root with a leading
+     `/`.
+
+   After each call, read the config back (it prints no variable values; observed read-only
+   2026-11-11: `railway service list --json` is an array of `{id, name, ...}` and `railway
+   environment config --json` keys `services` by service ID):
+   `railway environment config --json | jq --arg id "$(railway service list --json | jq -r
+   '.[] | select(.name=="mcp").id')" '.services[$id] | {build, deploy}'` and confirm the value
+   just set is there. A value that is absent is set in the dashboard instead: `mcp` Settings,
+   Build (Builder, Dockerfile Path, Watch Paths) or Settings, Deploy (Healthcheck Path,
+   Healthcheck Timeout), then read back again. Continue only when `build.builder` is
+   `DOCKERFILE`, `build.dockerfilePath` is `services/mcp/Dockerfile`, `build.watchPatterns`
+   equals the `railway.ts` list, `deploy.healthcheckPath` is `/health` and
+   `deploy.healthcheckTimeout` is 60.
+5. Region, replicas and CI gating:
+   - `railway scale --service mcp us-east4-eqdc4a=1` (the region of `pocketbase`, since every
+     MCP request calls `/me`). Railway, "railway scale" (https://docs.railway.com/cli/scale):
+     usage `railway scale [OPTIONS] [REGION=REPLICAS]...`. Fallback: dashboard, `mcp` Settings,
+     Deploy, Regions: `us-east4-eqdc4a`, 1 replica. The step 4 read-back shows it as
+     `deploy.multiRegionConfig` (observed 2026-11-11).
+   - Wait for CI (`checkSuites: true` in `railway.ts`): dashboard only, `mcp` Settings, Source,
+     "Wait for CI" on. Railway, "Wait for CI"
+     (https://docs.railway.com/deployments/github-autodeploys#wait-for-ci): "If your workflow
+     satisfies the requirements above, you will see the `Wait for CI` flag in service settings"
+     (the requirement: a GitHub Actions workflow with an `on: push` trigger, which
+     `.github/workflows/ci.yml` has). The page names no CLI or config field for it. Confirm with
+     `railway environment config --json | jq --arg id "<mcp id>" '.services[$id].source'`:
+     `checkSuites` true.
+6. The shared secret and pocketbase's MCP variables, before the rebuild: the service exits 1 at
+   boot without `MCP_INTERNAL_SECRET` (D10). First the non-secret pair, without a deploy:
+   `railway variable set --service pocketbase
    'MCP_INTERNAL_URL=http://${{mcp.RAILWAY_PRIVATE_DOMAIN}}:8081'
-   "MCP_PUBLIC_URL=https://mcp.<API host>"` (this redeploys pocketbase).
-7. `railway domain "mcp.<API host>" --service mcp --port 8080`; give the printed CNAME and TXT records to
-   the owner to add at the DNS provider; repeat `railway domain status "mcp.<API host>" --service mcp` until the
-   certificate is issued. Railway, "railway domain" (https://docs.railway.com/cli/domain): option
-   "-p, --port <PORT>", "Port to connect to the domain when creating a domain", and `railway
-   domain update <domain> --port 8080` to change it later; Railway, "Target ports"
-   (https://docs.railway.com/networking/domains/working-with-domains#target-ports): "If your app
-   listens on multiple ports, you're provided with a list to choose from". Unverified: whether
-   Railway would pick `PORT` unprompted (the page does not say); the explicit `--port` and the
-   check in step 8 make it moot. Fallback if the CLI refuses `--port`: dashboard, `mcp` Settings,
-   Networking, the domain's edit icon, target port 8080.
-8. Verify (read-only, no key): `curl -s https://mcp.<API host>/.well-known/oauth-protected-resource/mcp`
-   (200, `authorization_servers[0]` equals `PB_PUBLIC_URL`); `curl -s -o /dev/null -w
-   '%{http_code}' -X POST https://mcp.<API host>/mcp` (401); `curl -s
-   <PB_PUBLIC_URL>/.well-known/oauth-authorization-server` (200, `issuer` equals
-   `PB_PUBLIC_URL`); `curl -s -X POST https://mcp.<API host>/internal/client-metadata` (404 with
-   the public listener's body, `"message":"Nothing is served at this path."`, never the private
-   listener's `{"error":"not_found"}`: the domain reaches `PORT`, not 8081).
-9. Verify the private network: `railway ssh --service mcp -- bun -e "fetch(process.env.PB_INTERNAL_URL+'/api/health').then(r=>console.log(r.status))"` prints 200.
-10. Verify a sign-in end to end with Claude Code from the owner's machine: `claude mcp add
+   "MCP_PUBLIC_URL=https://mcp.<API host>" --skip-deploys`. Then generate the secret and set it
+   on both services in ONE shell invocation, so the value exists only in that subshell's memory
+   and never in a file, a variable of the calling shell or a command line:
+   `( S=$(openssl rand -hex 32) && printf %s "$S" | railway variable set --service mcp
+   MCP_INTERNAL_SECRET --stdin --skip-deploys && printf %s "$S" | railway variable set --service
+   pocketbase MCP_INTERNAL_SECRET --stdin )` (the second set redeploys pocketbase; `mcp` deploys
+   in step 7). CLI 5.71.0 `railway variable set --help` lists `--stdin` ("Read the value from
+   stdin instead of the command line (only with single KEY)") and `--skip-deploys`; unverified:
+   the two together, and whether a set prints the value back (run it where no log captures the
+   terminal). If the subshell fails after the first set, run the whole command again: it sets a
+   new value on both. Confirm the names only: `railway variables --service mcp --kv | cut -d=
+   -f1` and the same for `pocketbase` list `MCP_INTERNAL_SECRET`.
+7. Rebuild from the configured source: `railway redeploy --service mcp --from-source --yes`.
+   Observed: a plain `railway redeploy` reuses the existing image, so it would rerun step 3's
+   PocketBase build. Confirm with `railway logs --service mcp --lines 50` (CLI 5.71.0 `railway
+   logs --help` lists `--service` and `--lines`): the lines `listening on :::8080` and
+   `listening on :::8081` (`services/mcp/main.ts`), and no PocketBase startup banner.
+8. `railway domain "mcp.<API host>" --service mcp --port 8080`; give the printed CNAME and TXT
+   records to the owner to add at the DNS provider; repeat `railway domain status "mcp.<API
+   host>" --service mcp` until the certificate is issued. Railway, "railway domain"
+   (https://docs.railway.com/cli/domain): option "-p, --port <PORT>", "Port to connect to the
+   domain when creating a domain", and `railway domain update <domain> --port 8080` to change it
+   later. Fallback if the CLI refuses `--port`: dashboard, `mcp` Settings, Networking, the
+   domain's edit icon, target port 8080.
+9. Verify (read-only, no key):
+   - `curl -s https://mcp.<API host>/health`: `{"status":"ok"}`.
+   - `curl -s https://mcp.<API host>/api/health`: 404 with the service's body, `"message":"Nothing
+     is served at this path."`, never PocketBase's health answer (the domain does not reach a
+     PocketBase built by step 3).
+   - `curl -s https://mcp.<API host>/.well-known/oauth-protected-resource/mcp`: 200,
+     `authorization_servers[0]` equals `PB_PUBLIC_URL`.
+   - `curl -s -o /dev/null -w '%{http_code}' -X POST https://mcp.<API host>/mcp`: 401.
+   - `curl -s <PB_PUBLIC_URL>/.well-known/oauth-authorization-server`: 200, `issuer` equals
+     `PB_PUBLIC_URL`.
+   - `curl -s -X POST https://mcp.<API host>/internal/client-metadata`: 404 with the public
+     listener's body, `"message":"Nothing is served at this path."`, never the private
+     listener's `{"error":"not_found"}` (the domain reaches `PORT`, not 8081).
+   - `railway deployment list --service mcp` shows the latest deployment SUCCESS, which with a
+     healthcheck path set means `/health` answered: Railway, "Deploy options"
+     (https://docs.railway.com/overview/advanced-concepts#deploy-options): Railway fetches the
+     healthcheck path "to ensure that your service actually started up before it removes the
+     previous deployment".
+10. Verify the private network: `railway ssh --service mcp -- bun -e
+    "fetch(process.env.PB_INTERNAL_URL+'/api/health').then(r=>console.log(r.status))"` prints
+    200.
+11. Verify a sign-in end to end with Claude Code from the owner's machine: `claude mcp add
     --transport http tracker https://mcp.<API host>/mcp`, run `/mcp` in Claude Code, complete
     the browser sign-in, and list tools (expect the write set). Then revoke the minted key in
     the key list and confirm the next call asks to sign in again.
-11. `railway config plan --source-tree "$(git rev-parse HEAD:)" --out /tmp/plan.json` and
-    confirm the plan proposes no change to `mcp` and none to `pocketbase`'s watch patterns
-    (steps 4, 5, 5a and 5b set every value the `mcp` entry declares; a diff on one of them is
-    the step that did not take: set it by that step's dashboard fallback and plan again; read only; never `apply`, per
-    `deploy/railway/README.md`).
-12. Edit `docs/readiness/agent-clients.md`: AC-6 and AC-7 `met`, evidence "steps 8-10 of the
+12. After step 8 (observed: the plan fails with "Custom-domain registration is not supported by
+    Railway configuration" while the `mcp.` domain does not exist): `railway config plan
+    --source-tree "$(git rev-parse HEAD:)" --out /tmp/plan.json` and confirm the plan proposes
+    no change to `mcp`, no deletion of `pocketbase.PORT`, and none to `pocketbase`'s watch
+    patterns (steps 3 to 6 and 8 set every value the `mcp` entry declares; a diff on one of them is
+    the step that did not take: set it by that step's dashboard fallback and plan again; read
+    only; never `apply`, per `deploy/railway/README.md`).
+13. Edit `docs/readiness/agent-clients.md`: AC-6 and AC-7 `met`, evidence "steps 9-11 of the
     hosted-mcp-endpoint runbook on <date>"; commit through a PR.
 
 ## Risks
 
 - **R1. Railway listens and the private network.** `[::]` on PocketBase and `::` on the MCP
-  service are proven locally by `make smoke` (Docker) only. Caught by Phase 10 steps 8 and 9
+  service are proven locally by `make smoke` (Docker) only. Caught by Phase 10 steps 9 and 10
   (healthcheck and private fetch). Fallback: set `MCP_HOST=0.0.0.0` on `mcp` and revert the
   `Dockerfile` `--http` change in a follow-up PR if a listener fails.
 - **R2. The `oven/bun:1.4.3-alpine` base image.** The tag exists on Docker Hub (amd64 and arm64,
   checked 2026-11-10); a removed tag is caught by `make smoke`'s build, fallback `FROM
   oven/bun:1.4.3` (Debian), same remaining lines.
-- **R3. CLI dot-paths and array values** in runbook step 5, and the combined `--repo`,
-  `--branch` and repeated `--variables` flags of step 4, are unverified (the CLI's help shows
-  only `variables.*`, `deploy.startCommand` and `source.image`); the dashboard path is written
-  out as the fallback.
+- **R3. CLI dot-paths and array values.** This happened in the 2026-11-11 run: one invalid
+  value (the metadata path as `deploy.healthcheckPath`) made a whole `railway environment edit`
+  apply nothing while exiting 0. Runbook step 4 now sets one value per call and reads the config
+  back after each, with the dashboard as the fallback; the service gained `/health` because
+  Railway accepts only letters, digits, `/` and `_` in a healthcheck path. Also learned: `railway add --repo`
+  deploys at once with the default builder (the root `Dockerfile`), so step 7 rebuilds with
+  `--from-source` (a plain `redeploy` reuses the image); `railway config plan` fails until the
+  custom domain exists and proposed deleting `pocketbase.PORT` until `railway.ts` declared it.
+  The combined `--repo`, `--branch` and repeated `--variables` flags of step 3 worked. Still
+  unverified: an array value through the CLI, and a number on `deploy.healthcheckTimeout`.
 - **R4. Claude on the web: protocol revision and `Origin`** are unverified. A missing `Origin` is
   served and `https://claude.ai` is listed, and both protocol legs are served, so either answer
   works; caught by connecting from claude.ai after Phase 10.
