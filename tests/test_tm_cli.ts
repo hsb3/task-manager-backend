@@ -2,7 +2,7 @@
 /**
  * tm CLI (clients/tm): login stores the key (and never echoes it at a terminal), every verb answers
  * --json, create/show round-trip, search rows carry kind, list pages, --set is typed by the schema,
- * usage is checked before config, a read key's write exits 1 naming api_key_scope
+ * usage is checked before config, logout revokes a key that may revoke itself, a read key's write exits 1 naming api_key_scope
  * (decision:api-keys).
  *
  * Fully self-contained clean-room server; runs the CLI as a subprocess. Port 8193 + PB_PORT_OFFSET.
@@ -67,12 +67,15 @@ for (const name of fs.readdirSync(MIG_DIR)) {
 
 type Run = { code: number; stdout: string; stderr: string; json: any };
 
+const read_cfg = (file: string): any =>
+  fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
+
 /** Run the CLI as a user would: env for the key and URL, XDG config dir in scratch. */
 async function tm(args: string[], env: Record<string, string> = {}, stdin?: string): Promise<Run> {
   const { TM_API_KEY, TM_URL, ...clean } = process.env;
   const proc = Bun.spawn([process.execPath, TM, ...args], {
     cwd: S, // never the repo: a CLI must not depend on where it is run from
-    env: { ...clean, HOME: S, XDG_CONFIG_HOME: XDG, ...env },
+    env: { ...clean, HOME: S, XDG_CONFIG_HOME: XDG, TM_CREDENTIAL_STORE: "file", ...env },
     stdin: stdin === undefined ? "ignore" : new Response(stdin),
     stdout: "pipe",
     stderr: "pipe",
@@ -105,7 +108,13 @@ async function tm_pty(
     process.platform === "linux"
       ? ["sh", "-c", 'cat | script -q -c "$1" /dev/null', "sh", argv.map(sh_quote).join(" ")]
       : ["sh", "-c", 'cat | script -q /dev/null "$@"', "sh", ...argv],
-    { cwd: S, env: { ...clean, HOME: S, ...env }, stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+    {
+      cwd: S,
+      env: { ...clean, HOME: S, TM_CREDENTIAL_STORE: "file", ...env },
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   );
   const timer = setTimeout(() => {
     Bun.spawnSync(["pkill", "-P", String(proc.pid)]); // sh's children: cat and script
@@ -165,6 +174,7 @@ try {
     approved: true,
   });
   check("fixture Alice created", s, 200);
+  const ALICE_ID: string = r.id;
   [s, r] = await api("POST", "/api/collections/users/auth-with-password", null, {
     identity: "alice@example.com",
     password: "test123456",
@@ -196,7 +206,7 @@ try {
   const R = { TM_URL: BASE_URL, TM_API_KEY: READ_KEY };
 
   console.log("\n── tm login: stores the pasted key, prints where, never echoes it ──");
-  let o = await tm(["login", "--url", BASE_URL], {}, `${WRITE_KEY}\n`);
+  let o = await tm(["login", "--with-key", "--url", BASE_URL], {}, `${WRITE_KEY}\n`);
   const cfg = path.join(XDG, "tm", "config.json");
   check("login exits 0", tup(o.code, o.stderr), tup(0, ""));
   check("login names the config file it wrote", o.stdout.includes(cfg), true);
@@ -212,13 +222,13 @@ try {
     fs.existsSync(cfg) ? (fs.statSync(cfg).mode & 0o777).toString(8) : null,
     "600",
   );
-  o = await tm(["login"], {}, WRITE_KEY);
+  o = await tm(["login", "--with-key"], {}, WRITE_KEY);
   check(
     "login again, piped without a trailing newline, keeps the saved url",
     tup(o.code, o.stdout.includes(cfg)),
     tup(0, true),
   );
-  o = await tm(["login"], {}, "");
+  o = await tm(["login", "--with-key"], {}, "");
   check("login with empty input → exit 2", tup(o.code, o.stderr.includes("no key")), tup(2, true));
   o = await tm(["list", "--json"]);
   check(
@@ -492,6 +502,7 @@ try {
   );
   o = await tm(["list", "--json"], { TM_URL: BASE_URL, TM_API_KEY: "sekretvalue" });
   check("the bad key's value is not echoed", o.stderr.includes("sekretvalue"), false);
+  fs.mkdirSync(path.dirname(cfg), { recursive: true });
   fs.writeFileSync(cfg, JSON.stringify({ url: BASE_URL, key: "sekretfile" }));
   o = await tm(["list", "--json"], {});
   check(
@@ -499,7 +510,7 @@ try {
     tup(o.code, o.stderr.includes(cfg), o.stderr.includes("sekretfile")),
     tup(1, true, false),
   );
-  o = await tm(["login", "--url", BASE_URL], {}, "sekretpaste\n");
+  o = await tm(["login", "--with-key", "--url", BASE_URL], {}, "sekretpaste\n");
   check(
     "login refuses a key without tmk_ → exit 1, no echo",
     tup(o.code, o.stderr.includes("tmk_"), (o.stdout + o.stderr).includes("sekretpaste")),
@@ -507,13 +518,13 @@ try {
   );
   // repair: a bad saved key is replaced by login; a bad env key never blocks login
   fs.writeFileSync(cfg, JSON.stringify({ url: BASE_URL, key: "sekretfile" }));
-  o = await tm(["login"], {}, `${WRITE_KEY}\n`);
+  o = await tm(["login", "--with-key"], {}, `${WRITE_KEY}\n`);
   check(
     "login replaces a bad saved key (url kept) → exit 0, file holds the good key",
     tup(o.code, JSON.parse(fs.readFileSync(cfg, "utf8"))),
     tup(0, { url: BASE_URL, key: WRITE_KEY }),
   );
-  o = await tm(["login"], { TM_API_KEY: "x" }, `${WRITE_KEY}\n`);
+  o = await tm(["login", "--with-key"], { TM_API_KEY: "x" }, `${WRITE_KEY}\n`);
   check("a bad env key does not block login → exit 0", o.code, 0);
   o = await tm(["list", "--json"], { TM_API_KEY: ` Bearer  ${WRITE_KEY} ` });
   check("env key with Bearer and spaces is normalised and accepted", o.code, 0);
@@ -521,7 +532,7 @@ try {
   check("env key with leading spaces is accepted", o.code, 0);
   o = await tm(["list", "--json"], { TM_API_KEY: "eyJhbGciOiJIUzI1NiJ9.e30.sig" });
   check("a JWT-looking value is refused → exit 1", o.code, 1);
-  o = await tm(["login"], {}, "eyJhbGciOiJIUzI1NiJ9.e30.sig\n");
+  o = await tm(["login", "--with-key"], {}, "eyJhbGciOiJIUzI1NiJ9.e30.sig\n");
   check("login refuses a JWT-looking paste → exit 1", o.code, 1);
   fs.writeFileSync(cfg, `{"url":"${BASE_URL}","key":ZQXsecret}`);
   o = await tm(["list", "--json"], {});
@@ -597,6 +608,210 @@ try {
     tup(1, true, false),
   );
 
+  console.log("\n── login --with-key and logout: a manage key is revoked, a pasted key is kept ──");
+  const LX = { XDG_CONFIG_HOME: path.join(S, "logout-xdg") };
+  const lx_cfg = path.join(LX.XDG_CONFIG_HOME, "tm", "config.json");
+  const su_key = async (name: string, extra: Record<string, unknown> = {}) => {
+    const [st, kr] = await api("POST", "/api/collections/api_keys/records", su, {
+      user: ALICE_ID,
+      name,
+      scope: "write",
+      ...extra,
+    });
+    check(`(fixture) superuser makes Alice key ${name}`, st, 200);
+    return { id: kr.id ?? "", key: kr.key ?? "tmk_none" };
+  };
+  const alice_key = async (name: string) => {
+    const [st, kr] = await api("POST", "/api/collections/api_keys/records", alice, {
+      name,
+      scope: "write",
+    });
+    check(`(fixture) Alice makes key ${name}`, st, 200);
+    return { id: kr.id ?? "", key: kr.key ?? "tmk_none" };
+  };
+  const me = async (key: string) => (await api("GET", "/api/tracker/me", key))[0];
+  const save = (key: string, extra: string[] = []) =>
+    tm(["login", "--with-key", "--url", BASE_URL, ...extra], LX, `${key}\n`);
+
+  for (const flag of [["--scope", "read"], ["--no-browser"]]) {
+    o = await tm(["login", "--with-key", "--url", BASE_URL, ...flag], LX, `${WRITE_KEY}\n`);
+    check(
+      `login --with-key ${flag[0]} → exit 2, the mixed-flags message, nothing saved`,
+      tup(
+        o.code,
+        o.stderr.includes("tm: --with-key cannot be combined with --scope or --no-browser"),
+        fs.existsSync(lx_cfg),
+      ),
+      tup(2, true, false),
+    );
+  }
+  o = await tm(["login", "--with-key", "--url", BASE_URL, "--json"], LX, `${WRITE_KEY}\n`);
+  check(
+    "login --with-key --json → {saved, store: file}",
+    tup(o.code, o.json),
+    tup(0, { saved: lx_cfg, store: "file" }),
+  );
+  fs.rmSync(lx_cfg, { force: true });
+
+  o = await tm(["logout"], LX);
+  check(
+    "logout with nothing saved → exit 1, no saved login to log out of",
+    tup(o.code, o.stderr.trim()),
+    tup(1, "tm: no saved login to log out of"),
+  );
+
+  const pasted = await alice_key("cli pasted");
+  o = await save(pasted.key);
+  check(
+    "login --with-key saves a pasted key",
+    tup(o.code, read_cfg(lx_cfg)?.key),
+    tup(0, pasted.key),
+  );
+  o = await tm(["logout"], LX);
+  check(
+    "logout pasted key → exit 0, says it was not revoked and why, config gone, key still 200",
+    tup(o.code, o.stdout.trim(), fs.existsSync(lx_cfg), await me(pasted.key)),
+    tup(
+      0,
+      `logged out of ${BASE_URL}; key ${pasted.id} was not revoked: this key cannot revoke keys (reach all, no manage-keys permission)`,
+      false,
+      200,
+    ),
+  );
+
+  const mk = await su_key("cli manage", { manage_keys: true });
+  await save(mk.key);
+  o = await tm(["logout"], LX);
+  check(
+    "logout manage key → exit 0, revoked, the key answers 401, config gone",
+    tup(o.code, o.stdout.trim(), await me(mk.key), fs.existsSync(lx_cfg)),
+    tup(0, `logged out of ${BASE_URL}; key ${mk.id} revoked`, 401, false),
+  );
+
+  const lim = await su_key("cli limited", { scope: "read", reach: "workspace", workspace: WS });
+  await save(lim.key);
+  o = await tm(["logout"], LX);
+  check(
+    "logout limited key → exit 0, revoked, the key answers 401, config gone",
+    tup(o.code, o.stdout.trim(), await me(lim.key), fs.existsSync(lx_cfg)),
+    tup(0, `logged out of ${BASE_URL}; key ${lim.id} revoked`, 401, false),
+  );
+
+  const mj = await su_key("cli manage json", { manage_keys: true });
+  await save(mj.key);
+  o = await tm(["logout", "--json"], LX);
+  check(
+    "logout --json (manage key) → {url, key_id, revoked: true}",
+    tup(o.code, o.json, await me(mj.key)),
+    tup(0, { url: BASE_URL, key_id: mj.id, revoked: true }, 401),
+  );
+
+  const a = await su_key("cli replaced", { manage_keys: true });
+  const b = await alice_key("cli replacing");
+  await save(a.key);
+  o = await save(b.key);
+  check(
+    "login replaces manage key A with B → A answers 401, B saved",
+    tup(o.code, await me(a.key), read_cfg(lx_cfg)?.key),
+    tup(0, 401, b.key),
+  );
+  const c = await alice_key("cli kept");
+  await save(c.key);
+  o = await save(b.key);
+  check(
+    "login keeps pasted key C when B replaces it → C still 200, B saved",
+    tup(o.code, await me(c.key), read_cfg(lx_cfg)?.key),
+    tup(0, 200, b.key),
+  );
+
+  await save(a.key);
+  o = await tm(["logout", "--json"], LX);
+  check(
+    "logout of an already revoked key → exit 0, key_id empty, revoked false, config gone",
+    tup(o.code, o.json, fs.existsSync(lx_cfg)),
+    tup(0, { url: BASE_URL, key_id: "", revoked: false }, false),
+  );
+  await save(a.key);
+  o = await tm(["logout"], LX);
+  check(
+    "the same in human text",
+    tup(o.code, o.stdout.trim()),
+    tup(0, `logged out of ${BASE_URL}; the saved key was already invalid`),
+  );
+
+  fs.mkdirSync(path.dirname(lx_cfg), { recursive: true });
+  fs.writeFileSync(lx_cfg, JSON.stringify({ url: "http://127.0.0.1:1", key: b.key }));
+  o = await tm(["logout"], LX);
+  check(
+    "logout when the server does not answer → exit 1, says so, config gone, no key echoed",
+    tup(
+      o.code,
+      o.stdout.includes("was not revoked: cannot reach"),
+      fs.existsSync(lx_cfg),
+      (o.stdout + o.stderr).includes(b.key),
+    ),
+    tup(1, true, false, false),
+  );
+  fs.writeFileSync(lx_cfg, JSON.stringify({ url: "notaurl", key: b.key }));
+  o = await tm(["logout"], LX);
+  check(
+    "logout of a saved login whose url is not a URL → exit 1, no stack trace, config gone",
+    tup(o.code, o.stderr.includes("    at "), fs.existsSync(lx_cfg)),
+    tup(1, false, false),
+  );
+
+  console.log("\n── login --with-key: positionals, a bad URL, a config that cannot be written ──");
+  const POS_XDG = { XDG_CONFIG_HOME: path.join(S, "pos-xdg") };
+  const pos_cfg = path.join(POS_XDG.XDG_CONFIG_HOME, "tm", "config.json");
+  o = await tm(
+    ["login", "--with-key", "--url", BASE_URL, "tmk_onthecommandline"],
+    POS_XDG,
+    `${WRITE_KEY}\n`,
+  );
+  check(
+    "a key on the command line → warned, never echoed, the pasted key saved",
+    tup(
+      o.code,
+      o.stderr.trim(),
+      (o.stdout + o.stderr).includes("tmk_onthecommandline"),
+      read_cfg(pos_cfg)?.key,
+    ),
+    tup(
+      0,
+      "tm: warning: text after login was ignored; the key is read from the prompt or standard input",
+      false,
+      WRITE_KEY,
+    ),
+  );
+  const BADURL = { XDG_CONFIG_HOME: path.join(S, "badurl-xdg") };
+  o = await tm(["login", "--with-key", "--url", "notaurl"], BADURL, `${WRITE_KEY}\n`);
+  check(
+    "login --with-key --url notaurl → exit 1, not a URL, nothing saved",
+    tup(o.code, o.stderr.trim(), fs.existsSync(path.join(BADURL.XDG_CONFIG_HOME, "tm"))),
+    tup(1, 'tm: the server URL "notaurl" is not a URL', false),
+  );
+  const DIRX = { XDG_CONFIG_HOME: path.join(S, "dir-xdg") };
+  fs.mkdirSync(path.join(DIRX.XDG_CONFIG_HOME, "tm", "config.json", "occupied"), {
+    recursive: true,
+  });
+  o = await tm(["login", "--with-key", "--url", BASE_URL], DIRX, `${WRITE_KEY}\n`);
+  check(
+    "config.json is a directory: login → exit 1, tm: first, no stack trace, no key",
+    tup(
+      o.code,
+      o.stderr.startsWith("tm: "),
+      o.stderr.includes("    at "),
+      (o.stdout + o.stderr).includes(WRITE_KEY),
+    ),
+    tup(1, true, false, false),
+  );
+  o = await tm(["logout"], DIRX);
+  check(
+    "config.json is a directory: logout → exit 1, tm: first, no stack trace",
+    tup(o.code, o.stderr.startsWith("tm: "), o.stderr.includes("    at ")),
+    tup(1, true, false),
+  );
+
   console.log("\n── the command line is checked before any saved login is needed ──");
   const NOWHERE = { HOME: path.join(S, "nohome"), XDG_CONFIG_HOME: path.join(S, "noxdg") };
   for (const args of [
@@ -624,7 +839,7 @@ try {
     const PTY_XDG = path.join(S, "pty-xdg");
     const pty = await tm_pty(
       TM,
-      ["login", "--url", BASE_URL],
+      ["login", "--with-key", "--url", BASE_URL],
       { XDG_CONFIG_HOME: PTY_XDG },
       `${WRITE_KEY}\n`,
     );
@@ -644,7 +859,7 @@ try {
     fs.writeFileSync(path.join(NO_RAW, "tm.ts"), src);
     const echo = await tm_pty(
       path.join(NO_RAW, "tm.ts"),
-      ["login", "--url", BASE_URL],
+      ["login", "--with-key", "--url", BASE_URL],
       { XDG_CONFIG_HOME: path.join(S, "no-raw-xdg") },
       `${WRITE_KEY}\n`,
     );

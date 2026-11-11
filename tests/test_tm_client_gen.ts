@@ -35,10 +35,11 @@ function renamed(spec: any): any {
   return mut;
 }
 
-/** tsc on verbs.ts in a scratch copy of api.ts + verbs.ts beside the given api.generated.ts. */
+/** tsc on verbs.ts in a scratch copy of api.ts, store.ts and verbs.ts beside the given api.generated.ts. */
 function tsc_verbs(dir: string, generated: string): { code: number; out: string } {
   fs.mkdirSync(dir, { recursive: true });
-  for (const f of ["api.ts", "verbs.ts"]) fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
+  for (const f of ["api.ts", "store.ts", "verbs.ts"])
+    fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
   fs.writeFileSync(path.join(dir, "api.generated.ts"), generated);
   const p = Bun.spawnSync(
     [

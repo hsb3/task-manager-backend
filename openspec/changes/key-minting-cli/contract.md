@@ -144,12 +144,16 @@ Shared rules:
 
 - **Server URL.** `--url`, else `TM_URL`, else the saved login's URL; trailing slashes removed.
   Only `login` and `keys create` read `--url`; other verbs ignore it, as today.
-- **Credential.** `TM_API_KEY`, else the credential store entry for the server URL in use
-  (`TM_URL`, else the saved URL; none when that is empty), else the key in the configuration
-  file. `keys list` and `keys revoke` need one; `login` and `keys create` do
+- **Credential.** `TM_API_KEY`, else the credential store entry of the saved login, when the
+  configuration file exists and the server URL in use (`TM_URL`, else the saved URL) is the saved
+  one, else the key in the configuration file; once the file is gone no store entry is read. Saving a key to one of the two clears the other (best effort): a key saved to the file
+  removes the store entry for that URL whatever `TM_CREDENTIAL_STORE` says, and when, with the store
+  in use (`os`), it cannot be reached to remove it, `tm` prints one warning line on standard error;
+  a save that fails leaves the store as it was, so an older stored key never silently wins over a
+  newer login. `keys list` and `keys revoke` need one; `login` and `keys create` do
   not. `logout` acts on the saved login only and ignores `TM_URL` and `TM_API_KEY`.
 - **Configuration.** `$XDG_CONFIG_HOME/tm/config.json` (`~/.config/tm/config.json` when
-  `XDG_CONFIG_HOME` is unset), mode 0600, in a directory set to 0700 on every save. With a
+  `XDG_CONFIG_HOME` is unset or not an absolute path), mode 0600, in a directory set to 0700 on every save. With a
   credential store it holds `{"url": "<url>"}`; without one, `{"url": "<url>", "key": "<key>"}`.
   The credential store entry is service `tm`, account `<url>`. `TM_CREDENTIAL_STORE=file` uses
   the file even where a store exists; any value other than `file` or `os` is refused. Under Node,
@@ -167,7 +171,7 @@ Shared rules:
 | --- | --- | --- |
 | `login` | `logged in to <url> as <user name>; key <id> saved in <the system credential store \| <config path>>` | `{"saved": "<config path>", "store": "os" \| "file", "url": "<url>", "user": {"id", "name"}, "key": {"id", "scope", "expires", "client_id", "manage_keys"}}` |
 | `login --with-key` | `saved to <config path>`, plus ` (key in the system credential store)` when it went there | `{"saved": "<config path>", "store": "os" \| "file"}` |
-| `logout` | `logged out of <url>; key <id> revoked`, or `logged out of <url>; key <id> was not revoked: <reason>` (reason `this key cannot revoke keys (reach all, no manage-keys permission)`, exit 0; or the server's message, exit 1), or `logged out of <url>; the saved key was already invalid` (exit 0; JSON `key_id` `""`, `revoked` false). The saved login is removed in every case. | `{"url": "<url>", "key_id": "<id>" \| "", "revoked": true \| false}` |
+| `logout` | `logged out of <url>; key <id> revoked`, or `logged out of <url>; key <id> was not revoked: <reason>` (reason `this key cannot revoke keys (reach all, no manage-keys permission)`, exit 0; or the server's message, exit 1), or `logged out of <url>; the saved key was already invalid` (exit 0; JSON `key_id` `""`, `revoked` false), or `logged out of <url>; the saved key was not revoked: <message>` when the server did not answer before the key's id was known (exit 1; JSON `key_id` `""`, `revoked` false). The saved login is removed in every case, and its credential store entry too where the store answers (whatever `TM_CREDENTIAL_STORE` says); when it does not, one `tm: warning:` line on standard error names the URL. | `{"url": "<url>", "key_id": "<id>" \| "", "revoked": true \| false}` |
 | `keys create` | the `tmk_` secret alone, one line; on standard error `created key <id> "<name>" (<scope>, expires <YYYY-MM-DD HH:MM UTC \| never>); it is shown only this once` | `{"id", "name", "scope", "expires", "client_id": "tm", "manage_keys": false, "key": "tmk_..."}` |
 | `keys list` | a table: `ID`, `NAME` (first 24 characters), `SCOPE`, `CLIENT` (first 24 characters; `-` for `""`), `CREATED`, `EXPIRES` (`never`), `LAST USED` (`never`), `STATUS` (`active`, `expired`, `revoked`; `active*` for the current key); dates as `YYYY-MM-DD HH:MM` UTC; `no keys` when empty. Active keys only unless `--all`. | the route's `items` array, filtered the same way |
 | `keys revoke` | `revoked <id> "<name>"`; when the revoked key is the one the command used, also `tm: note: that was this login's key; run tm login again` on standard error | the route's item |

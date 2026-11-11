@@ -50,8 +50,9 @@ export TM_URL=http://127.0.0.1:8090
 alias tm='bun clients/tm/tm.ts'
 ```
 
-Alice signs in and lists her workspaces and projects through the REST API, creates a write key, then
-creates and lists a task with `tm`. A real captured run (record ids differ every run):
+Alice signs in and lists her workspaces and projects through the REST API, signs in to `tm`
+through the browser, mints a write key for her agent with `tm keys create`, then creates and lists a
+task with `tm`. A captured run (record ids differ every run; the sign-in happens in the browser):
 
 ```console
 $ TOKEN=$(curl -s $TM_URL/api/collections/users/auth-with-password -H 'Content-Type: application/json' -d '{"identity":"alice@example.com","password":"test123456"}' | jq -r .token)
@@ -59,7 +60,8 @@ $ curl -s -H "Authorization: $TOKEN" "$TM_URL/api/collections/workspaces/records
 {"id":"6wdsct21yqtw9hk","name":"Alice's Workspace"}
 $ curl -s -H "Authorization: $TOKEN" "$TM_URL/api/collections/projects/records?fields=id,name" | jq -c '.items[]'
 {"id":"aeq9u2md2y1vlxv","name":"Website Redesign"}
-$ export TM_API_KEY=$(curl -s -H "Authorization: $TOKEN" -H 'Content-Type: application/json' -d '{"name":"my agent","scope":"write"}' $TM_URL/api/collections/api_keys/records | jq -r .key)
+$ tm login --url $TM_URL    # this line and the next go through the browser; their output is not shown
+$ export TM_API_KEY=$(tm keys create --name "my agent" --scope write)
 $ tm create "Write the launch checklist" --project aeq9u2md2y1vlxv --json | jq -c '{id, key, title}'
 {"id":"l08a4wxfgqiy8nu","key":"MYP-7","title":"Write the launch checklist"}
 $ tm list --project aeq9u2md2y1vlxv
