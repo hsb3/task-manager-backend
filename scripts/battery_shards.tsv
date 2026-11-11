@@ -110,6 +110,7 @@
 4	2	test_notification_actor
 4	2	test_app_docs_seed_coverage
 4	2	test_openspec_checker
+3	2	test_internal_caller
 1	1	test_app_docs_seed_idempotent
 1	1	test_tm_mcp
 1	1	test_tm_client_gen
