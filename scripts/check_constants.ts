@@ -361,6 +361,37 @@ export const CONSTANTS: Record<string, Spec> = {
       // seed is now the only live copy, checked against the list above and docs/constants.md.
     ],
   },
+  TRASH_PURGE_COLLECTIONS: {
+    values: ["workspaces", "projects", "tasks", "decisions", "milestones", "documents"],
+    sites: [
+      {
+        file: "pb_hooks/trash.pb.js",
+        marker: "── INLINED SWEEP (cron copy, uses $app) — KEEP IN SYNC with the route copy ──",
+        block: String.raw`var cols = \[([^\]]*)\]`,
+        note: "cron purge: the trashed collections, parents first",
+      },
+      {
+        file: "pb_hooks/trash.pb.js",
+        marker: "── INLINED SWEEP (cron copy, uses $app) — KEEP IN SYNC with the route copy ──",
+        block: String.raw`var kids = \[([^\]]*)\]`,
+        values: ["tasks", "decisions", "milestones", "documents"],
+        note: "cron orphan sweep: the item collections only, 4 of 6 by design",
+      },
+      {
+        file: "pb_hooks/trash.pb.js",
+        marker: "── INLINED SWEEP (route copy, uses e.app) — KEEP IN SYNC with the cron copy ──",
+        block: String.raw`var cols = \[([^\]]*)\]`,
+        note: "route purge: the trashed collections, parents first",
+      },
+      {
+        file: "pb_hooks/trash.pb.js",
+        marker: "── INLINED SWEEP (route copy, uses e.app) — KEEP IN SYNC with the cron copy ──",
+        block: String.raw`var kids = \[([^\]]*)\]`,
+        values: ["tasks", "decisions", "milestones", "documents"],
+        note: "route orphan sweep: the item collections only, 4 of 6 by design",
+      },
+    ],
+  },
 };
 
 export const TEMPLATE_KEYS_FILE = "pb_hooks/scope.pb.js";

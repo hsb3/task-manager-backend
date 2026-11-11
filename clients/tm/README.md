@@ -7,8 +7,9 @@ so it works as well inside a script or an agent as it does by hand.
 ## Set up once
 
 Run `bun install` from the repo root before first use; it installs the MCP SDK the `mcp` verb
-needs. Then create an API key in the app (a read key can only read; a write key can also create,
-edit and comment) and paste it:
+needs. Then mint an API key: sign in and create an `api_keys` record, whose response shows the
+key once ([What a client does](../../README.md#what-a-client-does) has the call, the levels and
+the reach). A `read` key only reads; `write` or above can also create, edit and comment. Paste it:
 
 ```bash
 bun clients/tm/tm.ts login --url https://tm.example.com
@@ -61,8 +62,8 @@ Claude Desktop's `claude_desktop_config.json` under `mcpServers`. Write `bun` as
 }
 ```
 
-A read key lists only the read tools (those marked read-only: list, show and search); a write key
-lists every tool, so the agent can also create, edit and comment. A failed call comes back to the
+A `read` key lists only the read tools (those marked read-only: list, show and search); a key at
+any other level lists every tool, so the agent can also create, edit and comment. A failed call comes back to the
 agent as a tool result whose text is the JSON object `{"error": {"status", "code", "message",
 "fields"}}`, the same object also given as `structuredContent`: `status` is the server's HTTP
 status (`0` when it did not answer, `null` for arguments refused before any call), `code` names
