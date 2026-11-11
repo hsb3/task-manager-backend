@@ -6,7 +6,7 @@ export default defineRailway(() => {
   const pbFiles = bucket("pb-files", { region: "iad" });
   const pocketbase = service("pocketbase", {
     source: github("hsb3/task-manager-backend", { checkSuites: true }),
-    build: { buildEnvironment: "V3", builder: "RAILPACK", watchPatterns: ["Dockerfile", "pb_migrations/**", "pb_hooks/**"] },
+    build: { buildEnvironment: "V3", builder: "RAILPACK", watchPatterns: ["/Dockerfile", "/.dockerignore", "pb_migrations/**", "pb_hooks/**"] },
     healthcheck: "/api/health",
     healthcheckTimeout: 120,
     replicas: { "us-east4-eqdc4a": 1 },
@@ -47,7 +47,7 @@ export default defineRailway(() => {
 
   const mcp = service("mcp", {
     source: github("hsb3/task-manager-backend", { checkSuites: true }),
-    build: { builder: "DOCKERFILE", dockerfilePath: "services/mcp/Dockerfile", watchPatterns: ["services/mcp/**", "clients/tm/src/**", "clients/tm/package.json", "package.json", "bun.lock"] },
+    build: { builder: "DOCKERFILE", dockerfilePath: "services/mcp/Dockerfile", watchPatterns: ["services/mcp/**", "clients/tm/src/**", "clients/tm/package.json", "package.json", "bun.lock", "/.dockerignore"] },
     healthcheck: "/.well-known/oauth-protected-resource",
     healthcheckTimeout: 60,
     replicas: { "us-east4-eqdc4a": 1 },

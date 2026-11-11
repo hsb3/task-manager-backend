@@ -297,9 +297,9 @@ without the `Authorization` value. The service never reads a credential from the
 
 | Service | Variable | Value on Railway | Missing |
 | --- | --- | --- | --- |
-| mcp | `PORT` | Railway-provided | 8080 |
+| mcp | `PORT` | `8080`, set explicitly (the public domain targets it) | 8080 |
 | mcp | `MCP_HOST` | unset (listens on `::`) | `::`; suites set `127.0.0.1` |
-| mcp | `MCP_INTERNAL_PORT` | `8081` | 8081 |
+| mcp | `MCP_INTERNAL_PORT` | `8081`; pocketbase's `MCP_INTERNAL_URL` names the same port, so change both or neither | 8081 |
 | mcp | `PB_INTERNAL_URL` | `http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:<pocketbase PORT>` | exit 1 |
 | mcp | `PB_PUBLIC_URL` | `${{pocketbase.PB_PUBLIC_URL}}` ({API}) | exit 1 |
 | mcp | `MCP_PUBLIC_URL` | `https://mcp.<API host>` ({MCP}) | exit 1 |
@@ -1526,29 +1526,65 @@ command is exact; a step that cannot run as written stops the runbook and is rep
 4. `railway add --service mcp --repo hsb3/task-manager-backend --branch main --variables
    "MCP_INTERNAL_SECRET=$S" --variables 'PB_PUBLIC_URL=${{pocketbase.PB_PUBLIC_URL}}' --variables
    'PB_INTERNAL_URL=http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:${{pocketbase.PORT}}'
-   --variables "MCP_PUBLIC_URL=https://mcp.<API host from step 2>"`
+   --variables "MCP_PUBLIC_URL=https://mcp.<API host from step 2>" --variables PORT=8080`
+   (`PORT` is set explicitly because the service listens on two ports, `PORT` and
+   `MCP_INTERNAL_PORT` 8081, and step 7's domain must target `PORT`; `MCP_INTERNAL_PORT` stays
+   unset at its 8081 default, the port step 6's `MCP_INTERNAL_URL` names: change both or
+   neither).
 5. `railway environment edit --service-config mcp build.builder DOCKERFILE --service-config mcp
    build.dockerfilePath services/mcp/Dockerfile --service-config mcp deploy.healthcheckPath
-   /.well-known/oauth-protected-resource` (no `--stage`, so the edit commits at once); set `build.watchPatterns` to Phase 9's list in the dashboard (Settings,
-   Build, Watch Paths) if the CLI refuses an array value.
+   /.well-known/oauth-protected-resource --service-config mcp deploy.healthcheckTimeout 60` (no
+   `--stage`, so the edit commits at once); set `build.watchPatterns` to the `mcp` list in
+   `deploy/railway/railway.ts` in the dashboard (Settings, Build, Watch Paths) if the CLI refuses
+   an array value, and the healthcheck timeout (Settings, Deploy, Healthcheck Timeout) if it
+   refuses that path (R3). In the same Watch Paths field of `pocketbase`, replace `Dockerfile`
+   with `/Dockerfile` and add `/.dockerignore`, matching its `railway.ts` list. Railway, "Configure
+   watch paths" (https://docs.railway.com/builds/build-configuration#configure-watch-paths):
+   "Watch paths are gitignore-style patterns that can be used to trigger a new deployment based
+   on what file paths have changed"; the page's examples anchor at the repository root with a
+   leading `/` (`/*.go`, root only). Unverified: whether the unanchored `Dockerfile` also matched
+   `services/mcp/Dockerfile` (the page does not say; gitignore rules would match it); the
+   anchored form makes the question moot.
+5a. Region and replicas: `railway scale --service mcp us-east4-eqdc4a=1` (the region of
+   `pocketbase`, since every MCP request calls `/me`). Railway, "railway scale"
+   (https://docs.railway.com/cli/scale): usage `railway scale [OPTIONS] [REGION=REPLICAS]...`,
+   accepting a Railway region id. Fallback if the CLI refuses: dashboard, `mcp` Settings, Deploy,
+   Regions: `us-east4-eqdc4a`, 1 replica.
+5b. Wait for CI (`checkSuites: true` in `railway.ts`): dashboard only, `mcp` Settings, Source,
+   "Wait for CI" on. Railway, "Wait for CI"
+   (https://docs.railway.com/deployments/github-autodeploys#wait-for-ci): "If your workflow
+   satisfies the requirements above, you will see the `Wait for CI` flag in service settings"
+   (the requirement: a GitHub Actions workflow with an `on: push` trigger, which
+   `.github/workflows/ci.yml` has). The page names no CLI or config field for it.
 6. `railway variable set --service pocketbase "MCP_INTERNAL_SECRET=$S"
    'MCP_INTERNAL_URL=http://${{mcp.RAILWAY_PRIVATE_DOMAIN}}:8081'
    "MCP_PUBLIC_URL=https://mcp.<API host>"` (this redeploys pocketbase).
-7. `railway domain "mcp.<API host>" --service mcp`; give the printed CNAME and TXT records to
+7. `railway domain "mcp.<API host>" --service mcp --port 8080`; give the printed CNAME and TXT records to
    the owner to add at the DNS provider; repeat `railway domain status "mcp.<API host>" --service mcp` until the
-   certificate is issued.
+   certificate is issued. Railway, "railway domain" (https://docs.railway.com/cli/domain): option
+   "-p, --port <PORT>", "Port to connect to the domain when creating a domain", and `railway
+   domain update <domain> --port 8080` to change it later; Railway, "Target ports"
+   (https://docs.railway.com/networking/domains/working-with-domains#target-ports): "If your app
+   listens on multiple ports, you're provided with a list to choose from". Unverified: whether
+   Railway would pick `PORT` unprompted (the page does not say); the explicit `--port` and the
+   check in step 8 make it moot. Fallback if the CLI refuses `--port`: dashboard, `mcp` Settings,
+   Networking, the domain's edit icon, target port 8080.
 8. Verify (read-only, no key): `curl -s https://mcp.<API host>/.well-known/oauth-protected-resource/mcp`
    (200, `authorization_servers[0]` equals `PB_PUBLIC_URL`); `curl -s -o /dev/null -w
    '%{http_code}' -X POST https://mcp.<API host>/mcp` (401); `curl -s
    <PB_PUBLIC_URL>/.well-known/oauth-authorization-server` (200, `issuer` equals
-   `PB_PUBLIC_URL`).
+   `PB_PUBLIC_URL`); `curl -s -X POST https://mcp.<API host>/internal/client-metadata` (404 with
+   the public listener's body, `"message":"Nothing is served at this path."`, never the private
+   listener's `{"error":"not_found"}`: the domain reaches `PORT`, not 8081).
 9. Verify the private network: `railway ssh --service mcp -- bun -e "fetch(process.env.PB_INTERNAL_URL+'/api/health').then(r=>console.log(r.status))"` prints 200.
 10. Verify a sign-in end to end with Claude Code from the owner's machine: `claude mcp add
     --transport http tracker https://mcp.<API host>/mcp`, run `/mcp` in Claude Code, complete
     the browser sign-in, and list tools (expect the write set). Then revoke the minted key in
     the key list and confirm the next call asks to sign in again.
 11. `railway config plan --source-tree "$(git rev-parse HEAD:)" --out /tmp/plan.json` and
-    confirm the plan proposes no change to `mcp` (read only; never `apply`, per
+    confirm the plan proposes no change to `mcp` and none to `pocketbase`'s watch patterns
+    (steps 4, 5, 5a and 5b set every value the `mcp` entry declares; a diff on one of them is
+    the step that did not take: set it by that step's dashboard fallback and plan again; read only; never `apply`, per
     `deploy/railway/README.md`).
 12. Edit `docs/readiness/agent-clients.md`: AC-6 and AC-7 `met`, evidence "steps 8-10 of the
     hosted-mcp-endpoint runbook on <date>"; commit through a PR.
