@@ -9,6 +9,10 @@ const CLIENTS = {
       "http://localhost:8787/callback",
     ],
   },
+  tm: {
+    client_name: "tm (command line)",
+    redirect_uris: ["http://127.0.0.1/callback"],
+  },
 };
 
 // The consent page shows the host, so it is a name ending in a letter label: no IP literal (a
@@ -94,6 +98,37 @@ function parse_scope(raw) {
 function scope_text(scope) {
   const LADDER = require(`${__hooks}/lib/api_keys.js`).LEVELS;
   return LADDER.slice(0, LADDER.indexOf(scope) + 1).join(" ");
+}
+
+// "keys" asks for the manage-keys permission (tm only); the rest is the level scope.
+function split_keys(raw) {
+  const pieces = String(raw || "")
+    .split(" ")
+    .filter((v) => v !== "");
+  return {
+    scope: pieces.filter((v) => v !== "keys").join(" "),
+    keys: pieces.indexOf("keys") >= 0,
+  };
+}
+
+// The tm client's key_name and key_expires: {ok: {key_name, key_expires}} or {error}.
+function tm_params(p) {
+  const name = (p.key_name || "").trim() || (p.key_name ? "" : "tm");
+  const len = [...name].length;
+  if (len < 1 || len > 200)
+    return { error: "key_name must be 1 to 200 characters" };
+  if (!p.key_expires) return { ok: { key_name: name, key_expires: "" } };
+  const bad = { error: "key_expires must be a future UTC date-time" };
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(p.key_expires))
+    return bad;
+  let d;
+  try {
+    d = new DateTime(p.key_expires.replace("T", " "));
+  } catch (_) {
+    return bad;
+  }
+  if (!d.after(new DateTime())) return bad;
+  return { ok: { key_name: name, key_expires: d.string() } };
 }
 
 // Read and write always; manage and own only when the client asked for them.
@@ -278,6 +313,8 @@ const PARAMS = [
   "scope",
   "state",
   "resource",
+  "key_name",
+  "key_expires",
 ];
 
 // The request parameters a flow token binds (D14).
@@ -291,6 +328,8 @@ function flow_q(p) {
       v("scope"),
       v("state"),
       v("resource"),
+      v("key_name"),
+      v("key_expires"),
     ]),
   );
 }
@@ -314,7 +353,12 @@ function validate_request(app, p) {
     p.code_challenge_method !== "S256"
   )
     return { redirect: "invalid_request" };
-  if (parse_scope(p.scope) === null) return { redirect: "invalid_scope" };
+  const asked = split_keys(p.scope);
+  if (asked.keys && r.client.client_id !== "tm")
+    return { redirect: "invalid_scope" };
+  if (parse_scope(asked.scope) === null) return { redirect: "invalid_scope" };
+  if (r.client.client_id === "tm" && tm_params(p).error)
+    return { redirect: "invalid_request" };
   if (!resource_ok(p.resource)) return { redirect: "invalid_target" };
   return { ok: r.client };
 }
@@ -346,6 +390,8 @@ const LEVEL_LABELS = {
 function render_stage(e, app, client, p, stage, message, uid, otp) {
   const params = {};
   PARAMS.forEach((k) => (params[k] = p[k] || ""));
+  const level = parse_scope(split_keys(p.scope).scope);
+  const tm = client.client_id === "tm" ? tm_params(p).ok : null;
   const host = (uri) => {
     const m = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^@/?#]*@)?([^/?#:]*)/.exec(uri);
     return m ? m[1].toLowerCase() : uri;
@@ -358,11 +404,19 @@ function render_stage(e, app, client, p, stage, message, uid, otp) {
     Registered: client.registered,
     RedirectHost: host(p.redirect_uri),
     Loopback: is_loopback(p.redirect_uri),
-    Levels: offered_levels(parse_scope(p.scope)).map((v) => ({
+    Levels: offered_levels(level).map((v) => ({
       Value: v,
       Label: LEVEL_LABELS[v],
-      Checked: v === parse_scope(p.scope),
+      Checked: v === level,
     })),
+    Tm: !!tm,
+    KeyName: tm ? tm.key_name : "",
+    KeyExpires: tm
+      ? tm.key_expires
+        ? tm.key_expires.slice(0, 16) + " UTC"
+        : "never"
+      : "",
+    AskKeys: !!tm && split_keys(p.scope).keys,
     Workspaces: uid
       ? consent_workspaces(app, uid).map((w) => ({ Id: w.id, Name: w.name }))
       : [],
@@ -389,7 +443,8 @@ function sign_in_refusal(app, u) {
 }
 
 // Purges expired codes, stores a new one's fingerprint, and returns the code.
-function issue_code(app, user, client, p, scope, reach, workspace) {
+// tm: {key_name, key_expires, manage_keys} for the tm client, else null.
+function issue_code(app, user, client, p, scope, reach, workspace, tm) {
   app
     .db()
     .newQuery("DELETE FROM oauth_codes WHERE expires < {:now}")
@@ -406,6 +461,11 @@ function issue_code(app, user, client, p, scope, reach, workspace) {
   rec.set("scope", scope);
   rec.set("reach", reach);
   rec.set("workspace", workspace);
+  if (tm) {
+    rec.set("key_name", tm.key_name);
+    rec.set("key_expires", tm.key_expires);
+    rec.set("manage_keys", tm.manage_keys);
+  }
   rec.set(
     "expires",
     new Date(Date.now() + 600000).toISOString().replace("T", " "),
@@ -422,6 +482,8 @@ module.exports = {
   LADDER: require(`${__hooks}/lib/api_keys.js`).LEVELS,
   parse_scope,
   scope_text,
+  split_keys,
+  tm_params,
   offered_levels,
   consent_workspaces,
   pkce_s256,

@@ -23,9 +23,9 @@ capabilities:
   update:
     verbatim: (@request.auth.id != "" && user = @request.auth.id && @request.body.user:isset = false &&
       @request.body.scope:isset = false && @request.body.key_hash:isset = false && @request.body.expires:isset
-      = false && (@request.body.revoked:isset = false || @request.body.revoked = true) && @request.body.client_id:isset
-      = false) && @request.body.reach:isset = false && @request.body.workspace:isset = false && @request.body.projects:isset
-      = false
+      = false && @request.body.manage_keys:isset = false && @request.body.last_used:isset = false && (@request.body.revoked:isset
+      = false || @request.body.revoked = true) && @request.body.client_id:isset = false) && @request.body.reach:isset
+      = false && @request.body.workspace:isset = false && @request.body.projects:isset = false
     actors:
     - custom(user = @request.auth.id)
     authRequired: absent
@@ -33,6 +33,8 @@ capabilities:
     - '@request.body.client_id:isset'
     - '@request.body.expires:isset'
     - '@request.body.key_hash:isset'
+    - '@request.body.last_used:isset'
+    - '@request.body.manage_keys:isset'
     - '@request.body.projects:isset'
     - '@request.body.reach:isset'
     - '@request.body.revoked'
@@ -45,6 +47,8 @@ capabilities:
     - '@request.body.scope:isset = false'
     - '@request.body.key_hash:isset = false'
     - '@request.body.expires:isset = false'
+    - '@request.body.manage_keys:isset = false'
+    - '@request.body.last_used:isset = false'
     - '@request.body.revoked:isset = false'
     - '@request.body.revoked = true'
     - '@request.body.client_id:isset = false'
@@ -116,6 +120,12 @@ fields:
   - all
   - workspace
   - projects
+- name: manage_keys
+  type: bool
+  required: false
+- name: last_used
+  type: date
+  required: false
 field_policies:
 - 'key_hash: hidden field'
 - 'refresh_hash: hidden field'

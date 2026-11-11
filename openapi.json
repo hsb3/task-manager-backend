@@ -38,7 +38,7 @@
         "type": "object"
       },
       "ApiKeysRecord": {
-        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional), revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.\n\n**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is \"\" for a key minted by hand; a value sent at create is replaced with \"\", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is \"\" for a key minted by hand.\n\n**Reach and level.** Both are chosen at create and fixed: a change to reach, workspace or projects is refused with 404, as for scope. A create is refused with 400 when the reach is incoherent, the workspace is not one the user belongs to, a project is not a live project of it, or a projects key asks for manage or own (decision:api-key-reach-and-levels).",
+        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional), revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100). Two more fields are server-written: manage_keys (bool: the key may list and revoke its user's keys, never mint; set by sign-in or a superuser at create, a create value from anyone else is replaced with false) and last_used (date: when the key last authenticated a request, written at most once a minute).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names. A change to manage_keys or last_used is refused too: with 404 for the owner, with 400 for a superuser.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint keys. A key with reach all whose manage_keys is true lists and revokes its user's keys through route:tracker-keys (decision:api-key-manages-keys). A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5). An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.\n\n**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is \"\" for a key minted by hand; a value sent at create is replaced with \"\", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is \"\" for a key minted by hand.\n\n**Reach and level.** Both are chosen at create and fixed: a change to reach, workspace or projects is refused with 404, as for scope. A create is refused with 400 when the reach is incoherent, the workspace is not one the user belongs to, a project is not a live project of it, or a projects key asks for manage or own (decision:api-key-reach-and-levels).",
         "properties": {
           "client_id": {
             "description": "The app a sign-in minted this key for, or empty for a key minted by hand; set by the server, and a later change is refused.",
@@ -61,6 +61,15 @@
           "key_hash": {
             "description": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced, a client's later change is refused, and a sign-in's refresh replaces it. Hidden system field — not returned in API responses.",
             "type": "string"
+          },
+          "last_used": {
+            "description": "When the key last authenticated a request, written at most once a minute, or empty if never; set by the server only.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "manage_keys": {
+            "description": "Whether this key may list and revoke its user's keys; it can never mint one. Set by sign-in through tm login or by a superuser at create; a create value from anyone else is replaced with false, and a later change is refused.",
+            "type": "boolean"
           },
           "name": {
             "description": "A label to tell your keys apart, up to 200 characters, stored trimmed; it may be renamed later.",
@@ -1158,7 +1167,7 @@
         "type": "object"
       },
       "OauthCodesRecord": {
-        "description": "A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read, write, manage or own), reach (all or workspace) and workspace, which carry the person's workspace choice to the minted key, expires. No client rule opens it: only the server reads or writes it. The minted key keeps its scope, reach and workspace through every refresh (decision:api-key-reach-and-levels).",
+        "description": "A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read, write, manage or own), reach (all or workspace) and workspace, which carry the person's workspace choice to the minted key, expires. No client rule opens it: only the server reads or writes it. The minted key keeps its scope, reach and workspace through every refresh (decision:api-key-reach-and-levels). For the tm client it also holds key_name, key_expires and manage_keys, copied onto the key it mints.",
         "properties": {
           "client_id": {
             "description": "The app the code was issued to.",
@@ -1189,6 +1198,19 @@
           "id": {
             "description": "Record id, assigned by the server.",
             "type": "string"
+          },
+          "key_expires": {
+            "description": "The key expiry tm asked for; empty for none or for other clients.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "key_name": {
+            "description": "The key name tm asked for; empty for other clients.",
+            "type": "string"
+          },
+          "manage_keys": {
+            "description": "Whether the person let tm's key list and revoke keys.",
+            "type": "boolean"
           },
           "reach": {
             "description": "Every workspace, or the one workspace the person chose; empty means every workspace.",
@@ -10179,6 +10201,268 @@
         ]
       }
     },
+    "/api/tracker/keys": {
+      "get": {
+        "description": "A signed-in user, or an API key with reach all whose manage_keys is true, lists every key of its user (revoked and expired included, newest first, never a secret) and revokes one by id. current marks the key making the request. An API key with reach all and without manage_keys answers 403 with code api_key_manage, whatever its level; a read-level key with manage_keys may revoke. A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5). An id that is not one of the caller's keys answers 404. Revoking is one-way and revoking a revoked key changes nothing. No key can create a key. See collection:api_keys and decision:api-key-manages-keys.\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key with reach all needs the manage-keys permission here, whatever its level, else 403; a key limited to part of the tracker sees and revokes only itself. 403: An API key with reach all and without the manage-keys permission. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "client_id": {
+                            "type": "string"
+                          },
+                          "created": {
+                            "type": "string"
+                          },
+                          "current": {
+                            "type": "boolean"
+                          },
+                          "expires": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "last_used": {
+                            "type": "string"
+                          },
+                          "manage_keys": {
+                            "type": "boolean"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "projects": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "reach": {
+                            "type": "string"
+                          },
+                          "revoked": {
+                            "type": "boolean"
+                          },
+                          "scope": {
+                            "type": "string"
+                          },
+                          "workspace": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "scope",
+                          "client_id",
+                          "created",
+                          "expires",
+                          "last_used",
+                          "manage_keys",
+                          "revoked",
+                          "current",
+                          "reach",
+                          "workspace",
+                          "projects"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An API key with reach all and without the manage-keys permission."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait out the rate-limit window."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Lists the caller's API keys, newest first, without secrets; a key with reach all needs the manage-keys permission, and a limited key sees only itself.",
+        "tags": [
+          "tracker"
+        ]
+      }
+    },
+    "/api/tracker/keys/{id}/revoke": {
+      "post": {
+        "description": "A signed-in user, or an API key with reach all whose manage_keys is true, lists every key of its user (revoked and expired included, newest first, never a secret) and revokes one by id. current marks the key making the request. An API key with reach all and without manage_keys answers 403 with code api_key_manage, whatever its level; a read-level key with manage_keys may revoke. A key limited to part of the tracker, whatever its manage_keys, lists and revokes only itself; another id answers 404 (root ruling 5). An id that is not one of the caller's keys answers 404. Revoking is one-way and revoking a revoked key changes nothing. No key can create a key. See collection:api_keys and decision:api-key-manages-keys.\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key with reach all needs the manage-keys permission here, whatever its level, else 403; a key limited to part of the tracker sees and revokes only itself. 403: An API key with reach all and without the manage-keys permission. 404: No key with that id among the caller's. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
+        "parameters": [
+          {
+            "description": "Record id.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "client_id": {
+                      "type": "string"
+                    },
+                    "created": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "boolean"
+                    },
+                    "expires": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "last_used": {
+                      "type": "string"
+                    },
+                    "manage_keys": {
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "projects": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "reach": {
+                      "type": "string"
+                    },
+                    "revoked": {
+                      "type": "boolean"
+                    },
+                    "scope": {
+                      "type": "string"
+                    },
+                    "workspace": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "scope",
+                    "client_id",
+                    "created",
+                    "expires",
+                    "last_used",
+                    "manage_keys",
+                    "revoked",
+                    "current",
+                    "reach",
+                    "workspace",
+                    "projects"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Success."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The token is missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An API key with reach all and without the manage-keys permission."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No key with that id among the caller's."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many requests; wait out the rate-limit window."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Revokes one of the caller's API keys; revoking a revoked key changes nothing.",
+        "tags": [
+          "tracker"
+        ]
+      }
+    },
     "/api/tracker/me": {
       "get": {
         "description": "Auth required; a superuser answers 403, because it holds no workspace. Returns {user, unread_notifications, workspaces} in one call (decision:me-route).\n\n**user** is {id, name} of the caller.\n\n**workspaces** lists every live workspace the caller owns or holds a membership row in; a trashed workspace is left out (see route:workspaces-trash). Each entry is {id, name, role, status, counts, capabilities}. role is owner for the workspace owner, else the role of the membership row (admin, member or viewer); status is active for the owner, else the status of the row (active or suspended).\n\n**counts** is {projects, open_items}. projects counts the live projects of the workspace and never the hidden shadow project (concept:shadow-project). open_items counts live tasks, neither in the trash nor in a trashed project, whose status is in neither the completed nor the canceled category, so a task in a custom done status is not open, whatever its name. A task with no status counts as open.\n\n**capabilities** is {write, manage, own}, the tiers of decision:role-tiers: write (create, edit and trash items, create and edit projects) for the owner, an admin or a member; manage (workspace settings and vocabulary, invitations, templates, project delete, purge) for the owner or an admin; own (change a role, transfer ownership, delete the workspace) for the owner alone. The flags say what the rules admit; every write is still decided by its collection rule.\n\n**Suspended.** A suspended membership is listed with its id, role and status, so a client can tell a closed workspace from a missing one, but name and counts read null and every capability is false, because a suspended member cannot read the workspace.\n\n**unread_notifications** counts the rows the notifications list shows with read false, each decided by that same list rule, so it always equals the read=false total of the inbox (collection:notifications). An API key limited to one workspace lists only that workspace, and a key limited to projects counts only those projects and the open items in them; the unread notification count covers only what is in the key's reach.\n\nWho may call: a signed-in user. A missing or invalid token gets 401; a superuser gets 403, as does a caller who may not do this. An API key acts as its user, so it may call this too. Rate limit: the /api/tracker/ routes and /api/health together allow 300 requests per 60 seconds per client address (collection endpoints are counted separately); past that the answer is 429 with no retry header, so wait out the window. Superusers are not limited. Every error body is {\"status\": <code>, \"message\": \"<reason>\", \"data\": {}}; a validation error lists the offending fields under data.",
@@ -10189,7 +10473,7 @@
                 "schema": {
                   "properties": {
                     "key": {
-                      "description": "Present only under an API key: the key's id, level (scope), expiry (\"\" for never), client (\"\" for a key minted by hand), reach (all, workspace or projects), workspace (\"\" for reach all) and projects ([] unless reach is projects).",
+                      "description": "Present only under an API key: the key's id, level (scope), expiry (\"\" for never), client (\"\" for a key minted by hand), reach (all, workspace or projects), workspace (\"\" for reach all), projects ([] unless reach is projects) and whether it may list and revoke keys (manage_keys).",
                       "properties": {
                         "client_id": {
                           "type": "string"
@@ -10199,6 +10483,9 @@
                         },
                         "id": {
                           "type": "string"
+                        },
+                        "manage_keys": {
+                          "type": "boolean"
                         },
                         "projects": {
                           "items": {
@@ -10234,7 +10521,8 @@
                         "client_id",
                         "reach",
                         "workspace",
-                        "projects"
+                        "projects",
+                        "manage_keys"
                       ],
                       "type": "object"
                     },

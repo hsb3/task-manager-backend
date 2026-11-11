@@ -1,5 +1,5 @@
 /// <reference path="../../pb_data/types.d.ts" />
-// API key helpers: whether request text names api_keys (decision:api-key-reads-refused), a key's plain request-store object and the level each request needs; require() inside a handler body.
+// API key helpers: api_keys path refusal (decision:api-key-reads-refused), key levels and reach, keyInfo, and keyItem, the key list's item shape.
 
 // The text lower-cased at each round of percent-decoding (byte by byte, "+" as space, as Go reads a
 // query, never throwing) plus JSON \u escapes until stable; null when it never settles (fail closed).
@@ -48,7 +48,19 @@ function keyInfo(key) {
     workspace: key.getString("workspace"),
     // The JSON round trip yields a plain array.
     projects: JSON.parse(JSON.stringify(key.getStringSlice("projects"))),
+    manage_keys: key.getBool("manage_keys"),
   };
+}
+
+// One item of GET /api/tracker/keys; current is the request's key info, or null under a session.
+function keyItem(r, current) {
+  return Object.assign({}, keyInfo(r), {
+    name: r.getString("name"),
+    created: r.getString("created"),
+    last_used: r.getString("last_used"),
+    revoked: r.getBool("revoked"),
+    current: !!current && current.id === r.id,
+  });
 }
 
 // decision:api-key-reach-and-levels: the level order and the level each write needs.
@@ -60,7 +72,7 @@ function levelAtLeast(have, need) {
   return n !== -1 && LEVELS.indexOf(have) >= n;
 }
 
-// Keys are "METHOD /pattern"; null = no level check (a superuser-only route).
+// Keys are "METHOD /pattern"; null = no level check (a superuser-only route, or one whose handler decides).
 const ROUTE_LEVELS = {
   "POST /api/tracker/notifications/read-all": "write",
   "PATCH /api/tracker/users/{id}/settings": "write",
@@ -71,6 +83,7 @@ const ROUTE_LEVELS = {
   "POST /api/tracker/invitations/{id}/decline": "own",
   "POST /api/tracker/trash/purge": null,
   "POST /api/tracker/cycles/rollover": null,
+  "POST /api/tracker/keys/{id}/revoke": null,
 };
 
 // A string applies to every write method.
@@ -258,6 +271,7 @@ module.exports = {
   namesApiKeys,
   mentionsExpand,
   keyInfo,
+  keyItem,
   LEVELS,
   ROUTE_LEVELS,
   COLLECTION_LEVELS,

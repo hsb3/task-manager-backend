@@ -126,7 +126,7 @@ the saved login and say why the key was left.
 
 ### Requirement: A key records when it was last used
 
-The server SHALL record on each key, to the minute, when it last authenticated a request, and
+The server SHALL record on each key when it last authenticated a request, writing it at most once a minute, and
 SHALL show it in the key list. No client SHALL set it.
 
 #### Scenario: A key in use

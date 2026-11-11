@@ -58,7 +58,7 @@ already have put on main.
 7. **Revoking an id that is not the caller's** answers 404 `No key with that id among yours.`, the
    same as an id that does not exist, so ids of other users' keys are not confirmed (GitHub's
    404-for-private convention, cited in key-scoping's proposal).
-8. **`last_used`, to the minute, by a raw update.** In `tmkApiKeyAuth`, after the key passes every
+8. **`last_used`, written at most once a minute, by a raw update.** In `tmkApiKeyAuth`, after the key passes every
    check and before `e.next()`: when `last_used` is empty or more than 60 seconds old,
    `$app.db().newQuery("UPDATE api_keys SET last_used = {:t} WHERE id = {:id}").bind({ t: new
    DateTime().string(), id: key.id }).execute()`, inside `try`/`catch` that logs
@@ -229,7 +229,7 @@ form `8112/8113 = test_file_storage` uses).
     superuser at create; a create value from anyone else is replaced with false, and a later
     change is refused." }))`; `c.fields.add(new
     DateField({ id: "date4200609002", name: "last_used", required: false, help: "When the key
-    last authenticated a request, to the minute, or empty if never; set by the server only." }))`;
+    last authenticated a request, written at most once a minute, or empty if never; set by the server only." }))`;
     then replace, exactly once (throw if the count is not one, as
     `v2:1785187300_notifications_actor_read_at.js` `rules()` does), in `updateRule` the text
     `@request.body.expires:isset = false &&` with `@request.body.expires:isset = false &&
@@ -241,8 +241,9 @@ form `8112/8113 = test_file_storage` uses).
   - `pb_hooks/api_keys.pb.js` new hook `onRecordUpdateRequest((e) => { ... }, "api_keys")`: if
     `e.hasSuperuserAuth()` and the request body (`e.requestInfo().body`) has the key
     `manage_keys` or `last_used` with a value that differs from `e.record.original()`'s (so a
-    dashboard save that resends unchanged values passes), throw `new BadRequestError("manage_keys and last_used are set
-    only at create or by the server.")`; else `e.next()`. Sessions never reach it with those
+    dashboard save that resends unchanged values passes), throw a `BadRequestError` whose `message` is then set to `"manage_keys and last_used are set
+    only at create or by the server."` (build correction: PocketBase capitalises a new error's message, and an answer
+    without a throw would let a batch commit its other operations); else `e.next()`. Sessions never reach it with those
     fields: the update rule answers 404 first.
   - `pb_hooks/lib/api_keys.js` `keyInfo(key)`: its returned object gains `manage_keys:
     key.getBool("manage_keys")`.
@@ -255,11 +256,12 @@ form `8112/8113 = test_file_storage` uses).
     `manage_keys: { type: "boolean" }` in `properties` and in `required`, and its description
     gains " and whether it may list and revoke keys".
   - Re-seed edits, append-only so `scripts/check_app_docs_history.ts` needs no allowlist entry:
-    `collection:api_keys` body: after the Fields sentence (ending `and revoked (bool).`) add ` Two
+    `collection:api_keys` body: after the Fields sentence (build correction: after key-scoping it ends `and projects (relation
+    to projects, up to 100).`, not `and revoked (bool).`) add ` Two
     more fields are server-written: manage_keys (bool: the key may list and revoke its user's
     keys, never mint; set by sign-in or a superuser at create, a create value from anyone else is
-    replaced with false) and last_used (date: when the key last authenticated a request, to the
-    minute).`; at the end of the Access paragraph add ` A change to manage_keys or last_used is
+    replaced with false) and last_used (date: when the key last authenticated a request, written
+    at most once a minute).`; at the end of the Access paragraph add ` A change to manage_keys or last_used is
     refused too: with 404 for the owner, with 400 for a superuser.`. `concept:api-keys` body: append to Authentication ` A key that
     passes records its last use in last_used, at most once a minute, without changing updated.`
 - **Tests** (`tests/test_key_management.ts`, port `8220 + PB_PORT_OFFSET`, self-booting as

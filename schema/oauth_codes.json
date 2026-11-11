@@ -173,6 +173,43 @@
       "required": false,
       "system": false,
       "type": "relation"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "The key name tm asked for; empty for other clients.",
+      "hidden": false,
+      "id": "text4300109001",
+      "max": 200,
+      "min": 0,
+      "name": "key_name",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "help": "The key expiry tm asked for; empty for none or for other clients.",
+      "hidden": false,
+      "id": "date4300109002",
+      "max": "",
+      "min": "",
+      "name": "key_expires",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "date"
+    },
+    {
+      "help": "Whether the person let tm's key list and revoke keys.",
+      "hidden": false,
+      "id": "bool4300109003",
+      "name": "manage_keys",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "bool"
     }
   ],
   "indexes": [

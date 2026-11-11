@@ -44,7 +44,7 @@ request carries none.
 | Field | Type | Client may set | Meaning |
 | --- | --- | --- | --- |
 | `manage_keys` | bool | Superuser at create only; any other value sent at create is replaced with `false`; never on update | The key may list and revoke its user's keys (never mint). |
-| `last_used` | date, `""` when never used | Never | When the key last authenticated a request, to the minute. |
+| `last_used` | date, `""` when never used | Never | When the key last authenticated a request, stored at full precision and written at most once a minute, so it can trail the latest use by up to 60 seconds. |
 
 Both appear wherever an `api_keys` record is returned to its user's session.
 
@@ -64,7 +64,7 @@ Caller: a user session; a key with reach `all` whose `manage_keys` is true; or a
       "manage_keys": true,
       "created": "2026-11-10 22:13:28.369Z",
       "expires": "",
-      "last_used": "2026-11-10 22:14:00.000Z",
+      "last_used": "2026-11-10 22:13:56.390Z",
       "revoked": false,
       "current": true,
       "reach": "all",

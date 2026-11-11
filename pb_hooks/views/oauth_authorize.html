@@ -57,10 +57,13 @@
 {{if .Registered}}<p>It is registered with Task Tracker as {{.Params.client_id}}.</p>{{else}}<p>It identifies itself as {{.ClientHost}}.</p>{{end}}
 <p>After you answer, you return to {{.RedirectHost}}.</p>
 {{if .Loopback}}<p>This app runs on your own computer. Approve only if you started this sign-in yourself.</p>{{end}}
+{{if .Tm}}<p>Key name: {{.KeyName}}</p>
+<p>Expires: {{.KeyExpires}}</p>{{end}}
 <form method="post" action="/oauth/authorize">
   <input type="hidden" name="flow" value="{{.Flow}}">
   {{range $k, $v := .Params}}<input type="hidden" name="{{$k}}" value="{{$v}}">
   {{end}}
+  {{if .AskKeys}}<label><input type="checkbox" name="manage_keys" value="1" checked> Also let this key list and revoke your keys</label>{{end}}
   <fieldset><legend>Workspaces</legend>
   <label><input type="radio" name="workspace" value="" checked> All workspaces</label>{{range .Workspaces}}<label><input type="radio" name="workspace" value="{{.Id}}"> {{.Name}}</label>{{end}}</fieldset>
   <fieldset><legend>Access</legend>{{range .Levels}}<label><input type="radio" name="access" value="{{.Value}}"{{if .Checked}} checked{{end}}> {{.Label}}</label>{{end}}</fieldset>

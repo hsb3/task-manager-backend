@@ -220,6 +220,28 @@
       "required": false,
       "system": false,
       "type": "relation"
+    },
+    {
+      "help": "Whether this key may list and revoke its user's keys; it can never mint one. Set by sign-in through tm login or by a superuser at create; a create value from anyone else is replaced with false, and a later change is refused.",
+      "hidden": false,
+      "id": "bool4200609001",
+      "name": "manage_keys",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "bool"
+    },
+    {
+      "help": "When the key last authenticated a request, written at most once a minute, or empty if never; set by the server only.",
+      "hidden": false,
+      "id": "date4200609002",
+      "max": "",
+      "min": "",
+      "name": "last_used",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "date"
     }
   ],
   "indexes": [

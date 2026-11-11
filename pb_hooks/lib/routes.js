@@ -206,6 +206,106 @@ const ROUTES = {
       },
     },
   },
+  "GET /api/tracker/keys": {
+    summary:
+      "Lists the caller's API keys, newest first, without secrets; a key with reach all needs the manage-keys permission, and a limited key sees only itself.",
+    auth: "users",
+    docs: "route:tracker-keys",
+    responses: {
+      403: "An API key with reach all and without the manage-keys permission.",
+    },
+    response: {
+      status: 200,
+      schema: {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                scope: { type: "string" },
+                client_id: { type: "string" },
+                created: { type: "string" },
+                expires: { type: "string" },
+                last_used: { type: "string" },
+                manage_keys: { type: "boolean" },
+                revoked: { type: "boolean" },
+                current: { type: "boolean" },
+                reach: { type: "string" },
+                workspace: { type: "string" },
+                projects: { type: "array", items: { type: "string" } },
+              },
+              required: [
+                "id",
+                "name",
+                "scope",
+                "client_id",
+                "created",
+                "expires",
+                "last_used",
+                "manage_keys",
+                "revoked",
+                "current",
+                "reach",
+                "workspace",
+                "projects",
+              ],
+            },
+          },
+        },
+        required: ["items"],
+      },
+    },
+  },
+  "POST /api/tracker/keys/{id}/revoke": {
+    summary:
+      "Revokes one of the caller's API keys; revoking a revoked key changes nothing.",
+    auth: "users",
+    docs: "route:tracker-keys",
+    responses: {
+      403: "An API key with reach all and without the manage-keys permission.",
+      404: "No key with that id among the caller's.",
+    },
+    response: {
+      status: 200,
+      schema: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          scope: { type: "string" },
+          client_id: { type: "string" },
+          created: { type: "string" },
+          expires: { type: "string" },
+          last_used: { type: "string" },
+          manage_keys: { type: "boolean" },
+          revoked: { type: "boolean" },
+          current: { type: "boolean" },
+          reach: { type: "string" },
+          workspace: { type: "string" },
+          projects: { type: "array", items: { type: "string" } },
+        },
+        required: [
+          "id",
+          "name",
+          "scope",
+          "client_id",
+          "created",
+          "expires",
+          "last_used",
+          "manage_keys",
+          "revoked",
+          "current",
+          "reach",
+          "workspace",
+          "projects",
+        ],
+      },
+    },
+  },
   "POST /api/tracker/invitations/{id}/accept": {
     summary:
       "Accepts an invitation addressed to the caller and joins its workspace.",
@@ -301,7 +401,7 @@ const ROUTES = {
           key: {
             type: "object",
             description:
-              'Present only under an API key: the key\'s id, level (scope), expiry ("" for never), client ("" for a key minted by hand), reach (all, workspace or projects), workspace ("" for reach all) and projects ([] unless reach is projects).',
+              'Present only under an API key: the key\'s id, level (scope), expiry ("" for never), client ("" for a key minted by hand), reach (all, workspace or projects), workspace ("" for reach all), projects ([] unless reach is projects) and whether it may list and revoke keys (manage_keys).',
             properties: {
               id: { type: "string" },
               scope: {
@@ -313,6 +413,7 @@ const ROUTES = {
               reach: { type: "string", enum: ["all", "workspace", "projects"] },
               workspace: { type: "string" },
               projects: { type: "array", items: { type: "string" } },
+              manage_keys: { type: "boolean" },
             },
             required: [
               "id",
@@ -322,6 +423,7 @@ const ROUTES = {
               "reach",
               "workspace",
               "projects",
+              "manage_keys",
             ],
           },
         },
