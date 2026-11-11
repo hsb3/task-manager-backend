@@ -8,6 +8,8 @@ onRecordCreateRequest((e) => {
   e.record.set("client_id", "");
   // A superuser mints for the user it names; anyone else only for themself.
   if (!e.hasSuperuserAuth()) e.record.set("user", e.auth.id);
+  if (!e.hasSuperuserAuth()) e.record.set("manage_keys", false);
+  e.record.set("last_used", "");
 
   // decision:api-key-reach-and-levels: reach, workspace, projects and level must agree and be reachable.
   const reach = e.record.getString("reach") || "all";
@@ -278,6 +280,27 @@ require(`${__hooks}/lib/routes.js`).use(
           );
       }
       e.set("tmApiKey", keyInfo);
+      // A raw update fires no record hook or realtime event and leaves updated alone.
+      const last = key.getDateTime("last_used");
+      if (last.isZero() || last.unix() < new DateTime().unix() - 60) {
+        try {
+          $app
+            .db()
+            .newQuery("UPDATE api_keys SET last_used = {:t} WHERE id = {:id}")
+            .bind({ t: new DateTime().string(), id: key.id })
+            .execute();
+        } catch (err) {
+          $app
+            .logger()
+            .warn(
+              "api key last_used write failed",
+              "key",
+              key.id,
+              "error",
+              String(err),
+            );
+        }
+      }
       e.auth = owner;
       return e.next();
     },
@@ -285,6 +308,29 @@ require(`${__hooks}/lib/routes.js`).use(
     "tmkApiKeyAuth",
   ),
 );
+
+// A superuser may resend the server-written fields unchanged (a dashboard save) but never change them.
+onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
+  if (e.hasSuperuserAuth()) {
+    const body = e.requestInfo().body;
+    const orig = e.record.original();
+    const sent = (name) => Object.prototype.hasOwnProperty.call(body, name);
+    if (
+      (sent("manage_keys") &&
+        e.record.getBool("manage_keys") !== orig.getBool("manage_keys")) ||
+      (sent("last_used") &&
+        e.record.getString("last_used") !== orig.getString("last_used"))
+    ) {
+      // PocketBase capitalises a new error's message; this one starts with a field name. Thrown, so a batch rolls back.
+      const err = new BadRequestError("refused");
+      err.message =
+        "manage_keys and last_used are set only at create or by the server.";
+      throw err;
+    }
+  }
+  return e.next();
+}, "api_keys");
 
 // A role change needs the body, which the middleware never reads; its order against membership_status.pb.js's refusals is not fixed.
 onRecordUpdateRequest((e) => {

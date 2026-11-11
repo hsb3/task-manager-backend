@@ -301,7 +301,7 @@ const ROUTES = {
           key: {
             type: "object",
             description:
-              'Present only under an API key: the key\'s id, level (scope), expiry ("" for never), client ("" for a key minted by hand), reach (all, workspace or projects), workspace ("" for reach all) and projects ([] unless reach is projects).',
+              'Present only under an API key: the key\'s id, level (scope), expiry ("" for never), client ("" for a key minted by hand), reach (all, workspace or projects), workspace ("" for reach all), projects ([] unless reach is projects) and whether it may list and revoke keys (manage_keys).',
             properties: {
               id: { type: "string" },
               scope: {
@@ -313,6 +313,7 @@ const ROUTES = {
               reach: { type: "string", enum: ["all", "workspace", "projects"] },
               workspace: { type: "string" },
               projects: { type: "array", items: { type: "string" } },
+              manage_keys: { type: "boolean" },
             },
             required: [
               "id",
@@ -322,6 +323,7 @@ const ROUTES = {
               "reach",
               "workspace",
               "projects",
+              "manage_keys",
             ],
           },
         },

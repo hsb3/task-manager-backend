@@ -48,6 +48,7 @@ function keyInfo(key) {
     workspace: key.getString("workspace"),
     // The JSON round trip yields a plain array.
     projects: JSON.parse(JSON.stringify(key.getStringSlice("projects"))),
+    manage_keys: key.getBool("manage_keys"),
   };
 }
 

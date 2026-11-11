@@ -88,6 +88,7 @@
 3	4	test_vocab_upsert
 1	4	test_trash_entry
 3	4	test_oauth_authorize
+3	4	test_key_management
 3	3	test_e2e_world
 4	3	test_agent_probe_world
 4	3	test_rule_guard_checker

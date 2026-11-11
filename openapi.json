@@ -38,7 +38,7 @@
         "type": "object"
       },
       "ApiKeysRecord": {
-        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional), revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.\n\n**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is \"\" for a key minted by hand; a value sent at create is replaced with \"\", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is \"\" for a key minted by hand.\n\n**Reach and level.** Both are chosen at create and fixed: a change to reach, workspace or projects is refused with 404, as for scope. A create is refused with 400 when the reach is incoherent, the workspace is not one the user belongs to, a project is not a live project of it, or a projects key asks for manage or own (decision:api-key-reach-and-levels).",
+        "description": "One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional), revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100). Two more fields are server-written: manage_keys (bool: the key may list and revoke its user's keys, never mint; set by sign-in or a superuser at create, a create value from anyone else is replaced with false) and last_used (date: when the key last authenticated a request, to the minute).\n\n**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names. A change to manage_keys or last_used is refused too: with 404 for the owner, with 400 for a superuser.\n\n**Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.\n\nA key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.\n\n**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is \"\" for a key minted by hand; a value sent at create is replaced with \"\", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is \"\" for a key minted by hand.\n\n**Reach and level.** Both are chosen at create and fixed: a change to reach, workspace or projects is refused with 404, as for scope. A create is refused with 400 when the reach is incoherent, the workspace is not one the user belongs to, a project is not a live project of it, or a projects key asks for manage or own (decision:api-key-reach-and-levels).",
         "properties": {
           "client_id": {
             "description": "The app a sign-in minted this key for, or empty for a key minted by hand; set by the server, and a later change is refused.",
@@ -61,6 +61,15 @@
           "key_hash": {
             "description": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced, a client's later change is refused, and a sign-in's refresh replaces it. Hidden system field — not returned in API responses.",
             "type": "string"
+          },
+          "last_used": {
+            "description": "When the key last authenticated a request, to the minute, or empty if never; set by the server only.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "manage_keys": {
+            "description": "Whether this key may list and revoke its user's keys; it can never mint one. Set by sign-in through tm login or by a superuser at create; a create value from anyone else is replaced with false, and a later change is refused.",
+            "type": "boolean"
           },
           "name": {
             "description": "A label to tell your keys apart, up to 200 characters, stored trimmed; it may be renamed later.",
@@ -10189,7 +10198,7 @@
                 "schema": {
                   "properties": {
                     "key": {
-                      "description": "Present only under an API key: the key's id, level (scope), expiry (\"\" for never), client (\"\" for a key minted by hand), reach (all, workspace or projects), workspace (\"\" for reach all) and projects ([] unless reach is projects).",
+                      "description": "Present only under an API key: the key's id, level (scope), expiry (\"\" for never), client (\"\" for a key minted by hand), reach (all, workspace or projects), workspace (\"\" for reach all), projects ([] unless reach is projects) and whether it may list and revoke keys (manage_keys).",
                       "properties": {
                         "client_id": {
                           "type": "string"
@@ -10199,6 +10208,9 @@
                         },
                         "id": {
                           "type": "string"
+                        },
+                        "manage_keys": {
+                          "type": "boolean"
                         },
                         "projects": {
                           "items": {
@@ -10234,7 +10246,8 @@
                         "client_id",
                         "reach",
                         "workspace",
-                        "projects"
+                        "projects",
+                        "manage_keys"
                       ],
                       "type": "object"
                     },

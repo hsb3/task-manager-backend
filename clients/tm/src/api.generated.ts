@@ -9,9 +9,9 @@ export interface ApiKeysListResult {
   totalPages: number;
 }
 
-/** One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional), revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100).
+/** One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional), revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100). Two more fields are server-written: manage_keys (bool: the key may list and revoke its user's keys, never mint; set by sign-in or a superuser at create, a create value from anyone else is replaced with false) and last_used (date: when the key last authenticated a request, to the minute).
 
-**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.
+**Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names. A change to manage_keys or last_used is refused too: with 404 for the owner, with 400 for a superuser.
 
 **Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.
 
@@ -26,6 +26,8 @@ export interface ApiKeysRecord {
   expires?: string;
   id: string;
   key_hash?: string;
+  last_used?: string;
+  manage_keys?: boolean;
   name: string;
   projects?: string[];
   reach?: "all" | "workspace" | "projects";
@@ -1050,6 +1052,7 @@ export interface Paths {
         client_id: string;
         expires: string;
         id: string;
+        manage_keys: boolean;
         projects: string[];
         reach: "all" | "workspace" | "projects";
         scope: "read" | "write" | "manage" | "own";
@@ -1216,6 +1219,8 @@ export const FIELD_TYPES = {
     expires: "string",
     id: "string",
     key_hash: "string",
+    last_used: "string",
+    manage_keys: "boolean",
     name: "string",
     projects: "array",
     reach: "string",
