@@ -14,11 +14,14 @@ import {
   saved_login,
   UsageError,
 } from "./src/api.ts";
+import * as keys from "./src/keys.ts";
 import * as verbs from "./src/verbs.ts";
 
 const HELP = `usage: tm <verb> [options]
 
   login --with-key [--url URL]      paste an API key; saves it for the next runs
+  keys list [--all]                 your API keys; active ones unless --all
+  keys revoke <id>                  revokes one of your API keys
   logout                            revokes the saved key where it may; removes the saved login
   list [--project ID] [--workspace ID] [--kind KIND] [--limit N] [--page N]
   show <id>
@@ -186,6 +189,29 @@ async function logout(json: boolean): Promise<number> {
   return code;
 }
 
+/** `keys list` and `keys revoke`; the sub-verb is checked before any login is read. */
+async function keys_verb(rest: string[], all: boolean, json: boolean): Promise<number> {
+  const [sub, id] = rest;
+  if (!sub) throw new UsageError("missing <create|list|revoke>");
+  if (sub === "revoke" && !id) throw new UsageError("missing <id>");
+  if (sub !== "list" && sub !== "revoke")
+    throw new UsageError(
+      `unknown keys verb "${sub}"; one of ${sub === "create" ? "list, revoke" : "create, list, revoke"}`,
+    );
+  const cfg = await load_config();
+  if (sub === "list") {
+    const rows = await keys.list_keys(cfg, all);
+    if (json) console.log(JSON.stringify(rows, null, 2));
+    else for (const l of keys.key_lines(rows)) console.log(l);
+    return 0;
+  }
+  const row = await keys.revoke_key(cfg, id);
+  if (json) console.log(JSON.stringify(row, null, 2));
+  else console.log(`revoked ${row.id} "${keys.escaped(row.name)}"`);
+  if (row.current) console.error("tm: note: that was this login's key; run tm login again");
+  return 0;
+}
+
 async function main(argv: string[]): Promise<number> {
   let parsed: ReturnType<typeof parseArgs<{ options: typeof OPTIONS; allowPositionals: true }>>;
   try {
@@ -209,6 +235,8 @@ async function main(argv: string[]): Promise<number> {
   }
   // before the shared load_config: logout must run with no usable credential
   if (verb === "logout") return logout(v.json);
+  // before the shared load_config: keys create needs no usable credential
+  if (verb === "keys") return keys_verb(rest, v.all, v.json);
   if (!Object.hasOwn(NEEDS, verb)) throw new UsageError(`unknown verb "${verb}"`);
   const [n, what] = NEEDS[verb];
   if (rest.length < n) throw new UsageError(`missing ${what}`);

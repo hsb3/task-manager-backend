@@ -235,6 +235,36 @@ try {
     ]);
   });
 
+  const deny_delete = {
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {
+      throw coded("EACCES", "denied");
+    },
+  };
+  await run_case("store refuses the delete at logout", undefined, deny_delete, async ({ file }) => {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ url: URL_B }));
+    check(
+      "forget_config reports the refusal and the file is gone anyway",
+      tup(await refusal(forget_config(URL_B)), fs.existsSync(file)),
+      tup("the credential store refused: denied", false),
+    );
+  });
+
+  await run_case("a failed save leaves no temporary file", "file", undefined, async ({ file }) => {
+    fs.mkdirSync(path.join(file, "occupied"), { recursive: true }); // rename onto a full directory fails
+    const got = await save_config({ url: URL_B, key: KEY }).then(
+      () => "saved",
+      () => "refused",
+    );
+    check(
+      "save refused, nothing holding the key left beside the config",
+      tup(got, fs.readdirSync(path.dirname(file))),
+      tup("refused", ["config.json"]),
+    );
+  });
+
   await run_case("no Bun", undefined, undefined, async ({ file, stderr }) => {
     const r = await save_config({ url: URL_B, key: KEY });
     check("save_config returns store file", r, { file, store: "file" });

@@ -32,10 +32,15 @@ export async function save_config(cfg: {
   const body = store === "os" ? { url } : { url, key: cfg.key };
   const tmp = `${file}.${process.pid}.tmp`;
   fs.rmSync(tmp, { force: true });
-  fs.writeFileSync(tmp, JSON.stringify(body, null, 2) + "\n", { mode: 0o600, flag: "wx" });
-  fs.chmodSync(tmp, 0o600);
-  // rename replaces a symlink at `file` rather than writing through it, and never leaves half a file
-  fs.renameSync(tmp, file);
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(body, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+    fs.chmodSync(tmp, 0o600);
+    // rename replaces a symlink at `file` rather than writing through it, and never leaves half a file
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    fs.rmSync(tmp, { force: true }); // it may hold the key
+    throw e;
+  }
   if (mode === "os" && previous && previous !== url) await os_delete(previous);
   if (store === "file" && mode === "os")
     console.error(
@@ -46,8 +51,8 @@ export async function save_config(cfg: {
 
 /** Ends the saved login on this machine: its store entry and the file. */
 export async function forget_config(url: string): Promise<void> {
+  fs.rmSync(config_path(), { force: true }); // first: a store refusal must not keep the login
   if (store_mode() === "os") await os_delete(url);
-  fs.rmSync(config_path(), { force: true });
 }
 
 /** The saved login alone (TM_URL and TM_API_KEY ignored); strict removes a broken file and refuses. */
