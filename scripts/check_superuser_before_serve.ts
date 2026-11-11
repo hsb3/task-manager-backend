@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 /**
- * CI / battery check: every self-booting suite creates its superuser before it serves.
+ * CI / battery check: every self-booting suite, and every Markdown room recipe under `.agents/`
+ * and in AGENTS.md, creates its superuser before it serves.
  *
  * A `pocketbase serve` against a --dir with no superuser yet is PocketBase's "first
  * run" — it launches the installer link in the machine's default browser (see
@@ -36,6 +37,9 @@ import { is_launch_call, parse_ts, roomkit_alias } from "./_ts_source.ts";
 
 const REPO = repo_root(import.meta.path);
 const TESTS_DIR = py_join(REPO, "tests");
+// Agent and rule files carry copy-paste room recipes; a recipe that serves first is the same bug.
+const RECIPE_FILES = ["AGENTS.md"];
+const RECIPE_DIRS = [".agents"];
 
 // roomkit.serve() owns the spawn, so a call to it is a boot with no `serve` literal in sight.
 const ROOM_BOOTER = "serve";
@@ -242,6 +246,31 @@ export function audit(src: string): [number[], number[]] {
   return [serve_lines, violations];
 }
 
+/**
+ * Line numbers of a Markdown recipe's `pocketbase serve` lines with no `pocketbase superuser
+ * upsert` line above them in the same file. Bound: per file, not per code block.
+ */
+export function audit_recipe(text: string): number[] {
+  const violations: number[] = [];
+  let seen_superuser = false;
+  text.split("\n").forEach((line, i) => {
+    if (/pocketbase superuser upsert\b/.test(line)) seen_superuser = true;
+    else if (/pocketbase serve\b/.test(line) && !seen_superuser) violations.push(i + 1);
+  });
+  return violations;
+}
+
+function recipe_paths(): string[] {
+  const out = RECIPE_FILES.filter((f) => fs.existsSync(py_join(REPO, f)));
+  for (const dir of RECIPE_DIRS) {
+    if (!fs.existsSync(py_join(REPO, dir))) continue;
+    for (const rel of fs.readdirSync(py_join(REPO, dir), { recursive: true }) as string[]) {
+      if (rel.endsWith(".md")) out.push(py_join(dir, rel));
+    }
+  }
+  return out.sort(by_code_point);
+}
+
 export function main(argv: string[] = process.argv.slice(2)): number {
   const prog = path.basename(process.argv[1] ?? "");
   const usage = `usage: ${prog} [-h] [--table]`;
@@ -301,6 +330,17 @@ options:
       rows.push([stem, "❌ SERVE-BEFORE-UPSERT"]);
     } else {
       rows.push([stem, "ordered"]);
+    }
+  }
+
+  for (const rel of recipe_paths()) {
+    const violations = audit_recipe(read_text(py_join(REPO, rel)));
+    if (violations.length) {
+      errors.push(
+        `${rel}: recipe serves at line(s) ${violations.join(", ")} ` +
+          `with no superuser upsert above it — move the upsert ahead of serve`,
+      );
+      rows.push([rel, "❌ SERVE-BEFORE-UPSERT"]);
     }
   }
 

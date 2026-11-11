@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { py_repr } from "../scripts/_py.ts";
-import { audit } from "../scripts/check_superuser_before_serve.ts";
+import { audit, audit_recipe } from "../scripts/check_superuser_before_serve.ts";
 
 const REPO_ROOT = path.dirname(import.meta.dir);
 
@@ -212,6 +212,17 @@ try {
 }
 check("audit() of broken TS throws SyntaxError", raised, "SyntaxError");
 
+console.log("\n── (c2) Markdown room recipes ──");
+const MD_UP = "    ./pocketbase superuser upsert probe@example.com probe123456 --dir d\n";
+const MD_SERVE = "    ./pocketbase serve --http=127.0.0.1:8094 --dir d\n";
+check("recipe: upsert then serve → no violation", audit_recipe(MD_UP + MD_SERVE), []);
+check("recipe: serve then upsert → the serve line", audit_recipe("x\n" + MD_SERVE + MD_UP), [2]);
+check(
+  "recipe: prose naming `serve` alone is not a boot",
+  audit_recipe("Before `serve`, run x\n"),
+  [],
+);
+
 console.log("\n── (d) the CLI on a scratch tree (py:200-264) ──");
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "superuser-before-serve-checker-"));
 function write(rel: string, text: string): void {
@@ -252,6 +263,11 @@ try {
   check("--table prints the dispositions (py:246-251)", /test_quiet +no server/.test(out), true);
   check("...and the ordered one (py:243-244)", /test_good +ordered/.test(out), true);
 
+  write(".agents/rules/good.md", MD_UP + MD_SERVE);
+  [rc, out] = run();
+  check("an ordered recipe under .agents/ passes", rc, 0);
+
+  write(".agents/agents/claude/late.md", MD_SERVE + MD_UP);
   write("tests/test_late.ts", RK + SERVE + UP);
   write("tests/test_broken.ts", "const = ;\n");
   // The two gates now share one launch list; they still differ on an uncalled function's body.
@@ -262,6 +278,13 @@ try {
     "serve before upsert → SERVE-BEFORE-UPSERT (py:236-242)",
     out.includes("test_late: serve at line(s) 2 runs with no superuser upsert earlier") &&
       /test_late +❌ SERVE-BEFORE-UPSERT/.test(out),
+    true,
+  );
+  check(
+    "a recipe under .agents/ that serves first → SERVE-BEFORE-UPSERT",
+    out.includes(
+      ".agents/agents/claude/late.md: recipe serves at line(s) 1 with no superuser upsert",
+    ),
     true,
   );
   check(

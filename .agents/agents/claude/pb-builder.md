@@ -27,9 +27,10 @@ Clean room — every probe/test boots its own server; 8090 is off-limits:
     find pb_migrations pb_hooks -type l   # must print nothing
     cp -R pb_migrations <scratch>/mig && rm <scratch>/mig/*superuser_mfa.js
     cp -R pb_hooks <scratch>/hooks
+    ./pocketbase superuser upsert probe@example.com probe123456 --dir <scratch>/pb_data \
+      --migrationsDir <scratch>/mig
     ./pocketbase serve --http=127.0.0.1:<port> --dir <scratch>/pb_data \
       --migrationsDir <scratch>/mig --hooksDir <scratch>/hooks
-    ./pocketbase superuser upsert probe@example.com probe123456 --dir <scratch>/pb_data
 
 Your ports: 8094/8095/8098-8099 (probes) · 8100+ (suite self-boot), each plus
 `PB_PORT_OFFSET`. Never touch 8090-8093 (dev + battery).
