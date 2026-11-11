@@ -11,7 +11,26 @@ accept through `/api/tracker/invitations/{id}/accept`. Authors write their own i
 |---|---|
 | `world.ts` | `generate(seed)` returns the world as plain data; `bun e2e/world.ts --seed N` prints it as JSON |
 | `seed.ts` | `seed_world(url, world, [email, password])` builds it; `bun e2e/seed.ts --seed N --url URL` from the shell |
-| `smoke.ts` | `make smoke`: live probes against the production Docker image; independent of the seeded world |
+| `smoke.ts` | `make smoke`: live probes against the production Docker images (API and MCP service); independent of the seeded world |
+
+## Smoke probes of the MCP service and the authorization server
+
+`make smoke` also boots the MCP service image beside the API and probes what a client reaches
+without a key:
+
+- `probe_mcp_challenge`: `POST /mcp` with no credential answers 401 and a challenge naming the
+  Protected Resource Metadata and the `read write` scope.
+- `probe_mcp_metadata`: the metadata's authorization server equals the API's `issuer`, which
+  lists `S256` and `none`.
+- `probe_mcp_refusals`: `GET /mcp` 405, an unknown path 404, an unlisted `Origin` 403.
+- `probe_oauth_refusals`: an unknown client's sign-in page 400, a password grant 400
+  `unsupported_grant_type`, revocation 200 for a known client and 400 `invalid_client` otherwise.
+- `probe_mcp_anon_limit`: 30 unauthenticated requests from one address in a minute answer 401,
+  the 31st 429 with `Retry-After`.
+
+A key cannot be minted against the production image (its superuser requires MFA), so the keyed
+paths (a key on `/me`, a not-found under a key, the sign-in through to a minted key, tool calls
+and scope filtering) stay in the suite battery.
 
 ## Seed a room
 

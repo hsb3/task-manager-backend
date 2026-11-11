@@ -373,7 +373,8 @@ function container_cmd(data_dir: string, migrations_dir: string): string[] {
     .replaceAll("/pb/pb_data", data_dir)
     .replaceAll("/pb/pb_migrations", migrations_dir)
     .replaceAll("/pb/pb_hooks", HOOKS_DIR)
-    .replaceAll("0.0.0.0:", "127.0.0.1:");
+    .replaceAll("0.0.0.0:", "127.0.0.1:")
+    .replaceAll("[::]:", "127.0.0.1:");
   if (script.includes("/pb/")) {
     throw new roomkit.SystemExit(
       `the Dockerfile CMD names an image path §5 does not substitute: ${script}`,
