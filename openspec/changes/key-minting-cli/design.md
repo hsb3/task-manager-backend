@@ -599,7 +599,7 @@ form `8112/8113 = test_file_storage` uses).
       `mkdirSync(dir, { recursive: true, mode: 0o700 })` then `chmodSync(dir, 0o700)`; if
       `store_mode() === "os"` and `await os_set(url, key)` → write `{ url }`, return `os`; else
       write `{ url, key }`, print `tm: no credential store is available; the key is saved in
-      <file>, readable only by this user` on stderr (only when the mode was `os`), return `file`. (root ruling 2026-11-11: that fallback then removes the store entry for the URL, best effort; when the store cannot be reached it prints one `tm: warning:` line, so an older stored key never wins over the file.)
+      <file>, readable only by this user` on stderr (only when the mode was `os`), return `file`. (root rulings 2026-11-11: every save that writes the key to the file, in either mode, then removes the store entry for the URL, best effort; when the store cannot be reached it prints one `tm: warning:` line in mode `os` only. The store's previous value for the URL is read first, and a failed file write puts it back, or clears the entry when there was none.)
       The file is written to a temp file `config.json.<pid>.tmp` (flag `wx`, i.e. O_EXCL, mode
       0o600, then `chmodSync` 0o600) and renamed over `config.json`, so a symlink there is
       replaced, never written through, and no half file is left; a failed write removes the temp.
@@ -855,6 +855,14 @@ form `8112/8113 = test_file_storage` uses).
   our random `state`, and PKCE binds the code to this `tm` (RFC 8252 §8.1).
 - **`chmod 0700` follows a symlinked `$XDG_CONFIG_HOME/tm`** (accepted): a symlinked directory is
   the user's choice, and tm keeps the directory that holds its login private wherever it lives.
+- **A file-mode save clears the store quietly** (root ruling 2026-11-11, N1). Under
+  `TM_CREDENTIAL_STORE=file` every save removes the store entry for its URL but prints no warning
+  when the store does not answer: the user chose the file, and a machine with no store would warn on
+  every save. An entry that survives is read again only if the store mode returns to `os` for the
+  same URL before the next save there.
+- **`--json` carries raw C1 and format characters** (intentional). `JSON.stringify` escapes only C0,
+  so a key name holding C1, bidi or tag characters reaches standard output raw in `keys list --json`;
+  the JSON is for programs, which read the value, and the human table escapes it.
 - **Metadata issuer not compared with the URL** (accepted, root ruling 2026-11-11). `tm` checks
   the callback's `iss` against the metadata `issuer` but does not compare that `issuer` with the
   URL the metadata came from (RFC 8414 §3.3): the server's issuer is `PB_PUBLIC_URL`, which a

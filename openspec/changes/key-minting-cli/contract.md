@@ -147,8 +147,9 @@ Shared rules:
 - **Credential.** `TM_API_KEY`, else the credential store entry of the saved login, when the
   configuration file exists and the server URL in use (`TM_URL`, else the saved URL) is the saved
   one, else the key in the configuration file; once the file is gone no store entry is read. Saving a key to one of the two clears the other (best effort): a key saved to the file
-  removes the store entry for that URL, and when the store cannot be reached to remove it, `tm`
-  prints one warning line on standard error, so an older stored key never silently wins over a
+  removes the store entry for that URL whatever `TM_CREDENTIAL_STORE` says, and when, with the store
+  in use (`os`), it cannot be reached to remove it, `tm` prints one warning line on standard error;
+  a save that fails leaves the store as it was, so an older stored key never silently wins over a
   newer login. `keys list` and `keys revoke` need one; `login` and `keys create` do
   not. `logout` acts on the saved login only and ignores `TM_URL` and `TM_API_KEY`.
 - **Configuration.** `$XDG_CONFIG_HOME/tm/config.json` (`~/.config/tm/config.json` when

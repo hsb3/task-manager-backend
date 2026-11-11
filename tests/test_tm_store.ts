@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
  * tm credential store (clients/tm/src/store.ts): the key goes to the system store when one answers,
- * else to the config file with a note; TM_CREDENTIAL_STORE=file touches the store only to clear it
- * at logout; logout leaves no usable key behind; the config directory is tightened to 0700; a Node
+ * else to the config file with a note; TM_CREDENTIAL_STORE=file touches the store only to clear the
+ * entry a file save or a logout replaces; a failed save puts the store back as it was; logout leaves no usable key behind; the config directory is tightened to 0700; a Node
  * build falls back to the file. No server, no port.
  */
 
@@ -182,12 +182,52 @@ try {
       check("no stderr note (the file was asked for)", stderr(), "");
       check("load_config reads the file", await load_config(), { url: URL_B, key: KEY });
       check("saved_login reads the file", await saved_login(true), { url: URL_B, key: KEY });
+      check(
+        "save only clears the store entry; load and saved_login never call the backend",
+        m.calls,
+        ["delete"],
+      );
       await save_config({ url: URL_A, key: KEY });
-      check("save, load and saved_login never call the backend", tup(touched, m.calls), tup(0, []));
+      m.calls.length = 0;
       await forget_config(URL_B);
       check("forget_config removes the file", fs.existsSync(file), false);
       check("forget_config clears the store entry even here", m.calls, ["delete"]);
     });
+  }
+
+  {
+    const m = mem();
+    await run_case("os login, then a file-mode save of a newer key", undefined, m.api, async () => {
+      await save_config({ url: URL_B, key: "tmk_" + "1".repeat(40) });
+      process.env.TM_CREDENTIAL_STORE = "file";
+      await save_config({ url: URL_B, key: KEY });
+      check("the file-mode save removed the older store entry", [...m.entries.keys()], []);
+      delete process.env.TM_CREDENTIAL_STORE;
+      check("back in os mode, the newer login is the one used", (await load_config()).key, KEY);
+    });
+  }
+
+  for (const had of [true, false]) {
+    const m = mem();
+    const OLD = "tmk_" + "2".repeat(40);
+    await run_case(
+      `a save whose file cannot be written, store ${had ? "holding" : "without"} an older key`,
+      undefined,
+      m.api,
+      async ({ file }) => {
+        if (had) m.entries.set(`tm|${URL_B}`, OLD);
+        fs.mkdirSync(path.join(file, "occupied"), { recursive: true }); // the rename onto a full directory fails
+        const got = await save_config({ url: URL_B, key: KEY }).then(
+          () => "saved",
+          () => "refused",
+        );
+        check(
+          "the save is refused and the store is back as it was",
+          tup(got, m.entries.get(`tm|${URL_B}`) ?? null),
+          tup("refused", had ? OLD : null),
+        );
+      },
+    );
   }
 
   {

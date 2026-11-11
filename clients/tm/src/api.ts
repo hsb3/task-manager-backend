@@ -30,6 +30,7 @@ export async function save_config(cfg: {
   try {
     previous = String(read_saved(file).url ?? "").replace(/\/+$/, "");
   } catch {} // a broken file is being replaced
+  const before = mode === "os" ? await os_get(url).catch(() => null) : null;
   const store: Store = mode === "os" && (await os_set(url, cfg.key)) ? "os" : "file";
   const body = store === "os" ? { url } : { url, key: cfg.key };
   const tmp = `${file}.${process.pid}.tmp`;
@@ -41,15 +42,18 @@ export async function save_config(cfg: {
     fs.renameSync(tmp, file);
   } catch (e) {
     fs.rmSync(tmp, { force: true }); // it may hold the key
+    // the store goes back to the login the file still names
+    if (store === "os") await (before ? os_set(url, before) : os_clear(url)).catch(() => false);
     throw e;
   }
   if (mode === "os" && previous && previous !== url) await os_delete(previous);
-  if (store === "file" && mode === "os") {
-    console.error(
-      `tm: no credential store is available; the key is saved in ${file}, readable only by this user`,
-    );
-    // an older key left in the store would win over this file on the next run
-    if (!(await os_clear(url)))
+  if (store === "file") {
+    if (mode === "os")
+      console.error(
+        `tm: no credential store is available; the key is saved in ${file}, readable only by this user`,
+      );
+    // an older key left in the store would win over this file in os mode; file mode chose the file, so it stays quiet
+    if (!(await os_clear(url)) && mode === "os")
       console.error(
         `tm: warning: the credential store could not be reached to remove an older key for ${url}; it would be used instead of this login, so run tm login again once the store is available`,
       );
