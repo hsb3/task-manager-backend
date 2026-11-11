@@ -157,6 +157,7 @@ check(
     "app_docs",
     "app_settings",
     "invitation_events",
+    "oauth_codes",
     "task_activity",
     "task_subscribers",
     "workspace_invitations",

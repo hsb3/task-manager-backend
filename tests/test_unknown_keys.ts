@@ -161,6 +161,19 @@ try {
     ["notifications", { user: alice_id, kind: "ownership_transferred", workspace: ALICE_WS }],
     ["task_activity", { task: TASK, workspace: ALICE_WS, actor: alice_id, field: "title" }],
     ["invitation_events", { kind: "decline", email_key: "dora@example.com", workspace: ALICE_WS }],
+    [
+      "oauth_codes",
+      {
+        code_hash: "0".repeat(64),
+        user: alice_id,
+        client_id: "cursor",
+        client_name: "Cursor",
+        redirect_uri: "http://localhost:9999/callback",
+        code_challenge: "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+        scope: "write",
+        expires: "2099-01-01 00:00:00.000Z",
+      },
+    ],
   ];
   for (const [c, body] of fixtures) {
     if ((await find_by_filter(c, "", su)).length) continue;
