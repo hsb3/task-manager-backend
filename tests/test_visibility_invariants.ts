@@ -137,6 +137,14 @@ const READ_CARVEOUT_EXTRA = new Set(["workspace_members"]);
 // despite qualifying as configuration by the create-rule proxy.
 const NO_TRASH_CARVEOUT = new Set(["workspace_invitations"]);
 
+// collection -> why its workspace relation LIMITS the row rather than anchoring it: neither configuration nor containment.
+const NOT_ANCHORED: Map<string, string> = new Map([
+  [
+    "api_keys",
+    "a key is its user's own credential and its workspace/projects only limit its reach (decision:api-key-reach-and-levels)",
+  ],
+]);
+
 const FAILS: string[] = [];
 const OPEN_HITS: string[] = [];
 const NOOPS: string[] = [];
@@ -291,6 +299,7 @@ function is_configuration(collection: string): boolean {
   }
   return (
     !(collection in SUBJECTS) &&
+    !NOT_ANCHORED.has(collection) &&
     field_named(collection, "workspace") !== null &&
     (CREATE_RULES[collection] ?? null) !== null
   );
@@ -311,6 +320,7 @@ function is_containment(collection: string, target: string): boolean {
    * Everything else keeps the older test — content, meaning a subject or a row with no workspace
    * anchor of its own — so a hook-written class anchored on a workspace makes no promise here;
    * what its rows do when that workspace is trashed is ruled where they are written. */
+  if (NOT_ANCHORED.has(collection)) return false;
   return is_configuration(collection) ? target === "workspaces" : is_content(collection);
 }
 
@@ -439,6 +449,8 @@ function build_body(
     if (value !== null) body[f.name] = value;
   }
   Object.assign(body, overrides);
+  // The api_keys create hook refuses a reach that disagrees with the workspace/projects named.
+  if (collection === "api_keys") body.reach = body.projects ? "projects" : "workspace";
   return body;
 }
 
@@ -1347,7 +1359,9 @@ try {
   for (const [coll, relfield, target] of RELATION_CASES) {
     if (row_case_map.has([coll, relfield, target].join("\0"))) continue;
     let why: string;
-    if (is_configuration(coll)) {
+    if (NOT_ANCHORED.has(coll)) {
+      why = NOT_ANCHORED.get(coll)!;
+    } else if (is_configuration(coll)) {
       why =
         `${coll} is workspace-anchored configuration, which decision:workspace-configuration-freeze freezes with ` +
         `its WORKSPACE alone`;
@@ -1505,6 +1519,11 @@ try {
   // one at all. Open a createRule to any caller and the row above claims it as configuration
   // instead, so this check retires itself rather than going stale.
   for (const coll of NOT_CONFIGURATION) {
+    const unanchored = NOT_ANCHORED.get(coll);
+    if (unanchored) {
+      noop(`freeze-excluded:${coll}`, unanchored);
+      continue;
+    }
     const [s] = await api("POST", `/api/collections/${coll}/records`, owner_tok, {
       workspace: FREEZE_WS,
     });
