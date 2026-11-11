@@ -970,6 +970,20 @@ const ROUTES = {
     internal: true,
     response: { status: 200, schema: null },
   },
+  "GET /oauth/authorize": {
+    summary:
+      "The sign-in and consent page an app sends a person to (OAuth authorization request).",
+    auth: "none",
+    internal: true,
+    response: { status: 200, schema: null },
+  },
+  "POST /oauth/authorize": {
+    summary:
+      "The sign-in and consent page's form posts: password, emailed code, approve or deny.",
+    auth: "none",
+    internal: true,
+    response: { status: 200, schema: null },
+  },
 };
 const MIDDLEWARE = {
   any: () => [$apis.requireAuth()],

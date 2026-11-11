@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in to Task Tracker</title>
+<style>
+  body { font-family: system-ui, sans-serif; line-height: 1.5; color: #1a1a1a; background: #f6f6f7; margin: 0; }
+  main { max-width: 26rem; margin: 3rem auto; padding: 2rem; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+  h1 { font-size: 1.3rem; margin-top: 0; }
+  form { margin: 1.25rem 0; }
+  label { display: block; margin: .6rem 0 .2rem; }
+  input[type=email], input[type=password], input[type=text] { width: 100%; box-sizing: border-box; padding: .5rem; font-size: 1rem; }
+  button { margin-top: .8rem; padding: .5rem 1rem; font-size: 1rem; }
+  .message { padding: .6rem; background: #fdecea; border-radius: 4px; }
+  .choice label { display: inline; margin: 0; }
+  .choice { margin: .4rem 0; }
+</style>
+</head>
+<body>
+<main>
+{{if eq .Stage "error"}}
+<h1>This sign-in cannot continue</h1>
+<p class="message">{{.Message}}</p>
+{{else}}
+<h1>Sign in to Task Tracker</h1>
+{{if .Message}}<p class="message">{{.Message}}</p>{{end}}
+{{if eq .Stage "signin"}}
+<form method="post" action="/oauth/authorize">
+  <input type="hidden" name="flow" value="{{.Flow}}">
+  {{range $k, $v := .Params}}<input type="hidden" name="{{$k}}" value="{{$v}}">
+  {{end}}
+  <label for="pw-email">Email</label>
+  <input id="pw-email" type="email" name="email" autocomplete="username" required>
+  <label for="pw-password">Password</label>
+  <input id="pw-password" type="password" name="password" autocomplete="current-password" required>
+  <button type="submit" name="action" value="password">Sign in</button>
+</form>
+<form method="post" action="/oauth/authorize">
+  <input type="hidden" name="flow" value="{{.Flow}}">
+  {{range $k, $v := .Params}}<input type="hidden" name="{{$k}}" value="{{$v}}">
+  {{end}}
+  <label for="code-email">Email</label>
+  <input id="code-email" type="email" name="email" autocomplete="username" required>
+  <button type="submit" name="action" value="send_code">Email me a code</button>
+</form>
+{{else if eq .Stage "code"}}
+<p>If that address belongs to an account, a code is on its way.</p>
+<form method="post" action="/oauth/authorize">
+  <input type="hidden" name="flow" value="{{.Flow}}">
+  {{range $k, $v := .Params}}<input type="hidden" name="{{$k}}" value="{{$v}}">
+  {{end}}
+  <label for="code">Code</label>
+  <input id="code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required>
+  <button type="submit" name="action" value="verify_code">Continue</button>
+</form>
+{{else if eq .Stage "consent"}}
+<p>{{.ClientName}} wants to use your Task Tracker account.</p>
+{{if .Registered}}<p>It is registered with Task Tracker as {{.Params.client_id}}.</p>{{else}}<p>It identifies itself as {{.ClientHost}}.</p>{{end}}
+<p>After you answer, you return to {{.RedirectHost}}.</p>
+{{if .Loopback}}<p>This app runs on your own computer. Approve only if you started this sign-in yourself.</p>{{end}}
+<form method="post" action="/oauth/authorize">
+  <input type="hidden" name="flow" value="{{.Flow}}">
+  {{range $k, $v := .Params}}<input type="hidden" name="{{$k}}" value="{{$v}}">
+  {{end}}
+  <fieldset>
+    <legend>Access</legend>
+    <div class="choice"><input id="access-read" type="radio" name="access" value="read"{{if eq .Access "read"}} checked{{end}}> <label for="access-read">Read: see your workspaces, projects and items.</label></div>
+    <div class="choice"><input id="access-write" type="radio" name="access" value="write"{{if eq .Access "write"}} checked{{end}}> <label for="access-write">Read and write: also create, edit and comment on items.</label></div>
+  </fieldset>
+  <button type="submit" name="action" value="approve">Approve</button>
+  <button type="submit" name="action" value="deny">Deny</button>
+</form>
+{{end}}
+{{end}}
+</main>
+</body>
+</html>

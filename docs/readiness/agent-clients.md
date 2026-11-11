@@ -61,14 +61,11 @@ writes.
 - Gap: no network-reachable MCP endpoint.
 
 **AC-7** A remote MCP endpoint authenticates in a way hosted MCP clients support.
-- Verdict: missing.
-- Evidence: no remote endpoint exists (AC-6). The MCP "Authorization" page
-  (https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization) makes
-  authorization optional for HTTP transports but, when present, requires OAuth 2.1 with
-  Protected Resource Metadata (RFC 9728) and forbids tokens in the query string. The Claude
-  connector page above lists OAuth, or "No sign in" with request headers carrying fixed
-  credentials such as API keys.
-- Gap: no stated authentication scheme for a remote endpoint.
+- Verdict: partly.
+- Evidence: the API serves RFC 8414 metadata, a sign-in and consent page, token and revocation
+  endpoints (`pb_hooks/oauth_server.pb.js`; `tests/test_oauth_token.ts`,
+  `tests/test_oauth_authorize.ts`).
+- Gap: no deployed MCP endpoint presents the challenge yet (AC-6).
 
 **AC-8** The CLI runs on a machine that has no checkout of this repository.
 - Verdict: partly.

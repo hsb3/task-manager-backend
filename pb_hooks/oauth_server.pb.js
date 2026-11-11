@@ -294,3 +294,196 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/revoke", (e) => {
   e.response.header().set("Pragma", "no-cache");
   return e.noContent(200);
 });
+
+require(`${__hooks}/lib/routes.js`).add("GET /oauth/authorize", (e) => {
+  const lib = require(`${__hooks}/lib/oauth.js`);
+  const form = lib.parse_form(e.request.url.rawQuery);
+  if (!form || form.repeated.length > 0)
+    return lib.render(e, 400, {
+      Stage: "error",
+      Message: "The sign-in request is malformed.",
+    });
+  const p = form.params;
+  let v;
+  try {
+    v = lib.validate_request($app, p);
+  } catch (err) {
+    $app.logger().error("oauth authorize failed", "error", String(err));
+    return lib.render(e, 400, {
+      Stage: "error",
+      Message: "The sign-in could not continue. Try again.",
+    });
+  }
+  if (v.page) return lib.render(e, 400, { Stage: "error", Message: v.page });
+  const back = (pair) =>
+    e.redirect(
+      302,
+      lib.with_query(p.redirect_uri, [
+        pair,
+        ["state", p.state],
+        ["iss", lib.issuer()],
+      ]),
+    );
+  if (v.redirect) return back(["error", v.redirect]);
+  try {
+    return lib.render_stage(e, $app, v.ok, p, "signin", "", "", "");
+  } catch (err) {
+    $app.logger().error("oauth authorize failed", "error", String(err));
+    return back(["error", "server_error"]);
+  }
+});
+
+require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
+  const lib = require(`${__hooks}/lib/oauth.js`);
+  const form = lib.parse_form(toString(e.request.body));
+  if (!form || form.repeated.length > 0)
+    return lib.render(e, 400, {
+      Stage: "error",
+      Message: "The sign-in request is malformed.",
+    });
+  const p = form.params;
+  let v;
+  try {
+    v = lib.validate_request($app, p);
+  } catch (err) {
+    $app.logger().error("oauth authorize failed", "error", String(err));
+    return lib.render(e, 400, {
+      Stage: "error",
+      Message: "The sign-in could not continue. Try again.",
+    });
+  }
+  if (v.page) return lib.render(e, 400, { Stage: "error", Message: v.page });
+  const back = (pair) =>
+    e.redirect(
+      302,
+      lib.with_query(p.redirect_uri, [
+        pair,
+        ["state", p.state],
+        ["iss", lib.issuer()],
+      ]),
+    );
+  if (v.redirect) return back(["error", v.redirect]);
+  const client = v.ok;
+  const show = (stage, message, uid, otp) =>
+    lib.render_stage(e, $app, client, p, stage, message, uid, otp);
+  const find_user = (email) => {
+    try {
+      return $app.findAuthRecordByEmail("users", email || "");
+    } catch (_) {
+      return null;
+    }
+  };
+  const WRONG_CODE = "That code is wrong or has expired. Request a new one.";
+  try {
+    const flow = lib.read_flow($app, p.flow);
+    const needs = {
+      password: "signin",
+      send_code: "signin",
+      verify_code: "code",
+      approve: "consent",
+      deny: "consent",
+    };
+    if (
+      !flow ||
+      flow.q !== lib.flow_q(p) ||
+      !Object.prototype.hasOwnProperty.call(needs, p.action) ||
+      needs[p.action] !== flow.stage
+    )
+      return show(
+        "signin",
+        "This sign-in took too long or was changed. Start again.",
+      );
+
+    if (p.action === "password") {
+      const u = find_user(p.email);
+      if (!u || !u.validatePassword(p.password || ""))
+        return show(
+          "signin",
+          "That email and password do not match an account.",
+        );
+      const refusal = lib.sign_in_refusal($app, u);
+      return refusal ? show("signin", refusal) : show("consent", "", u.id);
+    }
+
+    if (p.action === "send_code") {
+      const u = find_user(p.email);
+      if (!u) return show("code", "", "", "");
+      const code = $security.randomStringWithAlphabet(8, "0123456789");
+      const otp = new Record($app.findCollectionByNameOrId("_otps"));
+      otp.set("collectionRef", u.collection().id);
+      otp.set("recordRef", u.id);
+      otp.set("sentTo", u.email());
+      otp.setPassword(code);
+      $app.save(otp);
+      try {
+        $mails.sendRecordOTP($app, u, otp.id, code);
+      } catch (err) {
+        $app
+          .logger()
+          .error("oauth sign-in code not sent", "error", String(err));
+        return show(
+          "signin",
+          "The code could not be sent. Try again in a minute, or sign in with your password.",
+        );
+      }
+      return show("code", "", "", otp.id);
+    }
+
+    if (p.action === "verify_code") {
+      // The callback returns instead of throwing, so a wrong guess's count and deletion commit.
+      let uid = "";
+      $app.runInTransaction((tx) => {
+        let otp;
+        try {
+          otp = tx.findOTPById(flow.otp);
+        } catch (_) {
+          return;
+        }
+        const u = tx.findRecordById(
+          otp.getString("collectionRef"),
+          otp.getString("recordRef"),
+        );
+        if (otp.hasExpired(u.collection().otp.durationTime())) {
+          tx.delete(otp);
+          return;
+        }
+        if (!otp.validatePassword(p.code || "")) {
+          const key = "oauth_otp_tries:" + otp.id;
+          const tries = ($app.store().get(key) || 0) + 1;
+          if (tries >= 5) {
+            tx.delete(otp);
+            $app.store().remove(key);
+          } else {
+            $app.store().set(key, tries);
+          }
+          return;
+        }
+        tx.delete(otp);
+        $app.store().remove("oauth_otp_tries:" + otp.id);
+        uid = u.id;
+      });
+      if (!uid) return show("code", WRONG_CODE, "", flow.otp);
+      const refusal = lib.sign_in_refusal(
+        $app,
+        $app.findRecordById("users", uid),
+      );
+      return refusal ? show("code", refusal, "", "") : show("consent", "", uid);
+    }
+
+    if (p.action === "deny") return back(["error", "access_denied"]);
+
+    if (p.access !== "read" && p.access !== "write")
+      return show("consent", "", flow.uid);
+    const code = lib.issue_code(
+      $app,
+      $app.findRecordById("users", flow.uid),
+      client,
+      p,
+      p.access,
+    );
+    return back(["code", code]);
+  } catch (err) {
+    $app.logger().error("oauth authorize failed", "error", String(err));
+    return back(["error", "server_error"]);
+  }
+});
