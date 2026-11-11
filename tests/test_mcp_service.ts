@@ -311,6 +311,31 @@ try {
   x = await raw("/.well-known/oauth-protected-resource/mcp", { method: "HEAD" });
   check("prm_head: 200, empty body", [x.status, x.text], [200, ""]);
 
+  console.log("\n── the health route ──");
+  x = await raw("/health", { method: "GET" });
+  check(
+    'health_get: 200 application/json, body exactly {"status":"ok"}',
+    [x.status, x.headers.get("Content-Type"), x.text],
+    [200, "application/json", '{"status":"ok"}'],
+  );
+  x = await raw("/health", { method: "HEAD" });
+  check("health_head: 200, empty body", [x.status, x.text], [200, ""]);
+  x = await raw("/health", { method: "POST", body: {} });
+  check(
+    "health_post_405: 405, Allow GET, HEAD, empty body",
+    [x.status, x.headers.get("Allow"), x.text],
+    [405, "GET, HEAD", ""],
+  );
+  const health_run = await statuses(31, () =>
+    raw("/health", { method: "GET", headers: { "X-Real-IP": "198.51.100.10" } }),
+  );
+  x = await raw("/mcp", { headers: { "X-Real-IP": "198.51.100.10" }, body: {} });
+  check(
+    "health_not_limited: 31 × 200 from one address, which still has its whole address budget (401)",
+    [health_run.map((y) => y.status), x.status],
+    [Array(31).fill(200), 401],
+  );
+
   console.log("\n── the 401 challenge ──");
   const init = msg("initialize", {
     protocolVersion: "2025-11-25",
@@ -700,6 +725,12 @@ try {
     "api_down_503: 503 unavailable, Retry-After 5",
     [x.status, x.json?.error?.code, x.headers.get("Retry-After")],
     [503, "unavailable", "5"],
+  );
+  x = await raw("/health", { method: "GET" });
+  check(
+    "health_without_api: 200 while the API is down",
+    [x.status, x.text],
+    [200, '{"status":"ok"}'],
   );
 } finally {
   for (const c of clients) await c.close().catch(() => {});

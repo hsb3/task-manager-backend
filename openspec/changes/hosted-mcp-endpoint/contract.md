@@ -21,6 +21,7 @@ A value marked *(Q n)* is set by that ruling in Open Questions.
 | OPTIONS | `/mcp` | 204, `Allow: POST`; CORS preflight headers only for an allowed `Origin` (see Origin). |
 | GET, HEAD | `/.well-known/oauth-protected-resource/mcp` | Protected Resource Metadata (RFC 9728 §3.1, path-inserted form). Other methods 405. |
 | GET, HEAD | `/.well-known/oauth-protected-resource` | The same document, for clients that try the root form (see Protected Resource Metadata). Other methods 405. |
+| GET, HEAD | `/health` | Liveness: 200, `application/json`, `{"status":"ok"}`. Other methods 405. |
 | any | any other path | 404, whatever the credential. |
 
 ### API, `{API}` (PocketBase)
@@ -399,7 +400,7 @@ with status 400, and no redirect (OAuth 2.1 §4.1.2.1). After: a redirect carryi
 | Surface | Caller | Credential |
 | --- | --- | --- |
 | `POST {MCP}/mcp` | Any MCP client | `Authorization: Bearer tmk_...` (or the bare key, read as the API reads it), hand-minted or grant-minted (ruling 2). A PocketBase user token, a refresh token, or any other value answers 401. Never read from the query string. |
-| `{MCP}` metadata documents | Anyone | None |
+| `{MCP}` metadata documents, `/health` | Anyone | None |
 | `{API}/.well-known/oauth-authorization-server` | Anyone | None |
 | `{API}/oauth/authorize` | A person in a browser | The page's own sign-in (users only, never superusers) |
 | `{API}/oauth/token`, `/oauth/revoke` | An OAuth client | Public: `client_id` in the body *(Q4)* |

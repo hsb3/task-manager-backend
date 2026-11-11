@@ -271,7 +271,7 @@ decision:refused-migration-fails-the-deploy); it does not gate a deploy.
 
 ## The MCP service
 
-The `mcp` Railway service is the hosted MCP endpoint (`services/mcp/`), built from `services/mcp/Dockerfile`. It deploys when a watch pattern is touched: `services/mcp/**`, `clients/tm/src/**`, `clients/tm/package.json`, `package.json`, `bun.lock`, `/.dockerignore`. It is created by the runbook in `openspec/changes/hosted-mcp-endpoint/design.md`, Phase 10; the entry for `mcp` in `railway/railway.ts` records what that runbook creates by CLI, so `railway config plan` proposes no change to it. `make local-up` serves it on 8089 (`+ PB_PORT_OFFSET`).
+The `mcp` Railway service is the hosted MCP endpoint (`services/mcp/`), built from `services/mcp/Dockerfile`. It deploys when a watch pattern is touched: `services/mcp/**`, `clients/tm/src/**`, `clients/tm/package.json`, `package.json`, `bun.lock`, `/.dockerignore`. Its healthcheck path is `/health` (Railway accepts only letters, digits, `/` and `_` in a healthcheck path, so not the metadata path). It is created by the runbook in `openspec/changes/hosted-mcp-endpoint/design.md`, Phase 10; the entry for `mcp` in `railway/railway.ts` records what that runbook creates by CLI, so `railway config plan` proposes no change to it; that plan fails until the `mcp.` custom domain exists. `make local-up` serves it on 8089 (`+ PB_PORT_OFFSET`).
 
 | Service | Variable | Value on Railway | If missing |
 | --- | --- | --- | --- |

@@ -155,6 +155,13 @@ export function make_app(env: Env): { fetch(req: Request, ip: string): Promise<R
       };
       return new Response(req.method === "HEAD" ? null : JSON.stringify(prm), { headers });
     }
+    if (path === "/health") {
+      if (req.method !== "GET" && req.method !== "HEAD")
+        return new Response(null, { status: 405, headers: { Allow: "GET, HEAD" } });
+      return new Response(req.method === "HEAD" ? null : '{"status":"ok"}', {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (path !== "/mcp") return error(404, "not_found", "Nothing is served at this path.");
     if (origin !== null && !env.allowed_origins.includes(origin))
       return error(403, "origin_not_allowed", "Requests from this web origin are not accepted.");

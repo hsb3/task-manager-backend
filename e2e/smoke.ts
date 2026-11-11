@@ -74,6 +74,12 @@ async function post(
 async function probe_health(): Promise<void> {
   const r = await fetch(BASE_URL + "/api/health");
   check("GET /api/health", r.status, 200);
+  const m = await fetch(MCP_URL + "/health");
+  check(
+    'MCP GET /health: 200 application/json {"status":"ok"}',
+    [m.status, m.headers.get("Content-Type"), await m.text()],
+    [200, "application/json", '{"status":"ok"}'],
+  );
 }
 
 async function batch_signup(method: string): Promise<void> {
@@ -396,7 +402,7 @@ async function main(): Promise<number> {
     BASE_URL = `http://127.0.0.1:${port}`;
     MCP_URL = `http://127.0.0.1:${mcp_port}`;
     const deadline = Date.now() + HEALTH_TIMEOUT_MS;
-    for (const url of [BASE_URL + "/api/health", MCP_URL + PRM_PATH]) {
+    for (const url of [BASE_URL + "/api/health", MCP_URL + "/health"]) {
       while (
         (await fetch(url).then(
           (r) => r.status,
