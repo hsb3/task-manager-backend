@@ -31,10 +31,11 @@ without a key:
   page whose flow token carries two 15-character ids, the shape a known email gets.
 - `probe_mcp_anon_limit`: 30 unauthenticated requests from one address in a minute answer 401,
   the 31st 429 with `Retry-After`.
+- `probe_read_key_me`: a read key's `GET /api/tracker/me` lists the provisioned workspace with
+  every capability false.
 
-A key cannot be minted against the production image (its superuser requires MFA), so the keyed
-paths (a key on `/me`, a not-found under a key, the sign-in through to a minted key, tool calls
-and scope filtering) stay in the suite battery.
+A smoke run copies `e2e/fixtures/smoke_key_user.js` into the image and restarts it, so the key
+probes have one approved, verified user; keyed paths beyond those probes stay battery-only.
 
 ## Seed a room
 

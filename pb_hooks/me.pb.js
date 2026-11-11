@@ -6,6 +6,8 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
       "This route answers for a signed-in user's own workspaces, and a superuser has none.",
     );
   const uid = e.auth.id;
+  const k = e.get("tmApiKey");
+  const readOnly = !!k && k.scope === "read";
   const rows = arrayOf(
     new DynamicModel({ id: "", name: "", owner: "", role: "", status: "" }),
   );
@@ -44,7 +46,7 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
         .one(res);
       counts = { projects: res.projects, open_items: res.open_items };
     }
-    // decision:role-tiers: write = items and projects, manage = settings, vocabulary, invites and purge, own = roles, transfer, workspace delete.
+    // decision:role-tiers: write = items and projects, manage = settings, vocabulary, invites and purge, own = roles, transfer, workspace delete; a read key holds none.
     workspaces.push({
       id: w.id,
       // A suspended member cannot read the workspace, so its name is withheld here too.
@@ -53,9 +55,9 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
       status: owner ? "active" : w.status,
       counts: counts,
       capabilities: {
-        write: active && role !== "viewer",
-        manage: active && (role === "owner" || role === "admin"),
-        own: owner,
+        write: !readOnly && active && role !== "viewer",
+        manage: !readOnly && active && (role === "owner" || role === "admin"),
+        own: !readOnly && owner,
       },
     });
   }
@@ -80,7 +82,6 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
     unread_notifications: unread,
     workspaces: workspaces,
   };
-  const k = e.get("tmApiKey");
   if (k) answer.key = k;
   return e.json(200, answer);
 });

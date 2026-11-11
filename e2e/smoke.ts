@@ -8,8 +8,9 @@ project `pb-smoke-<pid>` with a fresh volume, runs the probes in order, and alwa
 A later behaviour probe is one async function in PROBES; a 429 masks signup for 60s, so the
 rate-limit probe stays last.
 
-Not covered: OAuth sign-in (needs a live provider). Anything needing an API key: the image's
-superuser requires MFA, so no key can be minted here and the keyed paths stay battery-only. Mail (signup verification, OTP): it would
+Not covered: OAuth sign-in (needs a live provider). A smoke run copies e2e/fixtures/smoke_key_user.js
+into the image and restarts it, so the key probes have one approved, verified user; keyed paths
+beyond those probes stay battery-only. Mail (signup verification, OTP): it would
 take an SMTP host/port env override in pb_hooks/mail.pb.js (today it hardcodes smtp.resend.com
 behind RESEND_API_KEY), scripts/smtp_sink.ts listening on a host-gateway address instead of
 127.0.0.1, and `extra_hosts: host-gateway` in the compose file.
@@ -111,6 +112,46 @@ async function probe_password_signup(): Promise<void> {
     r.json?.data?.password?.code,
     "validation_signup_password",
   );
+}
+
+const KEY_USER = "smoke-keys@example.com";
+const KEY_PASSWORD = "smoke-keys-123456";
+const KEY_IP = "203.0.113.50"; // its own X-Real-IP, so this sign-in spends none of the forged-address probe's budget
+let KEY_SESSION = "";
+
+async function key_session(): Promise<string> {
+  if (!KEY_SESSION) {
+    const r = await post(
+      "/api/collections/users/auth-with-password",
+      { identity: KEY_USER, password: KEY_PASSWORD },
+      { "X-Real-IP": KEY_IP },
+    );
+    KEY_SESSION = r.json?.token ?? "";
+  }
+  return KEY_SESSION;
+}
+
+async function mint_key(fields: Record<string, unknown>): Promise<string> {
+  const r = await post(
+    "/api/collections/api_keys/records",
+    { name: "smoke", ...fields },
+    { Authorization: await key_session() },
+  );
+  return r.json?.key ?? "";
+}
+
+async function probe_read_key_me(): Promise<void> {
+  const key = await mint_key({ scope: "read" });
+  const r = await fetch(BASE_URL + "/api/tracker/me", {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  const workspaces: any[] = ((await r.json().catch(() => null)) as any)?.workspaces ?? [];
+  check(
+    "read key me: every capability false",
+    workspaces.every((w) => !w.capabilities.write && !w.capabilities.manage && !w.capabilities.own),
+    true,
+  );
+  check("read key me lists the provisioned workspace", workspaces.length >= 1, true);
 }
 
 // Without the edge, the counted address is the Docker gateway that publishes the port.
@@ -286,6 +327,7 @@ const PROBES = [
   probe_batch_create,
   probe_batch_upsert,
   probe_password_signup,
+  probe_read_key_me,
   probe_forged_client_address,
   probe_mcp_challenge,
   probe_mcp_metadata,
@@ -319,6 +361,39 @@ for (const [sig, code] of [
   });
 }
 
+// A restart republishes port 0 on a new host port, so the lookup runs after each boot.
+function resolve_base_url(): boolean {
+  const r = run([...COMPOSE, "port", "pocketbase", "8080"]);
+  const port = Number(r.out.trim().split(":").pop());
+  if (r.code !== 0 || !port || port === 8090 || port === 8089) {
+    console.error(
+      `❌ refusing published port ${port}: expected a Docker-picked port other than 8090 and 8089\n${r.out}`,
+    );
+    return false;
+  }
+  BASE_URL = `http://127.0.0.1:${port}`;
+  return true;
+}
+
+async function wait_healthy(): Promise<boolean> {
+  const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+  const url = BASE_URL + "/api/health";
+  while (
+    (await fetch(url).then(
+      (r) => r.status,
+      () => 0,
+    )) !== 200
+  ) {
+    if (Date.now() > deadline) {
+      console.error(`❌ no 200 from ${url} within ${HEALTH_TIMEOUT_MS / 1000}s; container log:`);
+      console.error(run([...COMPOSE, "logs", "--no-color"]).out);
+      return false;
+    }
+    await Bun.sleep(500);
+  }
+  return true;
+}
+
 async function main(): Promise<number> {
   if (run(["docker", "info"]).code !== 0) {
     console.error(
@@ -333,43 +408,53 @@ async function main(): Promise<number> {
       console.error(`❌ compose up failed:\n${up.out}`);
       return 1;
     }
-    const published = (service: string) =>
-      Number(
-        run([...COMPOSE, "port", service, "8080"])
-          .out.trim()
-          .split(":")
-          .pop(),
+    if (!resolve_base_url()) return 1;
+    const mcp_port = Number(
+      run([...COMPOSE, "port", "mcp", "8080"])
+        .out.trim()
+        .split(":")
+        .pop(),
+    );
+    if (!mcp_port || mcp_port === 8090 || mcp_port === 8089) {
+      console.error(
+        `❌ refusing published port ${mcp_port}: expected a Docker-picked port other than 8090 and 8089`,
       );
-    const port = published("pocketbase");
-    const mcp_port = published("mcp");
-    for (const p of [port, mcp_port]) {
-      if (!p || p === 8090 || p === 8089) {
-        console.error(
-          `❌ refusing published port ${p}: expected a Docker-picked port other than 8090 and 8089`,
-        );
+      return 1;
+    }
+    MCP_URL = `http://127.0.0.1:${mcp_port}`;
+    if (!(await wait_healthy())) return 1;
+    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
+    const prm = MCP_URL + PRM_PATH;
+    while (
+      (await fetch(prm).then(
+        (r) => r.status,
+        () => 0,
+      )) !== 200
+    ) {
+      if (Date.now() > deadline) {
+        console.error(`❌ no 200 from ${prm} within ${HEALTH_TIMEOUT_MS / 1000}s; container log:`);
+        console.error(run([...COMPOSE, "logs", "--no-color"]).out);
+        return 1;
+      }
+      await Bun.sleep(500);
+    }
+    const SMOKE_MIGRATION = "1785199999_smoke_key_user.js";
+    for (const cmd of [
+      [
+        ...COMPOSE,
+        "cp",
+        path.join(ROOT, "e2e/fixtures/smoke_key_user.js"),
+        "pocketbase:/pb/pb_migrations/" + SMOKE_MIGRATION,
+      ],
+      [...COMPOSE, "restart", "pocketbase"],
+    ]) {
+      const r = run(cmd);
+      if (r.code !== 0) {
+        console.error(`❌ ${cmd.slice(COMPOSE.length).join(" ")} failed:\n${r.out}`);
         return 1;
       }
     }
-    BASE_URL = `http://127.0.0.1:${port}`;
-    MCP_URL = `http://127.0.0.1:${mcp_port}`;
-    const deadline = Date.now() + HEALTH_TIMEOUT_MS;
-    for (const url of [BASE_URL + "/api/health", MCP_URL + PRM_PATH]) {
-      while (
-        (await fetch(url).then(
-          (r) => r.status,
-          () => 0,
-        )) !== 200
-      ) {
-        if (Date.now() > deadline) {
-          console.error(
-            `❌ no 200 from ${url} within ${HEALTH_TIMEOUT_MS / 1000}s; container log:`,
-          );
-          console.error(run([...COMPOSE, "logs", "--no-color"]).out);
-          return 1;
-        }
-        await Bun.sleep(500);
-      }
-    }
+    if (!resolve_base_url() || !(await wait_healthy())) return 1;
     console.log(`healthy at ${BASE_URL} and ${MCP_URL}`);
     for (const probe of PROBES) await probe();
   } finally {
