@@ -384,6 +384,13 @@ try {
     [r?.key?.id, r?.key?.scope, r?.key?.expires, r?.key?.client_id],
     [k.id, "read", "", ""],
   );
+  check(
+    "me_key_no_secrets: key has no key_hash, refresh_hash, refresh_expires, refresh_prev_hash, key",
+    ["key_hash", "refresh_hash", "refresh_expires", "refresh_prev_hash", "key"].filter(
+      (f) => r?.key && f in r.key,
+    ),
+    [],
+  );
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString().replace("T", " ");
   [, k] = await api("POST", KEYS, alice, { name: "me expiring", scope: "read", expires: tomorrow });
   const stored_expires = (await api("GET", `${KEYS}/${k.id}`, su))[1].expires;

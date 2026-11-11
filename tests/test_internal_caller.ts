@@ -117,7 +117,12 @@ try {
     ],
     { cwd: REPO_ROOT, capture_output: true },
   );
-  const HOOKS = roomkit.hooks_dir(S);
+  // A private copy (never the battery's shared PB_HOOKS_DIR) that also carries the header probe.
+  const HOOKS = copy_tree(roomkit.hooks_dir(S), path.join(S, "pb_hooks_probe"));
+  fs.writeFileSync(
+    path.join(HOOKS, "zz_probe_headers.pb.js"),
+    'routerAdd("GET", "/api/zz-probe-headers", (e) => e.json(200, { headers: e.requestInfo().headers }));\n',
+  );
   process.env.MCP_INTERNAL_SECRET = SECRET;
   server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, HOOKS);
   let su = await superuser();
@@ -170,6 +175,16 @@ try {
     "oauth_rule_counts: 31× /oauth/nothing → 30 × 404, then 429",
     [oauth_run.slice(0, 30).every((s) => s === 404), oauth_run[30]],
     [true, 429],
+  );
+
+  const probe = await fetch(BASE_URL + "/api/zz-probe-headers", {
+    headers: { "X-TM-Internal": SECRET, "X-Real-IP": "203.0.113.14" },
+  });
+  const probed = ((await probe.json()) as any).headers ?? {};
+  check(
+    "internal_header_deleted: a later hook sees no x_tm_internal, other headers intact",
+    [probe.status, "x_tm_internal" in probed, probed.x_real_ip !== undefined],
+    [200, false, true],
   );
 
   console.log("\n── second boot: an unset secret exempts nothing ──");
