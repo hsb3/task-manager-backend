@@ -38,7 +38,7 @@ const CHALLENGE = `Bearer resource_metadata="${PRM_URL}", scope="read write"`;
 const PRM_DOC = {
   resource: `${MCP}/mcp`,
   authorization_servers: [BASE_URL],
-  scopes_supported: ["read", "write"],
+  scopes_supported: ["read", "write", "manage", "own"],
   bearer_methods_supported: ["header"],
   resource_name: "Task tracker",
 };
@@ -259,10 +259,15 @@ try {
   const PROJECT: string = r.items?.find((p: any) => p.name)?.id ?? "";
   check("Alice has a provisioned project", Boolean(PROJECT), true);
 
-  async function mint(scope: "read" | "write", name: string): Promise<{ key: string; id: string }> {
+  async function mint(
+    scope: "read" | "write" | "manage",
+    name: string,
+    limits: Record<string, string> = {},
+  ): Promise<{ key: string; id: string }> {
     const [ms, mr] = await api("POST", "/api/collections/api_keys/records", alice, {
       name,
       scope,
+      ...limits,
     });
     check(`fixture: key ${name} (${scope}) minted`, [ms, /^tmk_/.test(mr.key ?? "")], [200, true]);
     return { key: mr.key, id: mr.id };
@@ -273,6 +278,25 @@ try {
   const L = (await mint("read", "L")).key;
   const M = (await mint("read", "M")).key;
   const F = (await mint("read", "F")).key;
+  const MG = (await mint("manage", "MG")).key;
+  [, r] = await api("GET", "/api/tracker/me", alice);
+  const WA: string = r.workspaces?.[0]?.id ?? "";
+  const KWA = (await mint("write", "KWA", { reach: "workspace", workspace: WA })).key;
+  [s, r] = await api("POST", "/api/collections/workspaces/records", alice, { name: "Second" });
+  check("fixture: Alice creates a second workspace", s, 200);
+  const WB: string = r.id;
+  [, r] = await api(
+    "GET",
+    `/api/collections/projects/records?filter=${encodeURIComponent(`workspace="${WB}" && shadow=false`)}`,
+    alice,
+  );
+  [s, r] = await api("POST", "/api/collections/tasks/records", alice, {
+    title: "in the second workspace",
+    workspace: WB,
+    project: r.items?.[0]?.id ?? "",
+  });
+  check("fixture: Alice creates an item in the second workspace", s, 200);
+  const WB_ITEM: string = r.id;
 
   console.log("\n── the service starts ──");
   await roomkit.require_free_port(MCP_PORT);
@@ -397,6 +421,13 @@ try {
   check(
     "tools_list_write_key: every TOOLS name, in catalog order",
     (await w.listTools()).tools.map((t) => t.name),
+    TOOLS.map((t) => t.name),
+  );
+  const mg = await connect_http(MG).catch((err) => String(err));
+  if (typeof mg !== "string") clients.push(mg);
+  check(
+    "tools_list_manage_key: every TOOLS name, in catalog order",
+    typeof mg === "string" ? mg : (await mg.listTools()).tools.map((t) => t.name),
     TOOLS.map((t) => t.name),
   );
   const created: any = await w.callTool({
@@ -534,6 +565,16 @@ try {
     "tool_failure_structured: isError, status 404",
     [x.json?.result?.isError, x.json?.result?.structuredContent?.error?.status],
     [true, 404],
+  );
+  x = await call_2025(KWA, "tm_show", { id: WB_ITEM });
+  check(
+    "tool_call_out_of_reach: a key limited to Alice's first workspace → isError, 404 not_found",
+    [
+      x.json?.result?.isError,
+      x.json?.result?.structuredContent?.error?.status,
+      x.json?.result?.structuredContent?.error?.code,
+    ],
+    [true, 404, "not_found"],
   );
 
   console.log("\n── refusals before the SDK ──");

@@ -170,6 +170,12 @@ try {
   });
   check("read key minted", tup(s, /^tmk_/.test(r.key ?? "")), tup(200, true));
   const READ_KEY: string = r.key;
+  [s, r] = await api("POST", "/api/collections/api_keys/records", alice, {
+    name: "mcp manage",
+    scope: "manage",
+  });
+  check("manage key minted", tup(s, /^tmk_/.test(r.key ?? "")), tup(200, true));
+  const MANAGE_KEY: string = r.key;
   const W = { HOME: S, TM_URL: BASE_URL, TM_API_KEY: WRITE_KEY };
   const R = { HOME: S, TM_URL: BASE_URL, TM_API_KEY: READ_KEY };
 
@@ -195,6 +201,13 @@ try {
       read_names.length > 0,
     ),
     tup(read_names, true),
+  );
+  const ml = await connect({ HOME: S, TM_URL: BASE_URL, TM_API_KEY: MANAGE_KEY });
+  clients.push(ml);
+  check(
+    "list_manage_key: every TOOLS name, in catalog order",
+    (await ml.listTools()).tools.map((t) => t.name),
+    TOOLS.map((t) => t.name),
   );
   for (const name of ["tm_list", "tm_show", "tm_search"]) {
     check(`${name} is readOnlyHint`, tools[name]?.annotations?.readOnlyHint, true);

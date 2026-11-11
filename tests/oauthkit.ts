@@ -71,12 +71,14 @@ export async function post_page(
   });
 }
 
-export async function sign_in_and_approve(
+type Level = "read" | "write" | "manage" | "own";
+
+/** GET the page, sign in by password, and return the page that answers it with its flow token. */
+export async function sign_in_to_consent(
   base: string,
   params: Record<string, string>,
   who: { email: string; password: string },
-  access: "read" | "write" = "write",
-): Promise<{ code: string; location: string }> {
+): Promise<{ status: number; html: string; flow: string }> {
   const page = await fetch(`${base}/oauth/authorize?${encode(Object.entries(params))}`, {
     redirect: "manual",
   });
@@ -84,10 +86,40 @@ export async function sign_in_and_approve(
   if (page.status !== 200 || field(signin, "flow") === null)
     throw new Error(`authorize page: ${page.status} ${signin.slice(0, 200)}`);
   const pw = await post_page(base, signin, { action: "password", ...who });
-  const consent = await pw.text();
-  if (pw.status !== 200 || !consent.includes('value="approve"'))
-    throw new Error(`password stage: ${pw.status} ${consent.slice(0, 400)}`);
-  const ap = await post_page(base, consent, { action: "approve", access });
+  const html = await pw.text();
+  return { status: pw.status, html, flow: field(html, "flow") ?? "" };
+}
+
+/** POST /oauth/authorize with the eight parameters, `flow` and `fields`; redirects not followed. */
+export async function post_consent(
+  base: string,
+  params: Record<string, string>,
+  flow: string,
+  fields: Record<string, string>,
+): Promise<Response> {
+  const form: Record<string, string> = { flow };
+  for (const n of PARAMS) form[n] = params[n] ?? "";
+  return fetch(base + "/oauth/authorize", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: encode(Object.entries({ ...form, ...fields })),
+    redirect: "manual",
+  });
+}
+
+export async function sign_in_and_approve(
+  base: string,
+  params: Record<string, string>,
+  who: { email: string; password: string },
+  opts: Level | { access?: Level; workspace?: string } = "write",
+): Promise<{ code: string; location: string }> {
+  const o = typeof opts === "string" ? { access: opts } : opts;
+  const { status, html: consent } = await sign_in_to_consent(base, params, who);
+  if (status !== 200 || !consent.includes('value="approve"'))
+    throw new Error(`password stage: ${status} ${consent.slice(0, 400)}`);
+  const extra: Record<string, string> = { action: "approve", access: o.access ?? "write" };
+  if (o.workspace !== undefined) extra.workspace = o.workspace;
+  const ap = await post_page(base, consent, extra);
   const location = ap.headers.get("Location") ?? "";
   const code = location ? new URL(location).searchParams.get("code") : null;
   if (ap.status !== 302 || !code) throw new Error(`consent stage: ${ap.status} ${location}`);

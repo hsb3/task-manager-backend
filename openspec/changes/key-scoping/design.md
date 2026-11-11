@@ -1099,8 +1099,10 @@ phase's code change, quote the failing line in the pull request, then make it pa
     "own"]` (anything else stays 503 `unavailable`); the PRM document's `scopes_supported`
     becomes `["read", "write", "manage", "own"]`. Step 8 (`insufficient_scope` for a write tool
     under a `read` key) is unchanged.
-  - `clients/tm/src/mcp.ts`: `type Scope = "read" | "write" | "manage" | "own"`; `tools_for` is
-    unchanged (`read` keeps the read-only tools, every other scope keeps all).
+  - `clients/tm/src/mcp.ts`: `type Scope = "read" | "write" | "manage" | "own"`; `tools_for`
+    keeps the read-only tools for `read` and all for every other scope. (Build correction: the
+    design said `tools_for` was unchanged, but it kept all tools only for `write`, so a manage
+    key listed the read-only tools; it now tests `scope !== "read"`.)
   - `tests/oauthkit.ts` adds `sign_in_to_consent(base, params, who): Promise<{ status: number;
     html: string; flow: string }>` (GET the page, post `action=password`, return the consent
     page and its `flow` field) and `post_consent(base, params, flow, fields: Record<string,
@@ -1157,7 +1159,7 @@ phase's code change, quote the failing line in the pull request, then make it pa
     good); the key answers 401 `api_key_invalid` on `/me` (the `api_keys.workspace` cascade,
     Phase 2).
 - **Tests** (`tests/test_mcp_service.ts`, hosted-mcp-endpoint Phase 6's suite, which gains a
-  manage key `M` for Alice):
+  manage key `MG` for Alice; build correction: the suite already names a read key `M`):
   - `tools_list_manage_key`: `tools/list` under `M`: every `TOOLS` name in catalog order (RED
     first: 503 `unavailable`).
   - `prm_doc` and `prm_root_doc`: their expected document's `scopes_supported` becomes

@@ -103,7 +103,9 @@ async function check_key(env: Env, key: string): Promise<Checked> {
   if (r.status === 401) return { status: 401 };
   if (r.status !== 200) return { failed: String(r.status) };
   const scope = ((await r.json().catch(() => null)) as any)?.key?.scope;
-  return scope === "read" || scope === "write" ? { scope } : { failed: "200 without a key scope" };
+  return ["read", "write", "manage", "own"].includes(scope)
+    ? { scope }
+    : { failed: "200 without a key scope" };
 }
 
 export function make_app(env: Env): { fetch(req: Request, ip: string): Promise<Response> } {
@@ -113,7 +115,7 @@ export function make_app(env: Env): { fetch(req: Request, ip: string): Promise<R
   const prm = {
     resource: `${env.mcp_public_url}/mcp`,
     authorization_servers: [env.pb_public_url],
-    scopes_supported: ["read", "write"],
+    scopes_supported: ["read", "write", "manage", "own"],
     bearer_methods_supported: ["header"],
     resource_name: "Task tracker",
   };

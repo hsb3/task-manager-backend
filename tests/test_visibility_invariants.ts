@@ -400,7 +400,8 @@ function default_value(
   text: string,
 ): any {
   const t = field.type;
-  if (t === "text" || t === "editor") return text;
+  if (t === "text") return text.padEnd(field.min || 0, "x").slice(0, field.max || undefined);
+  if (t === "editor") return text;
   if (t === "number") return 1;
   if (t === "bool") return false;
   if (t === "date") return now_ts();

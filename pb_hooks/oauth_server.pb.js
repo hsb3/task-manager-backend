@@ -23,7 +23,7 @@ require(`${__hooks}/lib/routes.js`).add(
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
       revocation_endpoint_auth_methods_supported: ["none"],
-      scopes_supported: ["read", "write"],
+      scopes_supported: ["read", "write", "manage", "own"],
       client_id_metadata_document_supported: true,
       authorization_response_iss_parameter_supported: true,
     });
@@ -114,6 +114,15 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/token", (e) => {
             "code_verifier does not match the code challenge.",
           ],
         };
+      } else if (
+        code.getString("workspace") !== "" &&
+        !lib
+          .consent_workspaces(tx, code.getString("user"))
+          .some((w) => w.id === code.getString("workspace"))
+      ) {
+        out = {
+          error: ["invalid_grant", "The code is unknown, used or expired."],
+        };
       } else {
         const access = fresh("tmk_");
         const refresh = fresh("tmr_");
@@ -121,6 +130,8 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/token", (e) => {
         key.set("user", code.getString("user"));
         key.set("name", code.getString("client_name"));
         key.set("scope", code.getString("scope"));
+        key.set("reach", code.getString("reach") || "all");
+        key.set("workspace", code.getString("workspace"));
         key.set("expires", at(DAY));
         key.set("client_id", p.client_id);
         key.set("key_hash", $security.sha256(access));
@@ -487,9 +498,22 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
     const u = $app.findRecordById("users", flow.uid);
     const refusal = lib.sign_in_refusal($app, u);
     if (refusal) return show("signin", refusal);
-    if (p.access !== "read" && p.access !== "write")
-      return show("consent", "", flow.uid);
-    const code = lib.issue_code($app, u, client, p, p.access);
+    const workspace = p.workspace || "";
+    if (
+      lib.offered_levels(lib.parse_scope(p.scope)).indexOf(p.access) < 0 ||
+      (workspace !== "" &&
+        !lib.consent_workspaces($app, u.id).some((w) => w.id === workspace))
+    )
+      return show("consent", "Choose one of the options shown.", flow.uid);
+    const code = lib.issue_code(
+      $app,
+      u,
+      client,
+      p,
+      p.access,
+      workspace ? "workspace" : "all",
+      workspace,
+    );
     return back(["code", code]);
   } catch (err) {
     $app.logger().error("oauth authorize failed", "error", String(err));

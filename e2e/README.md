@@ -37,6 +37,8 @@ without a key:
   `POST /api/tracker/workspaces/{id}/transfer-ownership` answer 403 `api_key_scope`.
 - `probe_key_reach`: a write key limited to the provisioned workspace lists no task of a second
   workspace "Smoke B", answers 404 for one by id, and 403 `api_key_reach` for a workspace create.
+- `probe_oauth_scopes`: the authorization server's metadata offers the levels `read`, `write`,
+  `manage` and `own`.
 
 A smoke run copies `e2e/fixtures/smoke_key_user.js` into the image and restarts it, so the key
 probes have one approved, verified user; keyed paths beyond those probes stay battery-only.

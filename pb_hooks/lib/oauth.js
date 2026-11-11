@@ -77,21 +77,42 @@ function parse_form(raw) {
   return { params: params, repeated: repeated };
 }
 
-// "read", "write", or null for a scope the server does not offer.
+// The highest level named, "read" for offline_access alone, "write" when blank, or null for a scope the server does not offer.
 function parse_scope(raw) {
+  const LADDER = require(`${__hooks}/lib/api_keys.js`).LEVELS;
   if (!raw || !raw.trim()) return "write";
   const values = raw.split(" ").filter((v) => v !== "");
-  let write = false;
+  let top = 0;
   for (let i = 0; i < values.length; i++) {
-    if (values[i] === "write") write = true;
-    else if (values[i] !== "read" && values[i] !== "offline_access")
-      return null;
+    const n = LADDER.indexOf(values[i]);
+    if (n > top) top = n;
+    else if (n < 0 && values[i] !== "offline_access") return null;
   }
-  return write ? "write" : "read";
+  return LADDER[top];
 }
 
 function scope_text(scope) {
-  return scope === "write" ? "read write" : "read";
+  const LADDER = require(`${__hooks}/lib/api_keys.js`).LEVELS;
+  return LADDER.slice(0, LADDER.indexOf(scope) + 1).join(" ");
+}
+
+// Read and write always; manage and own only when the client asked for them.
+function offered_levels(requested) {
+  const LADDER = require(`${__hooks}/lib/api_keys.js`).LEVELS;
+  return LADDER.slice(0, Math.max(2, LADDER.indexOf(requested) + 1));
+}
+
+// KEEP IN SYNC: the workspace check of the api_keys create hook in pb_hooks/api_keys.pb.js, an owner or a `status = 'active'` member.
+function consent_workspaces(app, uid) {
+  const rows = arrayOf(new DynamicModel({ id: "", name: "" }));
+  app
+    .db()
+    .newQuery(
+      "SELECT w.id AS id, w.name AS name FROM workspaces w WHERE w.trashed = '' AND (w.owner = {:u} OR EXISTS (SELECT 1 FROM workspace_members m WHERE m.workspace = w.id AND [[m.user]] = {:u} AND m.status = 'active')) ORDER BY w.created, w.id",
+    )
+    .bind({ u: uid })
+    .all(rows);
+  return rows.map((r) => ({ id: r.id, name: r.name }));
 }
 
 // The JSVM has no btoa, so the base64url step is done by hand.
@@ -313,6 +334,14 @@ function render(e, status, data) {
   return e.html(status, html);
 }
 
+const LEVEL_LABELS = {
+  read: "Read: see your workspaces, projects and items.",
+  write: "Read and write: also create, edit and comment on items.",
+  manage:
+    "Manage: also change workspace settings, invitations and members, and empty the trash.",
+  own: "Own: also change roles, hand over or delete workspaces, and accept invitations.",
+};
+
 // One stage of the page for a validated request; a fresh flow token binds it.
 function render_stage(e, app, client, p, stage, message, uid, otp) {
   const params = {};
@@ -329,7 +358,14 @@ function render_stage(e, app, client, p, stage, message, uid, otp) {
     Registered: client.registered,
     RedirectHost: host(p.redirect_uri),
     Loopback: is_loopback(p.redirect_uri),
-    Access: parse_scope(p.scope) || "write",
+    Levels: offered_levels(parse_scope(p.scope)).map((v) => ({
+      Value: v,
+      Label: LEVEL_LABELS[v],
+      Checked: v === parse_scope(p.scope),
+    })),
+    Workspaces: uid
+      ? consent_workspaces(app, uid).map((w) => ({ Id: w.id, Name: w.name }))
+      : [],
     Flow: sign_flow(app, stage, flow_q(p), uid, otp),
     Params: params,
   });
@@ -353,7 +389,7 @@ function sign_in_refusal(app, u) {
 }
 
 // Purges expired codes, stores a new one's fingerprint, and returns the code.
-function issue_code(app, user, client, p, scope) {
+function issue_code(app, user, client, p, scope, reach, workspace) {
   app
     .db()
     .newQuery("DELETE FROM oauth_codes WHERE expires < {:now}")
@@ -368,6 +404,8 @@ function issue_code(app, user, client, p, scope) {
   rec.set("redirect_uri", p.redirect_uri);
   rec.set("code_challenge", p.code_challenge);
   rec.set("scope", scope);
+  rec.set("reach", reach);
+  rec.set("workspace", workspace);
   rec.set(
     "expires",
     new Date(Date.now() + 600000).toISOString().replace("T", " "),
@@ -381,8 +419,11 @@ module.exports = {
   issuer,
   mcp_resource,
   parse_form,
+  LADDER: require(`${__hooks}/lib/api_keys.js`).LEVELS,
   parse_scope,
   scope_text,
+  offered_levels,
+  consent_workspaces,
   pkce_s256,
   redirect_matches,
   is_loopback,
