@@ -224,9 +224,10 @@ both by the key's level and by another rule of the server may answer either refu
 Unchanged: a key is presented as `Authorization: Bearer tmk_...` (or bare) and acts as its user,
 now narrowed by its reach and level. A user session, OAuth sign-in and superusers are unaffected.
 The reach is carried to the collection rules in request headers the server sets itself
-(`X-Tm-Key-Workspace`, `X-Tm-Key-Projects`); the server removes any such header a client sends, in any spelling that differs
-only by `-` or `_` or letter case,
-on every request, so a client can never set them.
+(`X-Tm-Key-Workspace`, `X-Tm-Key-Projects`); PocketBase reads a header name as its letter and digit
+runs joined by `_` and lower-cased (so `X.Tm.Key.Workspace` and `x~tm~key~workspace` read the same),
+and the server removes every header a client sends whose name reads as either one, on every request,
+so a client can never set them.
 
 ## Compatibility
 
