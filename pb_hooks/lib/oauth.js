@@ -178,6 +178,135 @@ function token_error(e, code, description) {
   return e.json(400, { error: code, error_description: description });
 }
 
+// The parameters every page form echoes as hidden inputs.
+const PARAMS = [
+  "client_id",
+  "redirect_uri",
+  "response_type",
+  "code_challenge",
+  "code_challenge_method",
+  "scope",
+  "state",
+  "resource",
+];
+
+// The request parameters a flow token binds (D14).
+function flow_q(p) {
+  const v = (k) => p[k] || "";
+  return $security.sha256(
+    JSON.stringify([
+      v("client_id"),
+      v("redirect_uri"),
+      v("code_challenge"),
+      v("scope"),
+      v("state"),
+      v("resource"),
+    ]),
+  );
+}
+
+// {page: message} before step 4 passes, {redirect: error} after, else {ok: client}.
+function validate_request(app, p) {
+  if (!p.client_id || !p.redirect_uri)
+    return { page: "The sign-in request is incomplete." };
+  const r = resolve_client(app, p.client_id);
+  if (!r.ok) return { page: r.message };
+  if (!r.client.redirect_uris.some((u) => redirect_matches(u, p.redirect_uri)))
+    return {
+      page: "The app asked to return to an address it has not registered.",
+    };
+  if (p.response_type !== "code")
+    return {
+      page: "The app sent a sign-in request Task Tracker does not support.",
+    };
+  if (
+    !/^[A-Za-z0-9_-]{43}$/.test(p.code_challenge || "") ||
+    p.code_challenge_method !== "S256"
+  )
+    return { redirect: "invalid_request" };
+  if (parse_scope(p.scope) === null) return { redirect: "invalid_scope" };
+  if (!resource_ok(p.resource)) return { redirect: "invalid_target" };
+  return { ok: r.client };
+}
+
+function render(e, status, data) {
+  const html = $template
+    .loadFiles(`${__hooks}/views/oauth_authorize.html`)
+    .render(data);
+  const h = e.response.header();
+  h.set(
+    "Content-Security-Policy",
+    "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+  );
+  h.set("X-Frame-Options", "DENY");
+  h.set("Cache-Control", "no-store");
+  h.set("Referrer-Policy", "no-referrer");
+  return e.html(status, html);
+}
+
+// One stage of the page for a validated request; a fresh flow token binds it.
+function render_stage(e, app, client, p, stage, message, uid, otp) {
+  const params = {};
+  PARAMS.forEach((k) => (params[k] = p[k] || ""));
+  const host = (uri) => {
+    const m = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^@/?#]*@)?([^/?#:]*)/.exec(uri);
+    return m ? m[1].toLowerCase() : uri;
+  };
+  return render(e, 200, {
+    Stage: stage,
+    Message: message || "",
+    ClientName: client.client_name,
+    ClientHost: client.registered ? "" : host(client.client_id),
+    Registered: client.registered,
+    RedirectHost: host(p.redirect_uri),
+    Loopback: is_loopback(p.redirect_uri),
+    Access: parse_scope(p.scope) || "write",
+    Flow: sign_flow(app, stage, flow_q(p), uid, otp),
+    Params: params,
+  });
+}
+
+// "" when the users authRule lets the account sign in, else the refusal shown on the page.
+function sign_in_refusal(app, u) {
+  if (
+    app.canAccessRecord(
+      u,
+      new RequestInfo({ auth: u }),
+      u.collection().authRule,
+    )
+  )
+    return "";
+  if (!u.verified())
+    return "This account cannot sign in yet: confirm your email address first.";
+  if (!u.getBool("approved"))
+    return "This account cannot sign in yet: it is waiting for approval.";
+  return "This account cannot sign in yet.";
+}
+
+// Purges expired codes, stores a new one's fingerprint, and returns the code.
+function issue_code(app, user, client, p, scope) {
+  app
+    .db()
+    .newQuery("DELETE FROM oauth_codes WHERE expires < {:now}")
+    .bind({ now: new DateTime().string() })
+    .execute();
+  const code = $security.randomString(40);
+  const rec = new Record(app.findCollectionByNameOrId("oauth_codes"));
+  rec.set("code_hash", $security.sha256(code));
+  rec.set("user", user.id);
+  rec.set("client_id", client.client_id);
+  rec.set("client_name", client.client_name);
+  rec.set("redirect_uri", p.redirect_uri);
+  rec.set("code_challenge", p.code_challenge);
+  rec.set("scope", scope);
+  rec.set(
+    "expires",
+    new Date(Date.now() + 600000).toISOString().replace("T", " "),
+  );
+  app.save(rec);
+  return code;
+}
+
 module.exports = {
   CLIENTS,
   issuer,
@@ -194,4 +323,10 @@ module.exports = {
   with_query,
   resolve_client,
   token_error,
+  flow_q,
+  validate_request,
+  render,
+  render_stage,
+  sign_in_refusal,
+  issue_code,
 };

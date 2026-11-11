@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * tm mcp (clients/tm): a real MCP client over stdio lists the six tools with their hints, create/show
+ * tm mcp (clients/tm): a real MCP client over stdio lists the catalog filtered by the key's scope, create/show
  * round-trip, search rows carry kind, tm_list pages, fields take typed values, a refusal names
- * inputs not flags, a read key's write is an isError result naming api_key_scope
- * (decision:api-keys), and
+ * inputs not flags, a failure carries structuredContent.error {status, code, message, fields}
+ * (decision:api-keys), an unknown tool is JSON-RPC -32602, and
  * an agent holding only an API key lists, creates, edits, comments and searches.
  *
  * Fully self-contained clean-room server; runs `tm mcp` as a subprocess. Port 8194 + PB_PORT_OFFSET.
@@ -17,11 +17,15 @@ import path from "node:path";
 import { py_repr, run_checked, tup, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 import { copy_tree } from "../scripts/_scratch_copy.ts";
+import { error_result, TOOLS } from "../clients/tm/src/mcp.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
 const REAL_MIGRATIONS_DIR = path.join(REPO_ROOT, "pb_migrations");
 const TM = path.join(REPO_ROOT, "clients", "tm", "tm.ts");
+const TM_VERSION: string = JSON.parse(
+  fs.readFileSync(path.join(REPO_ROOT, "clients", "tm", "package.json"), "utf8"),
+).version;
 
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
 const PORT = 8194 + PORT_OFFSET;
@@ -94,6 +98,14 @@ async function call(client: Client, name: string, args: Record<string, unknown>)
   return { isError: r.isError === true, text, json };
 }
 
+function json_of(text: unknown): any {
+  try {
+    return JSON.parse(String(text));
+  } catch {
+    return null;
+  }
+}
+
 let server: roomkit.Room | null = null;
 const clients: Client[] = [];
 try {
@@ -162,20 +174,28 @@ try {
   const R = { HOME: S, TM_URL: BASE_URL, TM_API_KEY: READ_KEY };
 
   console.log(
-    "\n── tools/list: six tools, read tools readOnlyHint, write tools not destructive ──",
+    "\n── tools/list: the catalog by scope, read tools readOnlyHint, write tools not destructive ──",
   );
   const w = await connect(W);
   clients.push(w);
   const listed = await w.listTools();
   const tools = Object.fromEntries(listed.tools.map((t) => [t.name, t]));
-  check("the six verbs, each as tm_<verb>", Object.keys(tools).sort(), [
-    "tm_comment",
-    "tm_create",
-    "tm_edit",
-    "tm_list",
-    "tm_search",
-    "tm_show",
-  ]);
+  check(
+    "list_write_key: every TOOLS name, in catalog order",
+    listed.tools.map((t) => t.name),
+    TOOLS.map((t) => t.name),
+  );
+  const read_names = TOOLS.filter((t) => t.annotations.readOnlyHint === true).map((t) => t.name);
+  const rl = await connect(R);
+  clients.push(rl);
+  check(
+    "list_read_key: only the readOnlyHint tools, in catalog order, not empty",
+    tup(
+      (await rl.listTools()).tools.map((t) => t.name),
+      read_names.length > 0,
+    ),
+    tup(read_names, true),
+  );
   for (const name of ["tm_list", "tm_show", "tm_search"]) {
     check(`${name} is readOnlyHint`, tools[name]?.annotations?.readOnlyHint, true);
   }
@@ -362,6 +382,22 @@ try {
     tup(o.isError, o.text.includes("api_key_scope"), o.text.includes("read-only")),
     tup(true, true, true),
   );
+  const scope_refusal = {
+    status: 403,
+    code: "api_key_scope",
+    message: "This API key is read-only.",
+    fields: { api_key: { code: "api_key_scope", message: "This API key is read-only." } },
+  };
+  const edit_rd: any = await rd.callTool({ name: "tm_edit", arguments: { id: ID, title: "x" } });
+  check(
+    "edit_read_key_structured: isError, structuredContent.error, text parses to the same object",
+    tup(
+      edit_rd.isError,
+      edit_rd.structuredContent?.error ?? null,
+      json_of(edit_rd.content?.[0]?.text)?.error ?? null,
+    ),
+    tup(true, scope_refusal, scope_refusal),
+  );
   o = await call(rd, "tm_show", { id: ID });
   check("read key on tm_show → reads are allowed", tup(o.isError, o.json?.id), tup(false, ID));
   o = await call(w, "tm_show", { id: "nope00000000000" });
@@ -395,6 +431,66 @@ try {
     tup(true, true),
   );
 
+  console.log("\n── a failure's structuredContent.error: status and code ──");
+  const err = (c: any) => c.structuredContent?.error ?? null;
+  const sc = async (client: Client, name: string, args: Record<string, unknown>) =>
+    err(await client.callTool({ name, arguments: args }));
+  let e = await sc(w, "tm_show", { id: "nope0000000000x" });
+  check(
+    "show_missing_404: status 404, code not_found",
+    tup(e?.status, e?.code),
+    tup(404, "not_found"),
+  );
+  e = await sc(w, "tm_show", {});
+  check(
+    "bad_arguments: status null, code invalid_arguments",
+    tup(e?.status, e?.code),
+    tup(null, "invalid_arguments"),
+  );
+  e = await sc(w, "tm_edit", { id: ID });
+  check(
+    "usage_refusal: code invalid_arguments, the verb's message",
+    tup(e?.code, e?.message),
+    tup("invalid_arguments", "edit needs a title or a field to set"),
+  );
+  const code_of = (...a: Parameters<typeof error_result>) =>
+    (error_result(...a).structuredContent as any).error.code;
+  const cases: [Parameters<typeof error_result>, string][] = [
+    [[null, "m"], "invalid_arguments"],
+    [[0, "m"], "unreachable"],
+    [[400, "m", { title: { code: "validation_required", message: "x" } }], "validation_required"],
+    [
+      [400, "m", { a: { code: "x", message: "" }, b: { code: "y", message: "" } }],
+      "validation_failed",
+    ],
+    [[200, "m"], "bad_response"],
+    [[400, "m"], "invalid_request"],
+    [[401, "m"], "unauthorized"],
+    [[403, "m"], "forbidden"],
+    [[404, "m"], "not_found"],
+    [[409, "m"], "conflict"],
+    [[429, "m"], "rate_limited"],
+    [[418, "m"], "request_failed"],
+    [[502, "m"], "server_error"],
+  ];
+  for (const [args, want] of cases) check(`code_mapping: ${py_repr(args)}`, code_of(...args), want);
+  check(
+    "code_mapping: fields {} when data is omitted",
+    (error_result(404, "m").structuredContent as any).error.fields,
+    {},
+  );
+  let unknown_code: unknown = null;
+  try {
+    await w.callTool({ name: "nope", arguments: {} });
+  } catch (x: any) {
+    unknown_code = x?.code ?? String(x);
+  }
+  check("unknown_tool: JSON-RPC error -32602", unknown_code, -32602);
+  const down = await connect({ HOME: S, TM_URL: "http://127.0.0.1:1", TM_API_KEY: WRITE_KEY });
+  clients.push(down);
+  e = await sc(down, "tm_list", {});
+  check("unreachable: status 0, code unreachable", tup(e?.status, e?.code), tup(0, "unreachable"));
+
   console.log("\n── wrong-typed input is refused before anything is sent ──");
   o = await call(w, "tm_list", { limit: "abc" });
   check(
@@ -410,6 +506,65 @@ try {
   );
   o = await call(w, "tm_show", { id: ID });
   check("the server still answers afterwards", tup(o.isError, o.json?.id), tup(false, ID));
+
+  console.log(
+    "\n── stdio_serves_until_eof: replies until the host closes the pipe, then exits 0 ──",
+  );
+  const raw = Bun.spawn([process.execPath, TM, "mcp"], {
+    cwd: S,
+    env: { PATH: process.env.PATH ?? "", ...W },
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "ignore",
+  });
+  const replies: any[] = [];
+  const reading = (async () => {
+    let buf = "";
+    for await (const chunk of raw.stdout as any) {
+      buf += new TextDecoder().decode(chunk);
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (line) replies.push(json_of(line));
+      }
+    }
+  })();
+  const send = (m: unknown) => raw.stdin.write(JSON.stringify(m) + "\n");
+  send({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: {
+      protocolVersion: "2025-11-25",
+      capabilities: {},
+      clientInfo: { name: "test_tm_mcp", version: "0" },
+    },
+  });
+  raw.stdin.flush();
+  await Bun.sleep(1_000);
+  send({ jsonrpc: "2.0", method: "notifications/initialized" });
+  send({ jsonrpc: "2.0", id: 2, method: "tools/list" });
+  raw.stdin.flush();
+  for (let i = 0; i < 50 && replies.length < 2; i++) await Bun.sleep(100);
+  check(
+    "stdio_serves_until_eof: initialize and tools/list both answered",
+    tup(
+      replies.find((m) => m?.id === 1)?.result?.protocolVersion !== undefined,
+      Array.isArray(replies.find((m) => m?.id === 2)?.result?.tools),
+    ),
+    tup(true, true),
+  );
+  check(
+    "server_info: serverInfo is tm at the package version",
+    replies.find((m) => m?.id === 1)?.result?.serverInfo ?? null,
+    { name: "tm", version: TM_VERSION },
+  );
+  raw.stdin.end();
+  const raw_exit = await Promise.race([raw.exited, Bun.sleep(5_000).then(() => "still running")]);
+  check("stdio_serves_until_eof: exits 0 within 5s of end of input", raw_exit, 0);
+  if (raw_exit !== 0) raw.kill();
+  await reading;
 
   console.log("\n── the server exits when the host closes its input ──");
   const lone = Bun.spawn([process.execPath, TM, "mcp"], {
@@ -451,7 +606,7 @@ try {
   });
   clients.push(agent);
   const names = (await agent.listTools()).tools.map((t) => t.name).sort();
-  check("agent lists the tools", names.length, 6);
+  check("agent lists the tools", names.length, TOOLS.length);
   o = await call(agent, "tm_create", { title: "stage check item", project: PROJECT });
   const SID: string = o.json?.id ?? "";
   check("agent creates", tup(o.isError, Boolean(SID)), tup(false, true));

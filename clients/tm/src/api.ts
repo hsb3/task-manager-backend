@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { Error as ApiErrorBody, Paths } from "./api.generated.ts";
 
-export type Config = { url: string; key: string };
+export type Config = { url: string; key: string; headers?: Record<string, string> };
 
 export function config_path(): string {
   const xdg = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
@@ -96,7 +96,7 @@ export async function request<T = any>(
   try {
     r = await fetch(url, {
       method,
-      headers: { Authorization: cfg.key, "Content-Type": "application/json" },
+      headers: { ...cfg.headers, Authorization: cfg.key, "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {

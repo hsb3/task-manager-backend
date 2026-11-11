@@ -687,6 +687,8 @@ run_suite "test_argparse" bun tests/test_argparse.ts
 run_suite "test_ts_source" bun tests/test_ts_source.ts
 run_suite "test_internal_caller" bun tests/test_internal_caller.ts
 run_suite "test_oauth_token" bun tests/test_oauth_token.ts
+run_suite "test_oauth_authorize" bun tests/test_oauth_authorize.ts
+run_suite "test_mcp_service" bun tests/test_mcp_service.ts
 # ── guard: the repo's real pb_migrations/ and scripts/ must be untouched by the battery ──
 echo ""; echo "──────── repo cleanliness guard ────────"
 dirty_mig="$(tree_state pb_migrations/)"

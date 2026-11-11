@@ -225,6 +225,12 @@ try {
     }),
   );
 
+  check(
+    "as_metadata: Cache-Control is public, max-age=300",
+    meta.headers.get("Cache-Control"),
+    "public, max-age=300",
+  );
+
   console.log("\n── the code exchange mints a key ──");
   const code1 = await code_row();
   const ex = await exchange(code1);
@@ -284,6 +290,11 @@ try {
     tup(400, "invalid_grant"),
   );
   check(
+    "pkce_plain: verifier equal to the stored challenge → 400 invalid_grant",
+    err(await exchange(await code_row(), { code_verifier: CHALLENGE })),
+    tup(400, "invalid_grant"),
+  );
+  check(
     "verifier_malformed: verifier short → 400 invalid_request",
     err(await exchange(await code_row(), { code_verifier: "short" })),
     tup(400, "invalid_request"),
@@ -328,6 +339,20 @@ try {
     "resource_ok: resource=HTTP://MCP.TEST/mcp → 200",
     (await exchange(await code_row(), { resource: "HTTP://MCP.TEST/mcp" })).status,
     200,
+  );
+
+  const racing = await code_row({ client_id: "cursor", client_name: "Race" });
+  const keys_before = (await api("GET", `${KEYS}?perPage=500`, su))[1].totalItems;
+  const raced = await Promise.all(Array.from({ length: 10 }, () => exchange(racing)));
+  const keys_after = (await api("GET", `${KEYS}?perPage=500`, su))[1].totalItems;
+  check(
+    "code_race: 10 parallel exchanges of one code → one 200, nine 400 invalid_grant, one new key",
+    tup(
+      raced.filter((x) => x.status === 200).length,
+      raced.filter((x) => x.body?.error === "invalid_grant").length,
+      keys_after - keys_before,
+    ),
+    tup(1, 9, 1),
   );
 
   console.log("\n── refresh ──");
@@ -376,6 +401,16 @@ try {
     "refresh_other_client: client_id=other → 400 invalid_client",
     err(await refresh(g.refresh, { client_id: "other" })),
     tup(400, "invalid_client"),
+  );
+  g = await grant();
+  const rec_before = JSON.stringify((await api("GET", `${KEYS}/${g.record_id}`, su))[1]);
+  check(
+    "refresh_wrong_client: a known other client uses the token → 400 invalid_client, record unchanged",
+    tup(
+      err(await refresh(g.refresh, { client_id: "https://example.com/c" })),
+      JSON.stringify((await api("GET", `${KEYS}/${g.record_id}`, su))[1]) === rec_before,
+    ),
+    tup(tup(400, "invalid_client"), true),
   );
   g = await grant();
   const [s_rev] = await api("PATCH", `${KEYS}/${g.record_id}`, alice, { revoked: true });

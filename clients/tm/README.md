@@ -61,8 +61,13 @@ Claude Desktop's `claude_desktop_config.json` under `mcpServers`. Write `bun` as
 }
 ```
 
-A read key lets the agent list, show and search; a write key also lets it create, edit and
-comment. A refused action comes back to the agent as the server's own message.
+A read key lists only the read tools (those marked read-only: list, show and search); a write key
+lists every tool, so the agent can also create, edit and comment. A failed call comes back to the
+agent as a tool result whose text is the JSON object `{"error": {"status", "code", "message",
+"fields"}}`, the same object also given as `structuredContent`: `status` is the server's HTTP
+status (`0` when it did not answer, `null` for arguments refused before any call), `code` names
+the failure (for example `api_key_scope` or `not_found`), and `fields` holds the server's
+per-field details.
 
 ## When something goes wrong
 

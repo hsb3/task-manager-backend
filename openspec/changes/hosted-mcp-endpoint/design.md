@@ -331,7 +331,9 @@ annotations: { readOnlyHint: boolean; destructiveHint?: boolean; idempotentHint?
 run: (cfg: Config, a: any) => Promise<unknown> }` (so `annotations` is required) and `type
 ToolResult = { content: { type: "text"; text: string }[]; isError: boolean;
 structuredContent?: Record<string, unknown> }`. The only casts are `as any` on the return value
-of each of the two `setRequestHandler` callbacks in `make_server`.
+of each of the two `setRequestHandler` callbacks in `make_server`, and `as any` on the
+`inputSchema` passed to `AjvJsonSchemaValidator.getValidator` (build correction: `tsc` rejects
+the local `properties?: Record<string, unknown>` as its `JsonSchemaType` parameter, TS2345).
 
 `error_result`'s `code`: `status === null` `invalid_arguments`; `0` `unreachable`; exactly one
 entry under `data` whose `code` is a string, that code; more than one entry `validation_failed`;
