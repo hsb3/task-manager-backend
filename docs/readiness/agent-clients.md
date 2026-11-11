@@ -33,9 +33,12 @@ write, expirable and revocable, and a revoked or expired one is refused on its n
 - Gap: none.
 
 **AC-3** A key can be limited to a workspace or project.
-- Verdict: missing.
-- Evidence: `schema/api_keys.json` has no workspace or project field.
-- Gap: no key scope narrower than every workspace its user reaches.
+- Verdict: met.
+- Evidence: `tests/test_key_reach.ts` ("kWA lists tasks → only WA's, totalItems = WA's count"),
+  `tests/test_key_reach_routes.ts` ("kWA search for a word in WA and WB titles → WA hits only"),
+  `tests/test_key_reach_live.ts` ("kWA subscribed to tasks/* receives a WA create, not a WB
+  create"); decision:api-key-reach-and-levels.
+- Gap: none.
 
 **AC-4** A write key can be denied destructive and ownership routes while keeping its other
 writes.

@@ -923,7 +923,11 @@ phase's code change, quote the failing line in the pull request, then make it pa
       inside the handler. When `reach`, refuse every subscription whose string carries
       `?options=` with a `query.expand` (decode the value after `options=` with
       `decodeURIComponent` and `JSON.parse`; a value that does not parse is refused too) with
-      403 `api_key_reach` and `lib.REACH_MESSAGE`: PocketBase checks a subscription's expansions
+      403 `api_key_reach` and `lib.REACH_MESSAGE` (build correction: that narrow check let
+      `?a=1&options=`, `?%6Fptions=` and a duplicate `query` key through, so, as the contract
+      says, any subscription whose text, percent-decoded with `\u` escapes resolved until stable,
+      contains `expand` in any case is refused; `mentionsExpand` in `pb_hooks/lib/api_keys.js`
+      shares that decoding with `namesApiKeys`): PocketBase checks a subscription's expansions
       with the subscription's own headers, which carry no reach. Then if (reach) e.client.set("apiKeyReach", JSON.stringify(reach)); else
       e.client.unset("apiKeyReach");`.
     - New `onRealtimeMessageSend((e) => { ... })`, whose body starts with `const lib =

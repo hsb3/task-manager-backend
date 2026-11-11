@@ -212,6 +212,12 @@ require(`${__hooks}/lib/routes.js`).use(
           api_key: new ValidationError("api_key_reach", lib.REACH_MESSAGE),
         });
       if (need !== null && !lib.levelAtLeast(have, need)) refuseLevel(need);
+      if (route === "/api/files/{collection}/{recordId}/{filename}") {
+        // A key downloads as itself, so the record's viewRule sees its reach; a user file token would not carry it.
+        const q = e.request.url.query();
+        q.set("token", owner.newFileToken());
+        e.request.url.rawQuery = q.encode();
+      }
 
       // A purge or leaving needs a higher level; decided only when the key may delete the record, so one out of reach still answers 404.
       if (
@@ -314,5 +320,54 @@ onRealtimeSubscribeRequest((e) => {
       });
     }
   }
+  const key = $app.findFirstRecordByData(
+    "api_keys",
+    "key_hash",
+    $security.sha256(header),
+  );
+  const reach = lib.keyReach(lib.keyInfo(key));
+  if (reach) {
+    // PB checks expansions with the subscription's own headers (no reach); any spelling of expand refuses, a filter value naming it too.
+    for (let i = 0; i < e.subscriptions.length; i++) {
+      if (lib.mentionsExpand(e.subscriptions[i]))
+        throw new ApiError(403, lib.REACH_MESSAGE, {
+          api_key: new ValidationError("api_key_reach", lib.REACH_MESSAGE),
+        });
+    }
+    e.client.set("apiKeyReach", JSON.stringify(reach));
+  } else e.client.unset("apiKeyReach");
   return e.next();
+});
+
+// A limited key's stream carries only records in its reach; a subscription's own headers cannot widen it.
+onRealtimeMessageSend((e) => {
+  const lib = require(`${__hooks}/lib/api_keys.js`);
+  const raw = e.client.get("apiKeyReach");
+  if (!raw) return e.next();
+  const reach = JSON.parse(raw);
+  const name = String(e.message.name);
+  if (name === "PB_CONNECT") return e.next();
+  let data;
+  try {
+    data = JSON.parse(
+      typeof e.message.data === "string"
+        ? e.message.data
+        : toString(e.message.data),
+    );
+  } catch (_) {
+    return;
+  }
+  let ok;
+  if (name.startsWith("rt:project_items:")) {
+    ok = lib.inReach($app, data.collection, data.rawRecord || {}, reach);
+  } else {
+    let coll = null;
+    try {
+      coll = $app.findCachedCollectionByNameOrId(
+        name.split("?")[0].split("/")[0],
+      );
+    } catch (_) {}
+    ok = !!coll && lib.inReach($app, coll.name, data.record || {}, reach);
+  }
+  if (ok) return e.next();
 });

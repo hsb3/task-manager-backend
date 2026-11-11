@@ -194,6 +194,46 @@ async function probe_key_levels(): Promise<void> {
   );
 }
 
+async function probe_key_reach(): Promise<void> {
+  const session = await key_session();
+  const call = async (method: string, url: string, auth: string, body?: unknown) => {
+    const r = await fetch(BASE_URL + url, {
+      method,
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: r.status, json: (await r.json().catch(() => null)) as any };
+  };
+  const me = await call("GET", "/api/tracker/me", session);
+  const ws: string = me.json?.workspaces?.[0]?.id ?? "";
+  const wsB = await call("POST", "/api/collections/workspaces/records", session, {
+    name: "Smoke B",
+  });
+  const task = await call("POST", "/api/collections/tasks/records", session, {
+    title: "smoke reach probe",
+    workspace: wsB.json?.id,
+  });
+  check("reach probe: Smoke B and its task created", [wsB.status, task.status], [200, 200]);
+  const key = `Bearer ${await mint_key({ scope: "write", reach: "workspace", workspace: ws })}`;
+  const listed = await call("GET", "/api/collections/tasks/records?perPage=500", key);
+  check(
+    "workspace key lists no Smoke B task",
+    [listed.status, (listed.json?.items ?? []).some((t: any) => t.workspace === wsB.json?.id)],
+    [200, false],
+  );
+  check(
+    "workspace key views the Smoke B task: 404",
+    (await call("GET", `/api/collections/tasks/records/${task.json?.id}`, key)).status,
+    404,
+  );
+  const create = await call("POST", "/api/collections/workspaces/records", key, { name: "no" });
+  check(
+    "workspace key creates a workspace: 403 api_key_reach",
+    [create.status, create.json?.data?.api_key?.code],
+    [403, "api_key_reach"],
+  );
+}
+
 // Without the edge, the counted address is the Docker gateway that publishes the port.
 async function probe_forged_client_address(): Promise<void> {
   const signin = (headers: Record<string, string> = {}) =>
@@ -407,6 +447,7 @@ const PROBES = [
   probe_password_signup,
   probe_read_key_me,
   probe_key_levels,
+  probe_key_reach,
   probe_forged_client_address,
   probe_mcp_challenge,
   probe_mcp_metadata,

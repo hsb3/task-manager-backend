@@ -1,23 +1,40 @@
 /// <reference path="../../pb_data/types.d.ts" />
 // API key helpers: whether request text names api_keys (decision:api-key-reads-refused), a key's plain request-store object and the level each request needs; require() inside a handler body.
 
-// Checks the raw text, its percent-decoding (byte by byte, as Go reads a query, never throwing)
-// and that decoding with JSON \u escapes resolved, so no spelling PocketBase decodes slips past.
+// The text lower-cased at each round of percent-decoding (byte by byte, "+" as space, as Go reads a
+// query, never throwing) plus JSON \u escapes until stable; null when it never settles (fail closed).
+function decodedForms(text) {
+  const forms = [String(text).toLowerCase()];
+  for (let i = 0; i < 8; i++) {
+    const last = forms[forms.length - 1];
+    const next = last
+      .replace(/\+/g, " ")
+      .replace(/%([0-9a-fA-F]{2})/g, (_, h) =>
+        String.fromCharCode(parseInt(h, 16)),
+      )
+      .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) =>
+        String.fromCharCode(parseInt(h, 16)),
+      )
+      .toLowerCase();
+    if (next === last) return forms;
+    forms.push(next);
+  }
+  return null;
+}
+
+// So no spelling PocketBase decodes slips past.
 function namesApiKeys(app, text) {
   const id = app.findCollectionByNameOrId("api_keys").id.toLowerCase();
-  const raw = String(text);
-  const decoded = raw
-    .replace(/\+/g, " ")
-    .replace(/%([0-9a-fA-F]{2})/g, (_, h) =>
-      String.fromCharCode(parseInt(h, 16)),
-    );
-  const unescaped = decoded.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) =>
-    String.fromCharCode(parseInt(h, 16)),
+  const forms = decodedForms(text);
+  return (
+    !forms ||
+    forms.some((t) => t.indexOf("api_keys") !== -1 || t.indexOf(id) !== -1)
   );
-  return [raw, decoded, unescaped].some((t) => {
-    const lower = t.toLowerCase();
-    return lower.indexOf("api_keys") !== -1 || lower.indexOf(id) !== -1;
-  });
+}
+
+function mentionsExpand(text) {
+  const forms = decodedForms(text);
+  return !forms || forms.some((t) => t.indexOf("expand") !== -1);
 }
 
 // The request-store and `me` view of a key; a key made before reach existed reads as reach all.
@@ -160,8 +177,71 @@ function stripReachHeaders(header) {
   }
 }
 
+// KEEP IN SYNC: the C_* clauses of the key reach rules migration.
+function inReach(app, name, rec, reach) {
+  const W = reach.workspace;
+  const P = reach.projects;
+  const inP = (id) => !!id && P.indexOf(id) !== -1;
+  const item = (ws, pr) => ws === W && (P === null || inP(pr));
+  const parent = (coll, id) => {
+    try {
+      const r = app.findRecordById(coll, id);
+      return item(r.getString("workspace"), r.getString("project"));
+    } catch (_) {
+      return false;
+    }
+  };
+  switch (name) {
+    case "workspaces":
+      return rec.id === W;
+    case "workspace_members":
+    case "labels":
+    case "statuses":
+    case "cycles":
+      return rec.workspace === W;
+    case "workspace_invitations":
+      return rec.workspace === W && P === null;
+    case "projects":
+      return rec.workspace === W && (P === null || inP(rec.id));
+    case "tasks":
+    case "decisions":
+    case "documents":
+    case "milestones":
+    case "templates":
+    case "saved_views":
+      return item(rec.workspace, rec.project);
+    case "comments":
+      if (rec.task) return parent("tasks", rec.task);
+      if (rec.document) return parent("documents", rec.document);
+      if (rec.decision) return parent("decisions", rec.decision);
+      return false;
+    case "task_subscribers":
+      return parent("tasks", rec.task);
+    case "task_activity":
+      return rec.task
+        ? parent("tasks", rec.task)
+        : rec.workspace === W && P === null;
+    case "notifications":
+      return (
+        rec.workspace === W &&
+        (P === null ||
+          (!!rec.task && parent("tasks", rec.task)) ||
+          (!!rec.document && parent("documents", rec.document)) ||
+          (!!rec.decision && parent("decisions", rec.decision)))
+      );
+    case "users":
+    case "user_settings":
+    case "app_docs":
+    case "app_settings":
+      return true;
+    default:
+      return false;
+  }
+}
+
 module.exports = {
   namesApiKeys,
+  mentionsExpand,
   keyInfo,
   LEVELS,
   ROUTE_LEVELS,
@@ -175,4 +255,5 @@ module.exports = {
   accountWide,
   REACH_MESSAGE,
   stripReachHeaders,
+  inReach,
 };

@@ -694,6 +694,7 @@ run_suite "test_key_create" bun tests/test_key_create.ts
 run_suite "test_key_levels" bun tests/test_key_levels.ts
 run_suite "test_key_reach" bun tests/test_key_reach.ts
 run_suite "test_key_reach_routes" bun tests/test_key_reach_routes.ts
+run_suite "test_key_reach_live" bun tests/test_key_reach_live.ts
 # ── guard: the repo's real pb_migrations/ and scripts/ must be untouched by the battery ──
 echo ""; echo "──────── repo cleanliness guard ────────"
 dirty_mig="$(tree_state pb_migrations/)"

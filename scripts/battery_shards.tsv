@@ -54,6 +54,7 @@
 1	5	test_task_rules
 2	5	test_user_settings_font
 3	5	test_workspace_save_tx
+1	5	test_key_reach_live
 1	4	test_counts_type_trash
 1	4	test_due_window
 2	4	test_next_milestone
