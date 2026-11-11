@@ -28,7 +28,7 @@ migrate(
         id: "date4200609002",
         name: "last_used",
         required: false,
-        help: "When the key last authenticated a request, to the minute, or empty if never; set by the server only.",
+        help: "When the key last authenticated a request, written at most once a minute, or empty if never; set by the server only.",
       }),
     );
     rules(c, false);

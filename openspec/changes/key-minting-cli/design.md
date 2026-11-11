@@ -58,7 +58,7 @@ already have put on main.
 7. **Revoking an id that is not the caller's** answers 404 `No key with that id among yours.`, the
    same as an id that does not exist, so ids of other users' keys are not confirmed (GitHub's
    404-for-private convention, cited in key-scoping's proposal).
-8. **`last_used`, to the minute, by a raw update.** In `tmkApiKeyAuth`, after the key passes every
+8. **`last_used`, written at most once a minute, by a raw update.** In `tmkApiKeyAuth`, after the key passes every
    check and before `e.next()`: when `last_used` is empty or more than 60 seconds old,
    `$app.db().newQuery("UPDATE api_keys SET last_used = {:t} WHERE id = {:id}").bind({ t: new
    DateTime().string(), id: key.id }).execute()`, inside `try`/`catch` that logs
@@ -229,7 +229,7 @@ form `8112/8113 = test_file_storage` uses).
     superuser at create; a create value from anyone else is replaced with false, and a later
     change is refused." }))`; `c.fields.add(new
     DateField({ id: "date4200609002", name: "last_used", required: false, help: "When the key
-    last authenticated a request, to the minute, or empty if never; set by the server only." }))`;
+    last authenticated a request, written at most once a minute, or empty if never; set by the server only." }))`;
     then replace, exactly once (throw if the count is not one, as
     `v2:1785187300_notifications_actor_read_at.js` `rules()` does), in `updateRule` the text
     `@request.body.expires:isset = false &&` with `@request.body.expires:isset = false &&
@@ -260,8 +260,8 @@ form `8112/8113 = test_file_storage` uses).
     to projects, up to 100).`, not `and revoked (bool).`) add ` Two
     more fields are server-written: manage_keys (bool: the key may list and revoke its user's
     keys, never mint; set by sign-in or a superuser at create, a create value from anyone else is
-    replaced with false) and last_used (date: when the key last authenticated a request, to the
-    minute).`; at the end of the Access paragraph add ` A change to manage_keys or last_used is
+    replaced with false) and last_used (date: when the key last authenticated a request, written
+    at most once a minute).`; at the end of the Access paragraph add ` A change to manage_keys or last_used is
     refused too: with 404 for the owner, with 400 for a superuser.`. `concept:api-keys` body: append to Authentication ` A key that
     passes records its last use in last_used, at most once a minute, without changing updated.`
 - **Tests** (`tests/test_key_management.ts`, port `8220 + PB_PORT_OFFSET`, self-booting as
