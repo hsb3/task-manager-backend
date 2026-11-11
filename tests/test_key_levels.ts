@@ -194,6 +194,7 @@ try {
   const bManage = await mint(bob, "bManage", "manage");
   const bOwn = await mint(bob, "bOwn", "own");
   const mOwn = await mint(tokens.Mia, "mOwn", "own");
+  const mManage = await mint(tokens.Mia, "mManage", "manage");
 
   console.log("\n── me: capabilities narrowed by level ──");
   const caps = async (key: string) => {
@@ -375,6 +376,13 @@ try {
     tup(s, (await member(rows[`Mia@${WA}`])).role),
     tup(200, "admin"),
   );
+  // Suspending one's own membership is a status write at manage, not leaving.
+  [s] = await api("PATCH", mia, mManage, { status: "suspended" });
+  check(
+    "mManage (Mia, now admin) suspends her own WA membership → 200",
+    tup(s, (await member(rows[`Mia@${WA}`])).status),
+    tup(200, "suspended"),
+  );
   check(
     "aManage removes Vic → 204",
     (await api("DELETE", `${recs("workspace_members")}/${rows[`Vic@${WA}`]}`, aManage))[0],
@@ -417,6 +425,14 @@ try {
   console.log("\n── handing over and deleting a workspace need own ──");
   const xfer = `/api/tracker/workspaces/${WT}/transfer-ownership`;
   check(
+    "aWrite transfer-ownership of WT to Bob → 403 own message, owner unchanged",
+    tup(
+      answer(await api("POST", xfer, aWrite, { user: ids.Bob })),
+      (await api("GET", `${recs("workspaces")}/${WT}`, su))[1].owner,
+    ),
+    tup(scope403(OWN_MSG), ids.Alice),
+  );
+  check(
     "aManage transfer-ownership of WT to Bob → 403",
     answer(await api("POST", xfer, aManage, { user: ids.Bob })),
     scope403(OWN_MSG),
@@ -434,6 +450,22 @@ try {
   );
   [s] = await api("DELETE", `${recs("workspaces")}/${WA}`, aOwn);
   check("aOwn deletes WA → 204 (trashed)", tup(s, await trashed("workspaces", WA)), tup(204, true));
+  [s] = await api("PATCH", `${recs("workspaces")}/${WA}`, aManage, { trashed: "" });
+  check(
+    "aManage restores the trashed WA (PATCH trashed '') → 200, live",
+    tup(s, await trashed("workspaces", WA)),
+    tup(200, false),
+  );
+
+  console.log("\n── an unknown level refuses ──");
+  const levelAtLeast = createRequire(import.meta.url)(
+    path.join(REPO_ROOT, "pb_hooks/lib/api_keys.js"),
+  ).levelAtLeast;
+  check(
+    "levelAtLeast: own vs a mistyped need 'mange', a mistyped have 'wirte' vs read → false, false",
+    tup(levelAtLeast("own", "mange"), levelAtLeast("wirte", "read")),
+    tup(false, false),
+  );
 
   console.log("\n── the level table covers the route registry ──");
   const req = createRequire(import.meta.url);

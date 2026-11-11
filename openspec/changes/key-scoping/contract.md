@@ -74,9 +74,9 @@ Reads (`GET`, `HEAD`) need `read`. Writes:
 | `task_activity` | (no writes) | | | in reach when its task is; a row with no task when its `workspace` is W, never for a project key |
 | `saved_views`, `templates` | saved views write, templates manage | same | same | in reach when its `workspace` is W and, for a project key, its `project` is in P |
 | `labels`, `statuses`, `cycles` | manage | manage | manage | in reach when its `workspace` is W (a project key reads them all) |
-| `workspace_members` | (no create) | manage; a change of `role` own | manage; removing the key's own user (leaving) own | in reach when its `workspace` is W (a project key reads them all) |
+| `workspace_members` | (no create) | manage, including suspending the key's own user (a status write, not leaving); a change of `role` own | manage; removing the key's own user (leaving) own | in reach when its `workspace` is W (a project key reads them all) |
 | `workspace_invitations` | manage | (no update) | manage | in reach when its `workspace` is W, never for a project key |
-| `workspaces` | write; a limited key 403 `api_key_reach` | manage | own | in reach when it is W (a project key reads it) |
+| `workspaces` | write; a limited key 403 `api_key_reach` | manage, including restoring a trashed workspace | own | in reach when it is W (a project key reads it) |
 | `notifications` | (no create) | write | (no delete) | in reach when its `workspace` is W and, for a project key, its task, document or decision is in P |
 | `user_settings` | write; a limited key 403 `api_key_reach` | same | same | the user's own row, any reach |
 | `users` | 403 `api_key_path` (unchanged) | same | same | readable under any reach (unchanged: any signed-in user lists users) |

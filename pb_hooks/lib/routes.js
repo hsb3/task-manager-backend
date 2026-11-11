@@ -295,7 +295,7 @@ const ROUTES = {
           key: {
             type: "object",
             description:
-              'Present only under an API key: the key\'s id, scope, expiry ("" for never) and client ("" for a key minted by hand). Under this change also the key\'s level, reach, workspace and projects.',
+              'Present only under an API key: the key\'s id, level (scope), expiry ("" for never), client ("" for a key minted by hand), reach (all, workspace or projects), workspace ("" for reach all) and projects ([] unless reach is projects).',
             properties: {
               id: { type: "string" },
               scope: {

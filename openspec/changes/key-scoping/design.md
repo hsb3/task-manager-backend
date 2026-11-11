@@ -417,14 +417,14 @@ phase's code change, quote the failing line in the pull request, then make it pa
   - `pb_hooks/lib/routes.js`, `GET /api/tracker/me` response schema: the `key` property's
     `scope` enum becomes `read`, `write`, `manage`, `own`, and it gains `reach` (string, enum
     `all`, `workspace`, `projects`), `workspace` (string) and `projects` (array of string), all
-    required; its description gains " Under this change also the key's level, reach, workspace
-    and projects.".
+    required; its description becomes "Present only under an API key: the key's id, level (scope), expiry ("" for never), client ("" for a key minted by hand), reach (all, workspace or projects), workspace ("" for reach all) and projects ([] unless reach is projects)." (root ruling: it states what the object holds).
   - New app_docs seed, per `.agents/rules/pocketbase.md` ("newest seed"): copy the current
     newest `pb_migrations/*_seed_app_docs.js` to the new slot, point `DEFAULT_OUTPUT` at it,
     edit records as below, run `bun scripts/gen_app_docs_seed.ts`:
     - `collection:api_keys` body: in the field list replace `scope (select, required: read or
-      write)` with `scope (select, required: read, write, manage or own, the key's level)` and
-      add after `revoked (bool)`: `, reach (select: all, workspace or projects; empty on older
+      write)` with `scope (select, required: read, write, manage or own, the key's level)`,
+      replace `expires (date, optional) and revoked (bool)` with `expires (date, optional),
+      revoked (bool)` (root ruling: one "and" in the list), and add after `revoked (bool)`: `, reach (select: all, workspace or projects; empty on older
       keys, read as all), workspace (relation to workspaces, removed with the workspace) and
       projects (relation to projects, up to 100)`; append the paragraph `**Reach and level.**
       Both are chosen at create and fixed: a change to reach, workspace or projects is refused

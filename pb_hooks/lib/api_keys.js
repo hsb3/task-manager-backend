@@ -37,8 +37,10 @@ function keyInfo(key) {
 // decision:api-key-reach-and-levels: the level order and the level each write needs.
 const LEVELS = ["read", "write", "manage", "own"];
 
+// An unknown level on either side refuses, so a typo in a table fails closed.
 function levelAtLeast(have, need) {
-  return LEVELS.indexOf(have) >= LEVELS.indexOf(need);
+  const n = LEVELS.indexOf(need);
+  return n !== -1 && LEVELS.indexOf(have) >= n;
 }
 
 // Keys are "METHOD /pattern"; null = no level check (a superuser-only route).
