@@ -30,13 +30,13 @@ behaviour and a glossary of the product's terms.
 
 **WEB-2** Every account mail (verification, password reset, email change, invitation) links
 to a page of the client app.
-- Verdict: missing.
-- Evidence: users templates in `v2:1785185200_collections.js` link to
-  `{APP_URL}/_/#/auth/confirm-verification/`, `confirm-password-reset/` and
-  `confirm-email-change/` (the PocketBase dashboard); `pb_hooks/mail.pb.js` builds the signup
-  link the same way; the invitation mail in `pb_hooks/invitations.pb.js` says "To accept it:
-  POST" followed by an API URL.
-- Gap: no account mail links to a client-app page.
+- Verdict: partly.
+- Evidence: the signup, password-reset and verification mails link to
+  `{APP_URL}/account/#/auth/...`, the account app's screens
+  (decision:account-app-mail-links, `tests/test_email.ts`).
+- Gap: the email-change mail links to the PocketBase dashboard
+  (`{APP_URL}/_/#/auth/confirm-email-change/`), and the invitation mail in
+  `pb_hooks/invitations.pb.js` says "To accept it: POST" followed by an API URL.
 
 **WEB-3** An approved account can sign in through the public API by password and by emailed
 one-time code.

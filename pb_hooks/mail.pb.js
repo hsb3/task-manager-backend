@@ -18,8 +18,8 @@ onBootstrap((e) => {
   // Per-boot secret that lets only this server call the signup-mail route below.
   e.app.store().set("signupMailSecret", $security.randomString(40));
 
-  // appURL drives {APP_URL} in the auth email templates, which link to PocketBase's own
-  // confirmation pages, so it is this server's public URL whether or not SMTP is configured.
+  // appURL drives {APP_URL} in the auth email templates, which link to the account app
+  // (decision:account-app-mail-links), so it is this server's public URL whether or not SMTP is configured.
   const settings0 = e.app.settings();
   settings0.meta.appURL =
     $os.getenv("PB_PUBLIC_URL") || "http://127.0.0.1:8090";
@@ -172,7 +172,7 @@ require(`${__hooks}/lib/routes.js`).add(
 // Unverified means its mailbox owner has chosen no password yet, so the reset mail reads as finishing signup (decision:password-signup-verify-first).
 onMailerRecordPasswordResetSend((e) => {
   if (!e.record.verified()) {
-    const link = `${e.app.settings().meta.appURL}/_/#/auth/confirm-password-reset/${e.meta.token}`;
+    const link = `${e.app.settings().meta.appURL}/account/#/auth/password-reset-confirm?token=${e.meta.token}`;
     const minutes = Math.round(
       e.record.collection().passwordResetToken.duration / 60,
     );

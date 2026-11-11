@@ -11,6 +11,19 @@ See docs/self-documenting-app.md for how the app_docs convention works.
 
 # Decisions
 
+## account-app-mail-links
+
+- **Slug:** `decision:account-app-mail-links`
+- **Title:** The signup, password-reset and verification mails link to the account app the server serves at /account/.
+- **Ref:** `users`
+
+This supersedes decision:password-signup-verify-first in part: its signup mail no longer opens the PocketBase dashboard's set-password page.
+
+- **The links.** The signup mail and the password-reset mail link to {APP_URL}/account/#/auth/password-reset-confirm?token={TOKEN}; the verification mail links to {APP_URL}/account/#/auth/email-verification-confirm?token={TOKEN}. {APP_URL} is the server's public URL (PB_PUBLIC_URL), which serves the account app.
+- **Unchanged.** Choosing the password from the link still verifies the account, its lifetime is still the collection's password-reset lifetime, and every other statement of decision:password-signup-verify-first stands. The email-change mail keeps its dashboard link, because the account app does not change an email address.
+
+Prior art: Linear sends sign-in links to its own app; the PocketBase dashboard is a superuser tool. `pb_hooks/mail.pb.js` builds the signup link and the users collection's templates carry the other two; `tests/test_email.ts` proves them. See collection:users.
+
 ## account-delete-sole-owner
 
 - **Slug:** `decision:account-delete-sole-owner`
@@ -650,6 +663,8 @@ Supersedes decision:verified-login and the verification-mail parts of decision:s
 - **Unchanged.** The `users` auth rule still requires `verified` and `approved` (decision:signup-approval). An approved account that never verifies, which now means one whose owner never chose a password, is still deleted by the daily `unconfirmed-signup-purge` after 30 days, and signup keeps its rate limit (decision:rate-limits-batch-and-superuser-mfa).
 
 Prior art: Linear and Slack sign up email-first, where a link or code proves the mailbox before any credential exists. `tests/test_signup_verification.ts` proves it.
+
+**Superseded in part:** the signup mail links to the account app at {APP_URL}/account/#/auth/password-reset-confirm?token={TOKEN}, not the PocketBase dashboard (decision:account-app-mail-links); the rest of this record is unchanged.
 
 ## project-items-membership-denormalised
 

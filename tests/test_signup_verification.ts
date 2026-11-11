@@ -128,7 +128,8 @@ const signup_body = (email: string, name: string) => ({ email, name });
 
 // The confirm-password-reset token from a captured welcome or reset mail.
 const reset_token = (mail: string | undefined): string =>
-  (mail?.replace(/=3D/g, "=").match(/confirm-password-reset\/([A-Za-z0-9._-]+)/) || [])[1] ?? "";
+  (mail?.replace(/=3D/g, "=").match(/password-reset-confirm\?token=([A-Za-z0-9._-]+)/) || [])[1] ??
+  "";
 const subject_of = (mail: string | undefined): string =>
   (mail?.match(/^Subject: (.*)$/m) || [])[1]?.trim() ?? "";
 const WELCOME_SUBJECT = "Finish creating your Task Tracker account";
@@ -540,8 +541,9 @@ try {
   check("request-verification for the legacy account → 204", s, 204);
   const legacy_mail = await wait_for_mail(MAIL_DIR_2, LEGACY);
   const vtok =
-    (legacy_mail[0]?.replace(/=3D/g, "=").match(/confirm-verification\/([A-Za-z0-9._-]+)/) ||
-      [])[1] ?? "";
+    (legacy_mail[0]
+      ?.replace(/=3D/g, "=")
+      .match(/email-verification-confirm\?token=([A-Za-z0-9._-]+)/) || [])[1] ?? "";
   check("its verification mail carries a token", vtok !== "", true);
   [s] = await api("POST", "/api/collections/users/confirm-verification", null, { token: vtok });
   check("the mailbox owner confirms the verification → 204", s, 204);

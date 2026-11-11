@@ -58,7 +58,7 @@ test_e2e_world · 8165 = test_path_scope · 8166 = test_owner_defaults · 8170 =
 test_owner_row · 8175 = test_trash_entry · 8176 = test_delete_impact · 8177 = test_me_route · 8178 =
 test_notification_actor · 8179 = test_notifications_suspended · 8185 = test_invitation_expiry_list ·
 8186 = test_landing · 8187 = test_invitation_mail · 8193 = test_tm_cli · 8194 = test_tm_mcp · 8195 =
-test_route_errors · 8200 = test_internal_caller · 8201 = test_oauth_token · 8202/8203 = test_oauth_authorize · 8204 = test_oauth_authorize · 8205 = test_mcp_service · 8206/8207 = test_mcp_service · 8210 = test_key_levels · 8211 = test_key_reach · 8212 = test_key_reach_routes · 8213 = test_key_reach_live · 8214 = test_key_create · 8215 = test_oauth_key_limits · 8220 = test_key_management · 8221 = test_tm_oauth_client · 9700 = test_script_help (a port it expects closed).
+test_route_errors · 8200 = test_internal_caller · 8201 = test_oauth_token · 8202/8203 = test_oauth_authorize · 8204 = test_oauth_authorize · 8205 = test_mcp_service · 8206/8207 = test_mcp_service · 8210 = test_key_levels · 8211 = test_key_reach · 8212 = test_key_reach_routes · 8213 = test_key_reach_live · 8214 = test_key_create · 8215 = test_oauth_key_limits · 8220 = test_key_management · 8221 = test_tm_oauth_client · 8225 = test_account_app · 9700 = test_script_help (a port it expects closed).
 SMTP sinks:
 2526 battery email · 2527 battery hardening · 2528-2531 test_observability · 2532
 test_collab_flow · 2533 test_subscribers_notifications · 2534 test_signup_verification · 2535 test_invitation_mail. `scripts/check_port_collisions.ts`
