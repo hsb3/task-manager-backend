@@ -156,3 +156,4 @@
 3	0	test_openapi_routes
 4	0	test_universal_touches_checker
 4	0	test_app_docs_seed_digest
+1	0	test_tm_store

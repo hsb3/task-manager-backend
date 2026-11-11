@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { Error as ApiErrorBody, Paths } from "./api.generated.ts";
+import { os_delete, os_get, os_set, type Store, store_mode } from "./store.ts";
 
 export type Config = { url: string; key: string; headers?: Record<string, string> };
 
@@ -12,12 +13,61 @@ export function config_path(): string {
   return path.join(xdg, "tm", "config.json");
 }
 
-export function save_config(cfg: Config): string {
+/** The key goes to the credential store when one answers, else into the file beside the URL. */
+export async function save_config(cfg: {
+  url: string;
+  key: string;
+}): Promise<{ file: string; store: Store }> {
+  const mode = store_mode();
   const file = config_path();
-  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n", { mode: 0o600 });
-  fs.chmodSync(file, 0o600); // `mode` above applies only when the file is created
-  return file;
+  const dir = path.dirname(file);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.chmodSync(dir, 0o700); // `mode` above applies only when the directory is created
+  const url = cfg.url.replace(/\/+$/, "");
+  let previous = "";
+  try {
+    previous = String(read_saved(file).url ?? "").replace(/\/+$/, "");
+  } catch {} // a broken file is being replaced
+  const store: Store = mode === "os" && (await os_set(url, cfg.key)) ? "os" : "file";
+  const body = store === "os" ? { url } : { url, key: cfg.key };
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.rmSync(tmp, { force: true });
+  fs.writeFileSync(tmp, JSON.stringify(body, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+  fs.chmodSync(tmp, 0o600);
+  // rename replaces a symlink at `file` rather than writing through it, and never leaves half a file
+  fs.renameSync(tmp, file);
+  if (mode === "os" && previous && previous !== url) await os_delete(previous);
+  if (store === "file" && mode === "os")
+    console.error(
+      `tm: no credential store is available; the key is saved in ${file}, readable only by this user`,
+    );
+  return { file, store };
+}
+
+/** Ends the saved login on this machine: its store entry and the file. */
+export async function forget_config(url: string): Promise<void> {
+  if (store_mode() === "os") await os_delete(url);
+  fs.rmSync(config_path(), { force: true });
+}
+
+/** The saved login alone (TM_URL and TM_API_KEY ignored); strict removes a broken file and refuses. */
+export async function saved_login(strict: boolean): Promise<Config | null> {
+  const mode = store_mode();
+  const file = config_path();
+  if (!fs.existsSync(file)) return null;
+  let saved: Partial<Config>;
+  try {
+    saved = read_saved(file);
+    if (typeof saved.url !== "string" || !saved.url)
+      throw new ConfigError(`${file} is not a saved login; run \`tm login\` again`);
+  } catch (e) {
+    if (!strict) return null;
+    fs.rmSync(file, { force: true });
+    throw e;
+  }
+  const url = saved.url.replace(/\/+$/, "");
+  const stored = mode === "os" ? await os_get(url) : null;
+  return { url, key: stored || (typeof saved.key === "string" ? saved.key : "") };
 }
 
 /** Same reading the server gives the header (trim, optional "Bearer "); tm takes API keys only, so a JWT is refused. */
@@ -45,23 +95,28 @@ function read_saved(file: string): Partial<Config> {
   return parsed;
 }
 
-/** The server URL of the saved login, whatever state its key is in. */
-export function saved_url(): string {
-  return String(read_saved(config_path()).url ?? "");
-}
-
-/** Env wins over the file: TM_URL and TM_API_KEY, each on its own. */
-export function load_config(): Config {
+/** Env wins over the saved login: TM_URL and TM_API_KEY, each on its own; the store over the file. */
+export async function load_config(): Promise<Config> {
+  const mode = store_mode();
   const file = config_path();
   const saved = read_saved(file);
   const url = process.env.TM_URL || saved.url || "";
-  const raw = process.env.TM_API_KEY || saved.key || "";
+  let raw: unknown = process.env.TM_API_KEY;
+  let from = "TM_API_KEY";
+  if (!raw && mode === "os" && typeof url === "string" && url) {
+    raw = await os_get(url);
+    from = "the credential store";
+  }
+  if (!raw) {
+    raw = saved.key || "";
+    from = file;
+  }
   if (typeof url !== "string" || typeof raw !== "string" || !url || !raw) {
     throw new ConfigError(
       "no server or key configured: run `tm login` or set TM_URL and TM_API_KEY",
     );
   }
-  const key = check_key(raw, process.env.TM_API_KEY ? "TM_API_KEY" : file);
+  const key = check_key(raw, from);
   try {
     new URL(url);
   } catch {

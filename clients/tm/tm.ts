@@ -3,19 +3,23 @@
 
 import { parseArgs } from "node:util";
 import {
+  api,
   ApiError,
   check_key,
+  type Config,
   ConfigError,
+  forget_config,
   load_config,
-  saved_url,
   save_config,
+  saved_login,
   UsageError,
 } from "./src/api.ts";
 import * as verbs from "./src/verbs.ts";
 
 const HELP = `usage: tm <verb> [options]
 
-  login [--url URL]                 paste an API key; saves it for the next runs
+  login --with-key [--url URL]      paste an API key; saves it for the next runs
+  logout                            revokes the saved key where it may; removes the saved login
   list [--project ID] [--workspace ID] [--kind KIND] [--limit N] [--page N]
   show <id>
   search <text>
@@ -40,6 +44,12 @@ const OPTIONS = {
   page: { type: "string" },
   title: { type: "string" },
   set: { type: "string", multiple: true, default: [] as string[] },
+  "with-key": { type: "boolean", default: false },
+  "no-browser": { type: "boolean", default: false },
+  name: { type: "string" },
+  scope: { type: "string" },
+  expires: { type: "string" },
+  all: { type: "boolean", default: false },
 } as const;
 
 /** `--set` pairs, typed by the kind's schema. */
@@ -117,20 +127,63 @@ async function read_secret(prompt: string): Promise<string> {
   return line.trim();
 }
 
-async function login(url: string | undefined): Promise<string> {
+async function login(url: string | undefined): Promise<{ file: string; store: string }> {
   const pasted = await read_secret("Paste your API key: ");
   if (!pasted) throw new UsageError("no key was pasted");
   const key = check_key(pasted, "the paste");
-  const previous = (() => {
-    try {
-      return saved_url();
-    } catch {
-      return "";
-    }
-  })();
-  const server = url || process.env.TM_URL || previous;
+  const previous = await saved_login(false);
+  const server = url || process.env.TM_URL || previous?.url;
   if (!server) throw new UsageError("login needs --url the first time");
-  return save_config({ url: server.replace(/\/+$/, ""), key });
+  const saved = await save_config({ url: server, key });
+  await retire(previous, key);
+  return saved;
+}
+
+/** Revokes the replaced login's key through itself when it may manage keys; it is being replaced, so failures are ignored. */
+async function retire(previous: Config | null, new_key: string): Promise<void> {
+  if (!previous || !previous.key || previous.key === new_key) return;
+  try {
+    const { key } = await api(previous, "GET /api/tracker/me", {});
+    if (key?.manage_keys)
+      await api(previous, "POST /api/tracker/keys/{id}/revoke", { path: { id: key.id } });
+  } catch {}
+}
+
+/** Revokes the saved key where it may, then removes the saved login whatever the server said. */
+async function logout(json: boolean): Promise<number> {
+  const saved = await saved_login(true);
+  if (!saved) throw new ConfigError("no saved login to log out of");
+  let key_id = "";
+  let revoked = false;
+  let reason: string | undefined;
+  let code = 0;
+  try {
+    const { key } = saved.key ? await api(saved, "GET /api/tracker/me", {}) : { key: undefined };
+    key_id = key?.id ?? "";
+    // root ruling 5: a key limited to part of the tracker may always revoke itself
+    if (key && (key.manage_keys || key.reach !== "all")) {
+      await api(saved, "POST /api/tracker/keys/{id}/revoke", { path: { id: key.id } });
+      revoked = true;
+    } else if (key) reason = "this key cannot revoke keys (reach all, no manage-keys permission)";
+  } catch (e) {
+    // anything, not only ApiError: the saved login is removed whatever went wrong
+    if (e instanceof ApiError && e.body.status === 401) key_id = "";
+    else
+      [reason, code] = [
+        e instanceof ApiError ? e.body.message : String((e as Error)?.message ?? e),
+        1,
+      ];
+  }
+  await forget_config(saved.url);
+  const where = `logged out of ${saved.url}`;
+  if (json) console.log(JSON.stringify({ url: saved.url, key_id, revoked }));
+  else if (revoked) console.log(`${where}; key ${key_id} revoked`);
+  else if (!key_id)
+    console.log(
+      `${where}; the saved key ${reason ? `was not revoked: ${reason}` : "was already invalid"}`,
+    );
+  else console.log(`${where}; key ${key_id} was not revoked: ${reason}`);
+  return code;
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -147,10 +200,15 @@ async function main(argv: string[]): Promise<number> {
     return v.help ? 0 : 2;
   }
   if (verb === "login") {
-    const file = await login(v.url);
-    console.log(v.json ? JSON.stringify({ saved: file }) : `saved to ${file}`);
+    if (v["with-key"] && (v.scope !== undefined || v["no-browser"]))
+      throw new UsageError("--with-key cannot be combined with --scope or --no-browser");
+    const { file, store } = await login(v.url);
+    const where = store === "os" ? " (key in the system credential store)" : "";
+    console.log(v.json ? JSON.stringify({ saved: file, store }) : `saved to ${file}${where}`);
     return 0;
   }
+  // before the shared load_config: logout must run with no usable credential
+  if (verb === "logout") return logout(v.json);
   if (!Object.hasOwn(NEEDS, verb)) throw new UsageError(`unknown verb "${verb}"`);
   const [n, what] = NEEDS[verb];
   if (rest.length < n) throw new UsageError(`missing ${what}`);
@@ -162,7 +220,7 @@ async function main(argv: string[]): Promise<number> {
     throw new UsageError("create needs a project or a workspace");
   if (verb === "edit" && v.title === undefined && !Object.keys(fields).length)
     throw new UsageError("edit needs a title or a field to set");
-  const cfg = load_config(); // after the command line is checked: a usage error needs no login
+  const cfg = await load_config(); // after the command line is checked: a usage error needs no login
   if (verb === "mcp") {
     await (await import("./src/mcp.ts")).serve(cfg); // loaded here only: the other verbs need no SDK
     return 0;
