@@ -271,13 +271,13 @@ decision:refused-migration-fails-the-deploy); it does not gate a deploy.
 
 ## The MCP service
 
-The `mcp` Railway service is the hosted MCP endpoint (`services/mcp/`), built from `services/mcp/Dockerfile`. It deploys when a watch pattern is touched: `services/mcp/**`, `clients/tm/src/**`, `clients/tm/package.json`, `package.json`, `bun.lock`. It is created by the runbook in `openspec/changes/hosted-mcp-endpoint/design.md`, Phase 10; the entry for `mcp` in `railway/railway.ts` records what that runbook creates by CLI, so `railway config plan` proposes no change to it. `make local-up` serves it on 8089 (`+ PB_PORT_OFFSET`).
+The `mcp` Railway service is the hosted MCP endpoint (`services/mcp/`), built from `services/mcp/Dockerfile`. It deploys when a watch pattern is touched: `services/mcp/**`, `clients/tm/src/**`, `clients/tm/package.json`, `package.json`, `bun.lock`, `/.dockerignore`. Its healthcheck path is `/health` (Railway accepts only letters, digits, `/` and `_` in a healthcheck path, so not the metadata path). It is created by the runbook in `openspec/changes/hosted-mcp-endpoint/design.md`, Phase 10; the entry for `mcp` in `railway/railway.ts` records what that runbook creates by CLI, so `railway config plan` proposes no change to it; that plan fails until the `mcp.` custom domain exists. `make local-up` serves it on 8089 (`+ PB_PORT_OFFSET`).
 
 | Service | Variable | Value on Railway | If missing |
 | --- | --- | --- | --- |
-| mcp | `PORT` | Railway-provided | 8080 |
+| mcp | `PORT` | `8080`, set explicitly and declared in `railway/railway.ts` (the public domain targets it) | 8080 |
 | mcp | `MCP_HOST` | unset (listens on `::`) | `::` |
-| mcp | `MCP_INTERNAL_PORT` | `8081` | 8081 |
+| mcp | `MCP_INTERNAL_PORT` | `8081`; pocketbase's `MCP_INTERNAL_URL` names the same port, so change both or neither | 8081 |
 | mcp | `PB_INTERNAL_URL` | `http://${{pocketbase.RAILWAY_PRIVATE_DOMAIN}}:<pocketbase PORT>` | exit 1 |
 | mcp | `PB_PUBLIC_URL` | `${{pocketbase.PB_PUBLIC_URL}}` | exit 1 |
 | mcp | `MCP_PUBLIC_URL` | `https://mcp.<API host>` | exit 1 |

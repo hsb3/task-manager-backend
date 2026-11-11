@@ -155,6 +155,13 @@ export function make_app(env: Env): { fetch(req: Request, ip: string): Promise<R
       };
       return new Response(req.method === "HEAD" ? null : JSON.stringify(prm), { headers });
     }
+    if (path === "/health") {
+      if (req.method !== "GET" && req.method !== "HEAD")
+        return new Response(null, { status: 405, headers: { Allow: "GET, HEAD" } });
+      return new Response(req.method === "HEAD" ? null : '{"status":"ok"}', {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     if (path !== "/mcp") return error(404, "not_found", "Nothing is served at this path.");
     if (origin !== null && !env.allowed_origins.includes(origin))
       return error(403, "origin_not_allowed", "Requests from this web origin are not accepted.");
@@ -209,6 +216,8 @@ export function make_app(env: Env): { fetch(req: Request, ip: string): Promise<R
       return rpc_error(400, "The body must be one JSON-RPC message.");
 
     // The SDK would hold an SSE stream open for this; the service sends none.
+    if (body.method === "subscriptions/listen" && !("id" in body))
+      return new Response(null, { status: 202 });
     if (body.method === "subscriptions/listen")
       return rpc_error(
         (await isLegacyRequest(req, body)) ? 200 : 404,

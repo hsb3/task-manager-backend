@@ -6,7 +6,7 @@ export default defineRailway(() => {
   const pbFiles = bucket("pb-files", { region: "iad" });
   const pocketbase = service("pocketbase", {
     source: github("hsb3/task-manager-backend", { checkSuites: true }),
-    build: { buildEnvironment: "V3", builder: "RAILPACK", watchPatterns: ["Dockerfile", "pb_migrations/**", "pb_hooks/**"] },
+    build: { buildEnvironment: "V3", builder: "RAILPACK", watchPatterns: ["/Dockerfile", "/.dockerignore", "pb_migrations/**", "pb_hooks/**"] },
     healthcheck: "/api/health",
     healthcheckTimeout: 120,
     replicas: { "us-east4-eqdc4a": 1 },
@@ -41,18 +41,20 @@ export default defineRailway(() => {
       PB_PUBLIC_URL: preserve(),
       PB_SUPERUSER_EMAIL: preserve(),
       PB_SUPERUSER_PASSWORD: preserve(),
+      PORT: preserve(),
       RESEND_API_KEY: preserve(),
     },
   });
 
   const mcp = service("mcp", {
     source: github("hsb3/task-manager-backend", { checkSuites: true }),
-    build: { builder: "DOCKERFILE", dockerfilePath: "services/mcp/Dockerfile", watchPatterns: ["services/mcp/**", "clients/tm/src/**", "clients/tm/package.json", "package.json", "bun.lock"] },
-    healthcheck: "/.well-known/oauth-protected-resource",
+    build: { builder: "DOCKERFILE", dockerfilePath: "services/mcp/Dockerfile", watchPatterns: ["services/mcp/**", "clients/tm/src/**", "clients/tm/package.json", "package.json", "bun.lock", "/.dockerignore"] },
+    healthcheck: "/health",
     healthcheckTimeout: 60,
     replicas: { "us-east4-eqdc4a": 1 },
     domains: ["mcp.admin.tasks-pocketbase.functionform.ai"],
     env: {
+      PORT: preserve(),
       MCP_INTERNAL_SECRET: preserve(),
       MCP_PUBLIC_URL: preserve(),
       PB_INTERNAL_URL: preserve(),

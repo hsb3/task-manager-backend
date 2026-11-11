@@ -11,6 +11,16 @@ const CLIENTS = {
   },
 };
 
+// The consent page shows the host, so it is a name ending in a letter label: no IP literal (a
+// numeric host like 0x7f.1 parses to an address), Unicode, %, \ or userinfo.
+// KEEP IN SYNC: services/mcp/src/cimd.ts "(?:[A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*\.?(?::\d{1,5})?" "[\x21\x22\x24-\x5b\x5d-\x7e]*"
+const AUTHORITY = String.raw`(?:[A-Za-z0-9-]+\.)*[A-Za-z][A-Za-z0-9-]*\.?(?::\d{1,5})?`;
+const REST = String.raw`[\x21\x22\x24-\x5b\x5d-\x7e]*`;
+const CLIENT_ID_SHAPE = new RegExp(`^https://${AUTHORITY}/${REST}$`);
+const REDIRECT_SHAPE = new RegExp(
+  `^(?:https://${AUTHORITY}|http://(?:localhost|127\\.0\\.0\\.1)(?::\\d{1,5})?)(?:/${REST})?$`,
+);
+
 function issuer() {
   return ($os.getenv("PB_PUBLIC_URL") || "http://127.0.0.1:8090").replace(
     /\/+$/,
@@ -165,15 +175,24 @@ function resolve_client(app, client_id) {
       message:
         "The app asking to sign in could not be verified right now. Try again in a minute.",
     };
-    const as_client = (c) => ({
-      ok: true,
-      client: {
-        client_id: c.client_id,
-        client_name: c.client_name,
-        redirect_uris: c.redirect_uris,
-        registered: false,
-      },
-    });
+    const invalid = {
+      ok: false,
+      message: "The app asking to sign in could not be verified.",
+    };
+    if (client_id.length > 2000 || !CLIENT_ID_SHAPE.test(client_id))
+      return invalid;
+    const as_client = (c) =>
+      c.redirect_uris.every((u) => u.length <= 2000 && REDIRECT_SHAPE.test(u))
+        ? {
+            ok: true,
+            client: {
+              client_id: client_id,
+              client_name: c.client_name.slice(0, 200),
+              redirect_uris: c.redirect_uris,
+              registered: false,
+            },
+          }
+        : invalid;
     const key = "cimd:" + client_id;
     const hit = app.store().get(key);
     if (hit && hit.exp > Date.now()) return as_client(hit.client);
@@ -196,7 +215,16 @@ function resolve_client(app, client_id) {
       return unavailable;
     }
     if (res.statusCode === 200) {
-      const client = res.json.client;
+      const client = res.json && res.json.client;
+      if (
+        !client ||
+        typeof client.client_name !== "string" ||
+        client.client_name === "" ||
+        !Array.isArray(client.redirect_uris) ||
+        !client.redirect_uris.length ||
+        !client.redirect_uris.every((u) => typeof u === "string")
+      )
+        return unavailable;
       if (res.json.max_age > 0)
         app.store().set(key, {
           client: client,
@@ -204,11 +232,7 @@ function resolve_client(app, client_id) {
         });
       return as_client(client);
     }
-    if (res.statusCode === 422)
-      return {
-        ok: false,
-        message: "The app asking to sign in could not be verified.",
-      };
+    if (res.statusCode === 422) return invalid;
     return unavailable;
   }
   return {

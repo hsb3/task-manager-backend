@@ -36,6 +36,9 @@ const HEALTH_TIMEOUT_MS = 120_000;
 const SIGNUP_LIMIT = 5; // settings rateLimits rule "POST /api/collections/users/records"
 const SIGNIN_LIMIT = 10; // settings rateLimits rule "POST /api/collections/users/auth-with-password"
 
+// The host ports compose publishes (0: Docker picks); compose builds the public URLs from them.
+const PUBLISH = { PB_PORT: "0", MCP_PORT: "0" };
+const MCP_RESOURCE = `http://127.0.0.1:${PUBLISH.MCP_PORT}/mcp`;
 let BASE_URL = "";
 let MCP_URL = "";
 let failures = 0;
@@ -72,6 +75,12 @@ async function post(
 async function probe_health(): Promise<void> {
   const r = await fetch(BASE_URL + "/api/health");
   check("GET /api/health", r.status, 200);
+  const m = await fetch(MCP_URL + "/health");
+  check(
+    'MCP GET /health: 200 application/json {"status":"ok"}',
+    [m.status, m.headers.get("Content-Type"), await m.text()],
+    [200, "application/json", '{"status":"ok"}'],
+  );
 }
 
 async function batch_signup(method: string): Promise<void> {
@@ -249,12 +258,50 @@ async function probe_mcp_metadata(): Promise<void> {
     as.issuer,
   );
   check(
-    "authorization server metadata lists S256 and none",
+    "authorization server metadata lists S256 and none, and metadata-document clients",
     [
       as.code_challenge_methods_supported?.includes("S256"),
       as.token_endpoint_auth_methods_supported?.includes("none"),
+      as.client_id_metadata_document_supported,
     ],
-    [true, true],
+    [true, true, true],
+  );
+  check("PRM resource is the compose file's MCP public URL plus /mcp", prm.resource, MCP_RESOURCE);
+}
+
+// PocketBase -> the mcp private listener: a refused document is "could not be verified." only when the secret, URL and listener all work.
+async function probe_pb_to_mcp_wiring(): Promise<void> {
+  const q = new URLSearchParams(
+    authorize_params({
+      client_id: "https://localhost/meta",
+      redirect_uri: "https://localhost/cb",
+    }),
+  );
+  const r = await fetch(`${BASE_URL}/oauth/authorize?${q}`);
+  const text = await r.text();
+  check(
+    "PocketBase -> mcp: a localhost metadata URL gets 'could not be verified.', not 'right now'",
+    [r.status, text.includes("could not be verified."), text.includes("right now")],
+    [400, true, false],
+  );
+}
+
+// mcp -> PocketBase: an unknown key is 401 only when the service reaches PocketBase's /me (503 otherwise).
+async function probe_mcp_to_pb_wiring(): Promise<void> {
+  const r = await fetch(MCP_URL + "/mcp", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer tmk_bogus",
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "X-Real-IP": "198.51.100.78",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+  });
+  check(
+    "mcp -> PocketBase: Bearer tmk_bogus is 401 invalid_token",
+    [r.status, ((await r.json().catch(() => null)) as any)?.error?.code],
+    [401, "invalid_token"],
   );
 }
 
@@ -364,6 +411,8 @@ const PROBES = [
   probe_mcp_challenge,
   probe_mcp_metadata,
   probe_mcp_refusals,
+  probe_pb_to_mcp_wiring,
+  probe_mcp_to_pb_wiring,
   probe_oauth_refusals,
   probe_oauth_code_stage_blind,
   probe_mcp_anon_limit,
@@ -435,7 +484,7 @@ async function main(): Promise<number> {
   }
   try {
     console.log(`building and booting ${ROOT} as compose project ${PROJECT}`);
-    const up = run([...COMPOSE, "up", "-d", "--build"], { PB_PORT: "0", MCP_PORT: "0" });
+    const up = run([...COMPOSE, "up", "-d", "--build"], PUBLISH);
     if (up.code !== 0) {
       console.error(`❌ compose up failed:\n${up.out}`);
       return 1;
@@ -456,15 +505,17 @@ async function main(): Promise<number> {
     MCP_URL = `http://127.0.0.1:${mcp_port}`;
     if (!(await wait_healthy())) return 1;
     const deadline = Date.now() + HEALTH_TIMEOUT_MS;
-    const prm = MCP_URL + PRM_PATH;
+    const mcpHealth = MCP_URL + "/health";
     while (
-      (await fetch(prm).then(
+      (await fetch(mcpHealth).then(
         (r) => r.status,
         () => 0,
       )) !== 200
     ) {
       if (Date.now() > deadline) {
-        console.error(`❌ no 200 from ${prm} within ${HEALTH_TIMEOUT_MS / 1000}s; container log:`);
+        console.error(
+          `❌ no 200 from ${mcpHealth} within ${HEALTH_TIMEOUT_MS / 1000}s; container log:`,
+        );
         console.error(run([...COMPOSE, "logs", "--no-color"]).out);
         return 1;
       }

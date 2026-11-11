@@ -163,7 +163,52 @@ for (const name of fs.readdirSync(MIG_DIR)) {
 }
 
 const CC_URL = "https://claude.ai/oauth/claude-code-client-metadata";
-const STUB_ANSWERS: Record<string, [number, object]> = {
+const LOOP_CB = ["http://localhost/callback"];
+const doc_client = (client_id: string, client_name: string, redirect_uris = LOOP_CB) => ({
+  client: { client_id, client_name, redirect_uris },
+  max_age: 0,
+});
+// A Cyrillic "с" in place of the Latin "c"; the stub answers it as a pre-fix service would.
+const SPOOF_URL = "https://\u0441laude.ai/oauth/claude-code-client-metadata";
+const PUNY_URL = "https://xn--laude-0ye.ai/meta";
+const SWAP_URL = "https://swap.example/meta";
+const STUB_ANSWERS: Record<string, [number, object | string]> = {
+  [SPOOF_URL]: [200, doc_client(SPOOF_URL, "Claude Code")],
+  [PUNY_URL]: [200, doc_client(PUNY_URL, "Puny")],
+  [SWAP_URL]: [200, doc_client(CC_URL, "Swap")],
+  "https://notjson.example/meta": [200, "not json"],
+  "https://empty.example/meta": [200, {}],
+  "https://nouris.example/meta": [
+    200,
+    { client: { client_id: "https://nouris.example/meta", client_name: "N" }, max_age: 0 },
+  ],
+  "https://long.example/meta": [200, doc_client("https://long.example/meta", "A".repeat(10240))],
+  "https://idnredirect.example/meta": [
+    200,
+    doc_client("https://idnredirect.example/meta", "I", ["https://\u0441laude.ai/cb"]),
+  ],
+  "https://bsredirect.example/meta": [
+    200,
+    doc_client("https://bsredirect.example/meta", "B", ["https://evil.example\\@claude.ai/cb"]),
+  ],
+  "https://jsredirect.example/meta": [
+    200,
+    doc_client("https://jsredirect.example/meta", "J", ["javascript:alert(1)//"]),
+  ],
+  "https://evil.example\\@claude.ai/meta": [
+    200,
+    doc_client("https://evil.example\\@claude.ai/meta", "Claude Code"),
+  ],
+  "https://numredirect.example/meta": [
+    200,
+    doc_client("https://numredirect.example/meta", "N", ["https://0x7f.1/cb"]),
+  ],
+  "https://[2606:4700::1]/meta": [200, doc_client("https://[2606:4700::1]/meta", "V6")],
+  "https://noname.example/meta": [200, doc_client("https://noname.example/meta", "")],
+  "https://ctlredirect.example/meta": [
+    200,
+    doc_client("https://ctlredirect.example/meta", "T", ["https://x.exa\tmple/cb"]),
+  ],
   [CC_URL]: [
     200,
     {
@@ -198,7 +243,9 @@ try {
       const id = String(((await req.json().catch(() => ({}))) as any).client_id);
       stub_seen.push({ client_id: id, secret: req.headers.get("X-TM-Internal") });
       const [status, body] = STUB_ANSWERS[id] ?? [404, { error: "not_found" }];
-      return Response.json(body, { status });
+      return typeof body === "string"
+        ? new Response(body, { status })
+        : Response.json(body, { status });
     },
   });
   run_checked(
@@ -744,6 +791,88 @@ try {
       ),
       tup(true, true),
     );
+    {
+      const asked = stub_seen.length;
+      a = await get({ ...cc, client_id: SPOOF_URL });
+      check(
+        "non_ascii_client_id: Cyrillic lookalike → 400 'could not be verified.', no consent, service not asked",
+        tup(
+          a.status,
+          a.text.includes("could not be verified."),
+          a.text.includes("right now"),
+          field(a.text, "flow"),
+          stub_seen.length - asked,
+        ),
+        tup(400, true, false, null, 0),
+      );
+    }
+    for (const [label, id, redirect] of [
+      ["redirect_non_ascii", "https://idnredirect.example/meta", "https://\u0441laude.ai/cb"],
+      ["redirect_control", "https://ctlredirect.example/meta", "https://x.exa\tmple/cb"],
+      [
+        "redirect_backslash",
+        "https://bsredirect.example/meta",
+        "https://evil.example\\@claude.ai/cb",
+      ],
+      ["redirect_scheme", "https://jsredirect.example/meta", "javascript:alert(1)//"],
+      ["redirect_numeric_host", "https://numredirect.example/meta", "https://0x7f.1/cb"],
+      ["client_id_ip_literal", "https://[2606:4700::1]/meta", "http://localhost/callback"],
+      ["client_id_backslash", "https://evil.example\\@claude.ai/meta", "http://localhost/callback"],
+    ]) {
+      a = await get({ ...cc, client_id: id!, redirect_uri: redirect! });
+      check(
+        `${label}: an id or returned redirect URI outside the URL rule → 400 'could not be verified.'`,
+        tup(a.status, a.text.includes("could not be verified."), a.text.includes("right now")),
+        tup(400, true, false),
+      );
+    }
+    {
+      const pc = { ...cc, client_id: PUNY_URL };
+      const consent = await consent_page(pc);
+      check(
+        "punycode_client: consent shows the punycode host",
+        consent.includes("It identifies itself as xn--laude-0ye.ai."),
+        true,
+      );
+    }
+    {
+      const sc = { ...cc, client_id: SWAP_URL };
+      const consent = await consent_page(sc);
+      const { code } = await sign_in_and_approve(BASE_URL, sc, ALICE);
+      const ex = await exchange(BASE_URL, code, sc);
+      const [, me] = await api("GET", "/api/tracker/me", ex.body?.access_token ?? "tmk_none");
+      check(
+        "requested_client_id_kept: service answers another client_id → consent names swap.example; key client_id the requested URL",
+        tup(
+          consent.includes("It identifies itself as swap.example."),
+          consent.includes("claude.ai"),
+          ex.status,
+          me?.key?.client_id,
+        ),
+        tup(true, false, 200, SWAP_URL),
+      );
+    }
+    for (const id of [
+      "https://notjson.example/meta",
+      "https://empty.example/meta",
+      "https://nouris.example/meta",
+      "https://noname.example/meta",
+    ]) {
+      a = await get({ ...cc, client_id: id });
+      check(
+        `malformed_200: ${id} → 400 'right now'`,
+        tup(a.status, a.text.includes("could not be verified right now")),
+        tup(400, true),
+      );
+    }
+    {
+      const consent = await consent_page({ ...cc, client_id: "https://long.example/meta" });
+      check(
+        "client_name_bounded: a 10240-character name renders at most 200 characters",
+        tup(consent.includes("A".repeat(200)), consent.includes("A".repeat(201))),
+        tup(true, false),
+      );
+    }
     await stub.stop(true);
     stub = null;
     a = await get({ ...cc, client_id: "https://down.example/meta" });

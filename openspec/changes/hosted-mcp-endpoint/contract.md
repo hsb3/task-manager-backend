@@ -21,6 +21,7 @@ A value marked *(Q n)* is set by that ruling in Open Questions.
 | OPTIONS | `/mcp` | 204, `Allow: POST`; CORS preflight headers only for an allowed `Origin` (see Origin). |
 | GET, HEAD | `/.well-known/oauth-protected-resource/mcp` | Protected Resource Metadata (RFC 9728 §3.1, path-inserted form). Other methods 405. |
 | GET, HEAD | `/.well-known/oauth-protected-resource` | The same document, for clients that try the root form (see Protected Resource Metadata). Other methods 405. |
+| GET, HEAD | `/health` | Liveness: 200, `application/json`, `{"status":"ok"}`. Other methods 405. |
 | any | any other path | 404, whatever the credential. |
 
 ### API, `{API}` (PocketBase)
@@ -233,7 +234,10 @@ private, loopback or link-local address) and requires valid JSON with `client_id
 URL, a `client_name`, and `redirect_uris` holding the request's redirect URI.
 `token_endpoint_auth_method`, if present, must be `none`. A document is cached as its HTTP cache
 headers allow, for at most 24 hours. *(Q3)* Any HTTPS host may serve a document; the consent page
-names it.
+names it. The host of the `client_id` and of each `https` redirect URI is a DNS name of letters,
+digits, hyphens and dots whose last label begins with a letter, never an IP address (an
+internationalised host is written as punycode, and the consent page shows it so), and the rest
+of each URL is printable ASCII without `#` or `\`.
 
 Known documents for the milestone clients (ruling 1):
 
@@ -396,7 +400,7 @@ with status 400, and no redirect (OAuth 2.1 §4.1.2.1). After: a redirect carryi
 | Surface | Caller | Credential |
 | --- | --- | --- |
 | `POST {MCP}/mcp` | Any MCP client | `Authorization: Bearer tmk_...` (or the bare key, read as the API reads it), hand-minted or grant-minted (ruling 2). A PocketBase user token, a refresh token, or any other value answers 401. Never read from the query string. |
-| `{MCP}` metadata documents | Anyone | None |
+| `{MCP}` metadata documents, `/health` | Anyone | None |
 | `{API}/.well-known/oauth-authorization-server` | Anyone | None |
 | `{API}/oauth/authorize` | A person in a browser | The page's own sign-in (users only, never superusers) |
 | `{API}/oauth/token`, `/oauth/revoke` | An OAuth client | Public: `client_id` in the body *(Q4)* |
