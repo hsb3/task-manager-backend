@@ -1,8 +1,8 @@
 ---
 title: Shared constants (mirror-site registry)
 status: current
-version: 19
-updated: 2026-11-10
+version: 20
+updated: 2026-11-11
 ---
 
 # Shared constants (mirror-site registry)
@@ -178,3 +178,24 @@ The two sweep bodies differ only in `$app` versus `e.app`, so each of the four s
 bounded by its own copy's `INLINED SWEEP` … `END INLINED SWEEP` markers — a site cannot be
 satisfied by the sibling copy's text, and drift is reported against the line that drifted.
 Each subset is intentional, not drift; together the four sites cover all three values.
+
+The trash purge sweeps in `pb_hooks/trash.pb.js` are not sites of this list: they select rows
+by their own `trashed` date and hide nothing from a reader. Their mirrored list is section 11.
+
+## 11. TRASH_PURGE_COLLECTIONS
+
+The collections a trash purge deletes from, parents first so a purged parent's cascade shrinks
+the later queries. The orphan sweep that follows the purge walks the item collections only.
+
+### TRASH_PURGE_COLLECTIONS
+Values: workspaces, projects, tasks, decisions, milestones, documents
+
+Sites:
+- `pb_hooks/trash.pb.js` — cron `trash-purge` sweep, `cols`. Full 6.
+- `pb_hooks/trash.pb.js` — cron sweep, orphan pass `kids`, **4 of 6 only** (`tasks`,
+  `decisions`, `milestones`, `documents`): only items hang under a project.
+- `pb_hooks/trash.pb.js` — route `POST /api/tracker/trash/purge` sweep, `cols`. Full 6.
+- `pb_hooks/trash.pb.js` — route sweep, orphan pass `kids`, the same **4 of 6**.
+
+Each site's region runs from its own copy's `INLINED SWEEP` marker to the next marker in the file,
+so a cron site cannot be satisfied by the route copy's text.

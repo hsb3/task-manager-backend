@@ -42,6 +42,20 @@ Assigning a task grants nothing on its own. No rule or route admits a task assig
 - **Assignment is limited to members.** A validation hook in `pb_hooks/main.pb.js` refuses, with a 400, an assignee who is neither the workspace owner nor an active member of the task workspace, which a rule cannot express because an update rule denial answers 404. It checks only a changed assignee, so a task whose assignee is later suspended stays editable on other fields.
 - **Accepting an invitation never reactivates a suspended member**: an existing membership row is left as it is.
 
+## api-key-answered-as-its-user
+
+- **Slug:** `decision:api-key-answered-as-its-user`
+- **Title:** An API key is answered as its user on the me, landing, counts and trash routes, within its reach, rather than refused outright.
+- **Ref:** `api_keys`
+
+Supersedes in part decision:inaccessible-workspace-answers-404, which listed an API key among the credentials refused outright with 403 on the routes that answer for a member: the me, landing, counts and trash routes. Key scoping (decision:api-key-reach-and-levels) answers those routes for a key instead. Measured on 2026-11-11 in a clean room:
+
+- **A key reaching every workspace,** at read or write, gets 200 from GET /api/tracker/me, GET /api/tracker/me/landing, GET /api/tracker/project-items/counts and GET /api/tracker/trash, answered for its user. GET /api/tracker/me also reports the key itself under key (concept:api-keys).
+- **A key limited to one workspace** gets 200 from the me, counts and trash routes, kept to that workspace, and 403 api_key_reach from the landing route, which answers for the whole account.
+- **A workspace out of a key's reach** answers 404 on the trash route, the same answer an unknown workspace gets.
+
+Ruling: on these routes a key is answered as its user, narrowed by its reach and level. A key is refused with 403 only by its path, reach or level (api_key_path, api_key_reach, api_key_scope). The 404 rule of decision:inaccessible-workspace-answers-404 is unchanged and binds a key as it binds a user, and its other 403 cases stand.
+
 ## api-key-manages-keys
 
 - **Slug:** `decision:api-key-manages-keys`
@@ -375,6 +389,8 @@ Prior art in this tree: POST /api/tracker/export, POST /api/tracker/workspaces/{
 
 Ruling: the status changes, and the prose follows it. The trash route answers a user 404 for an unknown id, for a workspace the user is not an active member of, and for a trashed workspace alike. 403 stays reserved for a caller whose kind of credential is refused outright: an API key, an unverified account, or a superuser on a route that answers for a member, which the me, landing, counts and trash routes all are. A workspace route that still answers a user 403 for a resource that user cannot read is a bug under this decision.
 
+**Superseded in part:** an API key is no longer refused outright on the me, landing, counts and trash routes; it is answered as its user, within its reach (decision:api-key-answered-as-its-user).
+
 ## invitation-keyed-by-email
 
 - **Slug:** `decision:invitation-keyed-by-email`
@@ -422,6 +438,7 @@ The window is the `app_settings` row `invitation_expiry_days`, default 7. Pocket
 Before this an invitation was silent: the row existed, but nothing told the invitee, who learned of it only by signing in with that address. Prior art: GitHub, Slack and Linear all email a link; Linear resends an invite from its member list and limits how often. This app has no web app of its own and its clients are API callers, so the mail names the app URL as the place to sign in and states the invitation id with the accept and decline calls in words.
 
 - **Send.** Both ways of creating an invitation (the collection create and POST /api/tracker/workspaces/{id}/resolve-member-email) send the mail, from the sender address in settings, after the create has answered, so a create never waits on the mail server (the same arrangement as decision:signup-mail-off-request). A failed send logs invitation email failed against the invitation id with the address redacted; the server does not retry by itself.
+- **How.** After the invitation is saved, the create hook sends a POST to `/internal/invitation-mail/{id}` on the address serve listens on, with a one-second timeout. That route answers 204 with Connection: close before it sends, so the create never waits on the mail server. It answers 404 to any request that does not carry a secret the server draws afresh at every boot, so it is no part of the client API and has no route record of its own.
 - **No mail server.** The create succeeds and the response says mail_sent: false; the server logs invitation email skipped: SMTP disabled. Refusing the create would leave a server without mail unable to invite at all, and the invitation itself is the grant; the mail is only how the invitee hears of it.
 - **Superuser rows send nothing** and answer mail_sent: false, as a superuser-created account gets no verification mail: seeding and import are not invitations by a person.
 - **Resend is re-inviting.** Inviting a pending address again through the route was already an idempotent 200; it now mails the same invitation again, keeping its id and expiry and spending none of the daily limit of decision:invitation-send-limit-and-decline-block, because no invitation was created. An invitation that has already expired cannot be accepted, so re-inviting replaces it with a fresh one (new id, new expiry, one daily slot), as revoke and invite would. No separate resend route: the member list already has the address, and one call covers invite and resend alike, as it does in Linear.
