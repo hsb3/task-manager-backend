@@ -14,6 +14,7 @@ import path from "node:path";
 import { py_repr, run_checked, tup, urlencode } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 import { copy_tree } from "../scripts/_scratch_copy.ts";
+import { ApiError, request, type Config } from "../clients/tm/src/api.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -548,6 +549,34 @@ try {
     tup(o.code, o.stderr.includes("cannot reach"), /ECONNREFUSED|fetch/i.test(o.stderr)),
     tup(1, true, false),
   );
+  {
+    const not_json = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("ok") });
+    const message = (cfg: Config) =>
+      request(cfg, "GET", "/api/tracker/me").then(
+        () => "answered",
+        (e) => (e instanceof ApiError ? e.message : String(e)),
+      );
+    const hosted = { key: WRITE_KEY, headers: { "X-TM-Internal": "s" } };
+    const down = "http://127.0.0.1:1";
+    const odd = `http://127.0.0.1:${not_json.port}`;
+    const got = [
+      await message({ url: down, ...hosted }),
+      await message({ url: odd, ...hosted }),
+      (await message({ url: down, key: WRITE_KEY })).includes(down),
+      (await message({ url: odd, key: WRITE_KEY })).includes(odd),
+    ];
+    not_json.stop(true);
+    check(
+      "hosted_failure_no_url: with headers set, unreachable and non-API answers omit the URL; without, they name it",
+      tup(
+        typeof got[0] === "string" && got[0].startsWith("cannot reach") && !got[0].includes(down),
+        typeof got[1] === "string" && !got[1].includes(odd) && got[1].includes("did not answer"),
+        got[2],
+        got[3],
+      ),
+      tup(true, true, true, true),
+    );
+  }
   o = await tm(["create", "zephyr nowhere", "--json"], W);
   check(
     "create with neither project nor workspace → exit 2 naming both as inputs",

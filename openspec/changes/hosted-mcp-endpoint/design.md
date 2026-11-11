@@ -237,6 +237,10 @@ the same reading the API uses), else Bun's `server.requestIP(req).address`. Sing
    `Content-Type` whose media type is not `application/json` (parameters allowed), unparsable
    JSON, a JSON array, or a non-object: 400 JSON-RPC `{"jsonrpc":"2.0","id":null,"error":
    {"code":-32600,"message":"The body must be one JSON-RPC message."}}`.
+   Then a `subscriptions/listen` request answers JSON-RPC `-32601` "Method not found" with its
+   `id` (404 on a 2026-07-28 request, 200 on the 2025 leg) before the SDK, so no SSE stream is
+   ever opened (slice-2 review item D); for that one method this answers ahead of the SDK's
+   protocol-header checks (`-32020`, `-32022`).
 8. `method` `tools/call` naming a catalog tool whose `annotations.readOnlyHint` is not `true`,
    under a `read` key: 403 `insufficient_scope`, "This credential is read-only; this tool needs
    write access.", header `WWW-Authenticate: Bearer error="insufficient_scope", scope="read
@@ -483,7 +487,7 @@ Go `html/template` escaping was proven on text and attribute contexts):
 | --- | --- | --- | --- |
 | (GET) | none | validate | `signin` |
 | `password` | `signin` | `$app.findAuthRecordByEmail("users", email)` (throws when unknown), `validatePassword`, then the users `authRule` via `$app.canAccessRecord(u, new RequestInfo({ auth: u }), u.collection().authRule)` | `consent`, or `signin` with a message |
-| `send_code` | `signin` | known email: create a `_otps` record (`collectionRef`, `recordRef`, `sentTo`, `setPassword(code)`) with an 8-digit code from `$security.randomStringWithAlphabet(8, "0123456789")`, then `$mails.sendRecordOTP($app, u, otp.id, code)`; unknown email: nothing | `code` (otp id in the token, `""` when unknown) |
+| `send_code` | `signin` | known email: create a `_otps` record (`collectionRef`, `recordRef`, `sentTo`, `setPassword(code)`) with an 8-digit code from `$security.randomStringWithAlphabet(8, "0123456789")`, then `$mails.sendRecordOTP($app, u, otp.id, code)`; unknown email: nothing | `code` (a random 15-character id in the user-id slot and the otp id in the token; an unknown email gets a random 15-character id in both, as PocketBase's own `request-otp` does. Correction: this cell first said `""` when unknown, which told a reader of the token whether the email has an account.) |
 | `verify_code` | `code` | inside `$app.runInTransaction`: `findOTPById`, `hasExpired(u.collection().otp.durationTime())`, `validatePassword(code)`, delete on success; a wrong guess increments `oauth_otp_tries:<id>` and at 5 deletes the OTP; then the `authRule` check | `consent`, or `code` with a message |
 | `approve` | `consent` | issue a code (D15) | 302 to `redirect_uri?code=&state=&iss=` |
 | `deny` | `consent` | nothing | 302 to `redirect_uri?error=access_denied&state=&iss=` |

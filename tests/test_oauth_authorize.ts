@@ -8,6 +8,7 @@
  * 8203 + PB_PORT_OFFSET; a stub of the MCP service's private listener on 8204 + PB_PORT_OFFSET.
  */
 
+import { createHmac, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -178,6 +179,12 @@ const STUB_ANSWERS: Record<string, [number, object]> = {
   "https://flaky.example/meta": [503, { error: "host did not answer" }],
 };
 const stub_seen: { client_id: string; secret: string | null }[] = [];
+const FLOW_SECRET = randomBytes(20).toString("hex");
+/** A flow token signed as pb_hooks/lib/oauth.js sign_flow signs one, with the pinned secret. */
+const sign_flow = (stage: string, q: string, uid: string, otp: string, exp: number) => {
+  const payload = [stage, q, uid, otp, exp].join("|");
+  return payload + "|" + createHmac("sha256", FLOW_SECRET).update(payload).digest("hex");
+};
 
 let server: roomkit.Room | null = null;
 let sink: Bun.Subprocess | null = null;
@@ -211,7 +218,13 @@ try {
   process.env.MCP_PUBLIC_URL = "http://mcp.test";
   process.env.MCP_INTERNAL_URL = `http://127.0.0.1:${STUB_PORT}`;
   process.env.MCP_INTERNAL_SECRET = "s3cret";
-  server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, roomkit.hooks_dir(S));
+  // A private hooks copy (the battery shares one) whose test-only hook pins the flow secret to this run's value.
+  const hooks = copy_tree(roomkit.hooks_dir(S), path.join(S, "pb_hooks_pinned"));
+  fs.writeFileSync(
+    path.join(hooks, "zz_test_flow_secret.pb.js"),
+    `routerUse((e) => { e.app.store().set("oauthFlowSecret", ${JSON.stringify(FLOW_SECRET)}); return e.next(); });\n`,
+  );
+  server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, hooks);
   const [, su_r] = await api("POST", "/api/collections/_superusers/auth-with-password", null, {
     identity: SU_EMAIL,
     password: SU_PASSWORD,
@@ -244,6 +257,7 @@ try {
     return r.id;
   }
   const alice_id = await user("Alice", true, true);
+  const ann_id = await user("Ann", true, true);
   await user("Una", true, false);
   await user("Vic", false, true);
 
@@ -437,6 +451,11 @@ try {
       ),
       tup(302, "http://localhost:5555/callback", true, "xyz", BASE_URL),
     );
+    check(
+      "approve_redirect_headers: the 302 carries Cache-Control no-store, Referrer-Policy no-referrer",
+      tup(ap.headers.get("Cache-Control"), ap.headers.get("Referrer-Policy")),
+      tup("no-store", "no-referrer"),
+    );
     const ex = await exchange(BASE_URL, u?.searchParams.get("code") ?? "none", base);
     check(
       "password_consent_approve: the code exchanges → 200, scope read write",
@@ -472,6 +491,33 @@ try {
     tup(a.status, a.text.includes('value="approve"'), a.headers.get("Location")),
     tup(200, true, null),
   );
+  {
+    const consent = await consent_page(base, { email: "ann@example.com", password: PASSWORD });
+    const [s_un] = await api("PATCH", `/api/collections/users/records/${ann_id}`, su, {
+      approved: false,
+    });
+    a = await post(consent, { action: "approve", access: "write" });
+    check(
+      "approve_rechecks_account: unapproved after sign-in → sign-in 'waiting for approval', no code",
+      tup(
+        s_un,
+        a.status,
+        a.text.includes("waiting for approval"),
+        a.text.includes('value="password"'),
+        a.headers.get("Location"),
+        await codes_of(ann_id),
+      ),
+      tup(200, 200, true, true, null, 0),
+    );
+  }
+  {
+    const { location } = await sign_in_and_approve(BASE_URL, { ...base, state: "a&b" }, ALICE);
+    check(
+      "state_encoded: state a&b → the Location carries state=a%26b and reads back a&b",
+      tup(location.includes("state=a%26b"), new URL(location).searchParams.get("state")),
+      tup(true, "a&b"),
+    );
+  }
 
   console.log("\n── flow token ──");
   const other = await consent_page({ ...base, state: "other" });
@@ -502,6 +548,49 @@ try {
     tup(a.status, a.text.includes(START_AGAIN), a.headers.get("Location")),
     tup(200, true, null),
   );
+  {
+    const consent = await consent_page();
+    const parts = (field(consent, "flow") ?? "").split("|");
+    const forged = (i: number, value: string) =>
+      parts.map((p, j) => (j === i ? value : p)).join("|");
+    const tampered: [string, Record<string, string>][] = [
+      ["the user id changed, signature kept", { flow: forged(2, "zzzzzzzzzzzzzzz") }],
+      ["the expiry extended, signature kept", { flow: forged(4, String(Date.now() + 86400000)) }],
+      ["redirect_uri changed to another port", { redirect_uri: "http://localhost:6666/callback" }],
+      ["code_challenge changed", { code_challenge: "A".repeat(43) }],
+    ];
+    for (const [what, extra] of tampered) {
+      a = await post(consent, { action: "approve", access: "write", ...extra });
+      check(
+        `flow_tampered: ${what} → 200 'Start again', no redirect`,
+        tup(a.status, a.text.includes(START_AGAIN), a.headers.get("Location")),
+        tup(200, true, null),
+      );
+    }
+  }
+  {
+    const signin = (await get(base)).text;
+    const q = (field(signin, "flow") ?? "").split("|")[1] ?? "";
+    const pw = { action: "password", ...ALICE };
+    const fresh = await post(signin, {
+      ...pw,
+      flow: sign_flow("signin", q, "", "", Date.now() + 600000),
+    });
+    const expired = await post(signin, {
+      ...pw,
+      flow: sign_flow("signin", q, "", "", Date.now() - 1000),
+    });
+    check(
+      "flow_expired: a self-signed fresh token → consent (pin holds); signed but expired → 'Start again'",
+      tup(
+        fresh.text.includes('value="approve"'),
+        expired.status,
+        expired.text.includes(START_AGAIN),
+        expired.text.includes('value="approve"'),
+      ),
+      tup(true, 200, true, false),
+    );
+  }
   a = await post((await get(base)).text, { action: "nonsense" });
   check(
     "flow_wrong_stage: an unknown action → 200 'Start again'",
@@ -522,11 +611,18 @@ try {
     ),
     tup(200, true, 1, true),
   );
+  const known_flow = field(a.text, "flow");
   let v = await post(a.text, { action: "verify_code", code: alice_code ?? "" });
   check(
     "code_sign_in: verify_code with it → consent page",
     tup(v.status, v.text.includes('value="approve"')),
     tup(200, true),
+  );
+  v = await post(a.text, { action: "verify_code", code: alice_code ?? "" });
+  check(
+    "code_single_use: the same correct code again → 'wrong or has expired', no consent",
+    tup(v.status, v.text.includes("wrong or has expired"), v.text.includes('value="approve"')),
+    tup(200, true, false),
   );
   a = await post((await get(base)).text, { action: "send_code", email: ALICE.email });
   const right = (await nth_code(ALICE.email, 2)) ?? "";
@@ -563,6 +659,16 @@ try {
     ),
     tup(200, true, 0),
   );
+  const shape = (flow: string | null) =>
+    (flow ?? "")
+      .split("|")
+      .slice(2, 4)
+      .map((id) => /^[a-z0-9]{15}$/.test(id));
+  check(
+    "code_flow_same_shape: known and unknown email → user and code ids both 15 characters",
+    tup(shape(known_flow), shape(field(a.text, "flow"))),
+    tup([true, true], [true, true]),
+  );
   v = await post(a.text, { action: "verify_code", code: "12345678" });
   check(
     "code_unknown_email: any code → refused",
@@ -575,9 +681,14 @@ try {
     code: (await nth_code("una@example.com", 1)) ?? "",
   });
   check(
-    "code_unapproved: Una's correct code → 'waiting for approval', no consent",
-    tup(v.status, v.text.includes("waiting for approval"), v.text.includes('value="approve"')),
-    tup(200, true, false),
+    "code_unapproved: Una's correct code → 'waiting for approval', no consent, token keeps its ids",
+    tup(
+      v.status,
+      v.text.includes("waiting for approval"),
+      v.text.includes('value="approve"'),
+      shape(field(v.text, "flow")),
+    ),
+    tup(200, true, false, [true, true]),
   );
 
   console.log("\n── metadata-document clients ──");

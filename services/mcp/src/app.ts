@@ -48,17 +48,25 @@ const PRM_PATHS = new Set([
 ]);
 const WINDOW_MS = 60_000;
 
+// Response.json would add ";charset=utf-8"; D9 names the type exactly.
+function json(body: unknown, status: number, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...headers },
+  });
+}
+
 function error(
   status: number,
   code: string,
   message: string,
   headers: Record<string, string> = {},
 ): Response {
-  return Response.json({ error: { status, code, message } }, { status, headers });
+  return json({ error: { status, code, message } }, status, headers);
 }
 
-function rpc_error(status: number, message: string): Response {
-  return Response.json({ jsonrpc: "2.0", id: null, error: { code: -32600, message } }, { status });
+function rpc_error(status: number, message: string, code = -32600, id: unknown = null): Response {
+  return json({ jsonrpc: "2.0", id, error: { code, message } }, status);
 }
 
 async function serve_mcp(req: Request, body: unknown, factory: () => Server): Promise<Response> {
@@ -199,6 +207,15 @@ export function make_app(env: Env): { fetch(req: Request, ip: string): Promise<R
       Array.isArray(body)
     )
       return rpc_error(400, "The body must be one JSON-RPC message.");
+
+    // The SDK would hold an SSE stream open for this; the service sends none.
+    if (body.method === "subscriptions/listen")
+      return rpc_error(
+        (await isLegacyRequest(req, body)) ? 200 : 404,
+        "Method not found",
+        -32601,
+        body.id ?? null,
+      );
 
     if (body.method === "tools/call" && scope === "read") {
       const tool = TOOLS.find((t) => t.name === body.params?.name);

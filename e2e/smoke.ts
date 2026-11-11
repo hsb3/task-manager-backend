@@ -16,6 +16,7 @@ behind RESEND_API_KEY), scripts/smtp_sink.ts listening on a host-gateway address
 */
 
 import path from "node:path";
+import { authorize_params, field } from "../tests/oauthkit.ts";
 
 const args = process.argv.slice(2);
 const ROOT = path.resolve(
@@ -154,13 +155,14 @@ async function probe_mcp_challenge(): Promise<void> {
   const challenge = r.headers.get("WWW-Authenticate") ?? "";
   // The configured public URL carries port 0 under MCP_PORT=0, so only the ends are fixed.
   check(
-    "MCP POST /mcp without a credential: 401, challenge names the PRM and both scopes",
+    "MCP POST /mcp without a credential: 401 application/json, challenge names the PRM and both scopes",
     [
       r.status,
+      r.headers.get("Content-Type"),
       challenge.startsWith('Bearer resource_metadata="'),
       challenge.endsWith(`${PRM_PATH}", scope="read write"`),
     ],
-    [401, true, true],
+    [401, "application/json", true, true],
   );
 }
 
@@ -224,6 +226,42 @@ async function probe_oauth_refusals(): Promise<void> {
     [revoke.status, unknown.status, ((await unknown.json()) as any).error],
     [200, 400, "invalid_client"],
   );
+  const { code_challenge: _, ...no_pkce } = authorize_params();
+  const back = await fetch(BASE_URL + "/oauth/authorize", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(no_pkce).toString(),
+    redirect: "manual",
+  });
+  check(
+    "POST /oauth/authorize without PKCE: 302 error redirect, no-store, no-referrer",
+    [back.status, back.headers.get("Cache-Control"), back.headers.get("Referrer-Policy")],
+    [302, "no-store", "no-referrer"],
+  );
+}
+
+async function probe_oauth_code_stage_blind(): Promise<void> {
+  const params = authorize_params();
+  const page = await (
+    await fetch(`${BASE_URL}/oauth/authorize?${new URLSearchParams(params)}`)
+  ).text();
+  const body = new URLSearchParams({
+    ...params,
+    flow: field(page, "flow") ?? "",
+    action: "send_code",
+    email: "nobody@example.com",
+  });
+  const code = await fetch(BASE_URL + "/oauth/authorize", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  const ids = (field(await code.text(), "flow") ?? "").split("|").slice(2, 4);
+  check(
+    "send_code for an unknown email: the code page's flow carries two 15-character ids",
+    [code.status, ids.map((id) => /^[a-z0-9]{15}$/.test(id))],
+    [200, [true, true]],
+  );
 }
 
 async function probe_mcp_anon_limit(): Promise<void> {
@@ -253,6 +291,7 @@ const PROBES = [
   probe_mcp_metadata,
   probe_mcp_refusals,
   probe_oauth_refusals,
+  probe_oauth_code_stage_blind,
   probe_mcp_anon_limit,
   probe_signup_rate_limit,
 ];
