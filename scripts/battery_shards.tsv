@@ -41,6 +41,7 @@
 3	6	test_priority_vocab
 2	6	test_roles
 3	6	test_agent_probe
+3	6	test_account_flows
 3	5	test_api_keys
 3	5	test_tm_cli
 4	5	test_auth_rules

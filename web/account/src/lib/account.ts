@@ -247,3 +247,293 @@ export function errorResult(err: unknown): Result<never> {
 export function client(url: string, store?: BaseAuthStore): PocketBase {
   return new PocketBase(url, store);
 }
+
+// The SDK cancels a repeated request to the same path unless requestKey is null; a double render repeats them.
+const once = { requestKey: null };
+
+async function attempt<T>(
+  call: () => Promise<T>,
+  refusal?: (err: ClientResponseError) => Result<never> | undefined,
+): Promise<Result<T>> {
+  try {
+    return { ok: true, value: await call() };
+  } catch (err) {
+    if (refusal && err instanceof ClientResponseError) {
+      const mapped = refusal(err);
+      if (mapped) return mapped;
+    }
+    return errorResult(err);
+  }
+}
+
+const refused = (
+  message: string,
+  status: number,
+  fields: Record<string, string> = {},
+): Result<never> => ({ ok: false, message, fields, status });
+
+export function signUp(
+  pb: PocketBase,
+  email: string,
+  name: string,
+): Promise<Result<null>> {
+  return attempt(async () => {
+    await pb
+      .collection("users")
+      .create({ email: email.trim(), name: name.trim() }, once);
+    return null;
+  });
+}
+
+export function sendPasswordLink(
+  pb: PocketBase,
+  email: string,
+): Promise<Result<null>> {
+  return attempt(async () => {
+    await pb.collection("users").requestPasswordReset(email.trim(), once);
+    return null;
+  });
+}
+
+export function signIn(
+  pb: PocketBase,
+  email: string,
+  password: string,
+): Promise<Result<null>> {
+  return attempt(
+    async () => {
+      await pb
+        .collection("users")
+        .authWithPassword(email.trim(), password, once);
+      return null;
+    },
+    (err) =>
+      err.status === 400
+        ? refused(MESSAGES.wrongCredentials, 400)
+        : err.status === 403
+          ? refused(MESSAGES.notReady, 403)
+          : undefined,
+  );
+}
+
+export function signInWithProvider(
+  pb: PocketBase,
+  provider: string,
+  popup: { location: { href: string } } | null,
+): Promise<Result<null>> {
+  return attempt(
+    async () => {
+      await pb.collection("users").authWithOAuth2({
+        provider,
+        urlCallback: (url) => {
+          if (popup) popup.location.href = url;
+        },
+        ...once,
+      });
+      return null;
+    },
+    (err) =>
+      err.isAbort
+        ? refused("", 0)
+        : err.status === 403
+          ? refused(MESSAGES.notReady, 403)
+          : undefined,
+  );
+}
+
+export function setPassword(
+  pb: PocketBase,
+  token: string,
+  password: string,
+  passwordConfirm: string,
+): Promise<Result<null>> {
+  return attempt(
+    async () => {
+      await pb
+        .collection("users")
+        .confirmPasswordReset(token, password, passwordConfirm, once);
+      return null;
+    },
+    (err) => {
+      if (err.status !== 400 || !err.response.data?.token) return undefined;
+      const all = errorResult(err);
+      if (all.ok) return undefined;
+      const { token: _token, ...fields } = all.fields;
+      return refused(MESSAGES.linkInvalid, 400, fields);
+    },
+  );
+}
+
+export function confirmEmail(
+  pb: PocketBase,
+  token: string,
+): Promise<Result<null>> {
+  return attempt(
+    async () => {
+      await pb.collection("users").confirmVerification(token, once);
+      return null;
+    },
+    (err) =>
+      err.status === 400 ? refused(MESSAGES.linkInvalid, 400) : undefined,
+  );
+}
+
+export async function refreshSession(pb: PocketBase): Promise<boolean> {
+  try {
+    await pb.collection("users").authRefresh(once);
+    return true;
+  } catch {
+    pb.authStore.clear();
+    return false;
+  }
+}
+
+export function signOut(pb: PocketBase): void {
+  pb.authStore.clear();
+}
+
+export function saveName(pb: PocketBase, name: string): Promise<Result<null>> {
+  return attempt(async () => {
+    const id = pb.authStore.record?.id ?? "";
+    await pb.collection("users").update(id, { name: name.trim() }, once);
+    return null;
+  });
+}
+
+export async function authProviders(
+  pb: PocketBase,
+): Promise<{ name: string; displayName: string }[]> {
+  try {
+    const methods = await pb.collection("users").listAuthMethods(once);
+    return methods.oauth2.enabled
+      ? methods.oauth2.providers.map(({ name, displayName }) => ({
+          name,
+          displayName,
+        }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function linkedProviders(pb: PocketBase): Promise<string[]> {
+  try {
+    const rows = await pb
+      .collection("_externalAuths")
+      .getFullList<{ provider: string }>({ fields: "provider", ...once });
+    return rows.map((r) => r.provider);
+  } catch {
+    return [];
+  }
+}
+
+export function listKeys(pb: PocketBase): Promise<Result<KeyItem[]>> {
+  return attempt(async () => {
+    const r = await pb.send<{ items: KeyItem[] }>("/api/tracker/keys", {
+      method: "GET",
+      ...once,
+    });
+    return r.items;
+  });
+}
+
+export function myWorkspaces(pb: PocketBase): Promise<Result<Workspace[]>> {
+  return attempt(async () => {
+    const r = await pb.send<{ workspaces: Workspace[] }>("/api/tracker/me", {
+      method: "GET",
+      ...once,
+    });
+    return r.workspaces;
+  });
+}
+
+export function projectsOf(
+  pb: PocketBase,
+  workspaceId: string,
+): Promise<Result<ProjectRef[]>> {
+  return attempt(() =>
+    pb.collection("projects").getFullList<ProjectRef>({
+      filter: pb.filter("workspace = {:w} && trashed = ''", { w: workspaceId }),
+      sort: "name",
+      fields: "id,name",
+      batch: 500,
+      ...once,
+    }),
+  );
+}
+
+export function createKey(
+  pb: PocketBase,
+  input: NewKey,
+): Promise<Result<{ item: KeyItem; secret: string }>> {
+  const body: Record<string, unknown> = {
+    name: input.name.trim(),
+    scope: input.scope,
+    reach: input.reach,
+  };
+  if (input.reach !== "all") body.workspace = input.workspace ?? "";
+  if (input.reach === "projects") body.projects = input.projects ?? [];
+  if (input.expires) body.expires = input.expires;
+  return attempt(async () => {
+    const {
+      key,
+      user: _user,
+      collectionId: _cid,
+      collectionName: _cname,
+      updated: _updated,
+      ...rest
+    } = await pb.collection("api_keys").create(body, once);
+    return { item: { ...rest, current: false } as KeyItem, secret: key };
+  });
+}
+
+export function revokeKey(
+  pb: PocketBase,
+  id: string,
+): Promise<Result<KeyItem>> {
+  return attempt(() =>
+    pb.send<KeyItem>(`/api/tracker/keys/${encodeURIComponent(id)}/revoke`, {
+      method: "POST",
+      ...once,
+    }),
+  );
+}
+
+export async function isAppAdmin(pb: PocketBase): Promise<boolean> {
+  try {
+    await pb.send("/api/tracker/admin/pending-users", {
+      method: "GET",
+      ...once,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function pendingUsers(pb: PocketBase): Promise<Result<PendingUser[]>> {
+  return attempt(
+    async () => {
+      const r = await pb.send<{ users: PendingUser[] }>(
+        "/api/tracker/admin/pending-users",
+        { method: "GET", ...once },
+      );
+      return r.users;
+    },
+    (err) => (err.status === 404 ? refused(MESSAGES.notAdmin, 404) : undefined),
+  );
+}
+
+export function approveUser(pb: PocketBase, id: string): Promise<Result<null>> {
+  return attempt(
+    async () => {
+      await pb.send(
+        `/api/tracker/admin/pending-users/${encodeURIComponent(id)}/approve`,
+        { method: "POST", ...once },
+      );
+      return null;
+    },
+    (err) =>
+      err.status === 404 ? refused(MESSAGES.accountGone, 404) : undefined,
+  );
+}
