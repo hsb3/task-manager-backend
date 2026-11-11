@@ -47,7 +47,7 @@
       "type": "text"
     },
     {
-      "help": "What the key may do: read allows only reads, write also allows changes; chosen at create and fixed afterwards.",
+      "help": "The key's level, per workspace role tier: read only reads; write also creates, edits, trashes work; manage also changes settings, invitations and members and purges trash; own also changes roles, hands over and deletes workspaces and accepts invitations. Capped by the user's role; fixed at create.",
       "hidden": false,
       "id": "select4200600003",
       "maxSelect": 1,
@@ -58,7 +58,9 @@
       "type": "select",
       "values": [
         "read",
-        "write"
+        "write",
+        "manage",
+        "own"
       ]
     },
     {
@@ -174,6 +176,50 @@
       "required": false,
       "system": false,
       "type": "text"
+    },
+    {
+      "help": "Which part of the tracker the key reaches: all for every workspace its user belongs to, workspace for one workspace, projects for some projects of one workspace; empty on keys made before reach existed, which reach every workspace. Chosen at create and fixed afterwards.",
+      "hidden": false,
+      "id": "select4200610001",
+      "maxSelect": 1,
+      "name": "reach",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "select",
+      "values": [
+        "all",
+        "workspace",
+        "projects"
+      ]
+    },
+    {
+      "cascadeDelete": true,
+      "collectionId": "pbc_300100001",
+      "help": "The one workspace a key limited to a workspace or to projects reaches, empty for a key that reaches every workspace; deleting the workspace for good deletes the key. Chosen at create and fixed afterwards.",
+      "hidden": false,
+      "id": "relation4200610002",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "workspace",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "cascadeDelete": false,
+      "collectionId": "pbc_484305853",
+      "help": "The projects a key limited to projects reaches, all in its workspace; a project deleted for good drops out of the list. Chosen at create and fixed afterwards.",
+      "hidden": false,
+      "id": "relation4200610003",
+      "maxSelect": 100,
+      "minSelect": 0,
+      "name": "projects",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
     }
   ],
   "indexes": [

@@ -42,6 +42,29 @@ Assigning a task grants nothing on its own. No rule or route admits a task assig
 - **Assignment is limited to members.** A validation hook in `pb_hooks/main.pb.js` refuses, with a 400, an assignee who is neither the workspace owner nor an active member of the task workspace, which a rule cannot express because an update rule denial answers 404. It checks only a changed assignee, so a task whose assignee is later suspended stays editable on other fields.
 - **Accepting an invitation never reactivates a suspended member**: an existing membership row is left as it is.
 
+## api-key-reach-and-levels
+
+- **Slug:** `decision:api-key-reach-and-levels`
+- **Title:** A key carries a reach, every workspace, one workspace or some of its projects, and a level that follows the role tiers, and acts at the lower of its level and its user's role.
+- **Ref:** `api_keys`
+
+Owner rulings of 2026-11-10:
+
+- **How narrow a key's reach can be.** Ruled: every workspace, or one workspace optionally narrowed to some of its projects (not sets of workspaces).
+- **What a project-limited key sees outside its projects.** Ruled: the workspace's settings (statuses, labels, cycles, members) only; work filed under no project is out of reach.
+- **How AC-4's limit is expressed.** Ruled: key levels follow decision:role-tiers (`read`, `write`, `manage`, `own`), at the lower of level and role (not one level above write, not per-surface permissions).
+- **Whether a write key keeps deletes that have no trash.** Ruled: kept at `write` (deleting a comment, removing an attachment, moving a project to the trash).
+- **What happens to existing write keys.** Ruled: a stored `write` means the new `write` tier; a key needing more is reissued.
+- **What the OAuth consent page offers.** Ruled: workspace picker plus read or write; a higher level only when the client requests it by name; no project narrowing on consent.
+
+**How it is enforced.** The key middleware removes the reach headers from every request and sets them for a key limited to a workspace or projects. Every workspace-bound collection rule carries a clause on those headers, so lists, views, writes and expansions keep to the reach. Custom routes, realtime delivery and file downloads apply the same reach by hand, and a new workspace-bound collection or route must do the same.
+
+**users stay listable.** Any signed-in user lists users today, and a limited key does too.
+
+**A level above the role does nothing.** A key acts at the lower of the two.
+
+Prior art: Linear lets a personal API key be limited to certain teams and permissions (https://linear.app/docs/api-and-webhooks); a GitHub fine-grained token reaches one resource owner and selected repositories, with administration as its own permission (https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens); Notion lets a person choose pages at consent and answers 404 for a page not shared (https://developers.notion.com/docs/authorization).
+
 ## api-key-reads-refused
 
 - **Slug:** `decision:api-key-reads-refused`
@@ -83,6 +106,8 @@ Accepted limits:
 - **A key survives a password change of its owner.** A key ends only by revoke, expiry or delete.
 
 `pb_hooks/api_keys.pb.js` implements it and `tests/test_api_keys.ts` proves it. See collection:api_keys and concept:api-keys.
+
+**Superseded in part:** write keys no longer reach every non-admin tracker route; a key's level and reach decide (decision:api-key-reach-and-levels).
 
 ## app-settings
 

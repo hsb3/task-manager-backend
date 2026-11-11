@@ -9,7 +9,7 @@ export interface ApiKeysListResult {
   totalPages: number;
 }
 
-/** One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read or write), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool).
+/** One row per key, owned by one user. Fields: user (relation to users, required, removed with the user), name (text, required, up to 200 characters), scope (select, required: read, write, manage or own, the key's level), key_hash (text, required, HIDDEN, unique: the SHA-256 hex digest of the key, never the key itself), expires (date, optional) and revoked (bool), reach (select: all, workspace or projects; empty on older keys, read as all), workspace (relation to workspaces, removed with the workspace) and projects (relation to projects, up to 100).
 
 **Access.** OWNER-ONLY. list, view and delete are open only to the signed-in owner of the row. create mints a key only for the caller: a create naming another user is refused with 400, and an omitted user is filled with the caller. update may change name and may set revoked to true; a change to user, scope, key_hash or expires, or setting revoked back to false, is refused with 404. A superuser may mint a key for the user it names.
 
@@ -17,7 +17,9 @@ export interface ApiKeysListResult {
 
 A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.
 
-**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is "" for a key minted by hand; a value sent at create is replaced with "", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is "" for a key minted by hand. */
+**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is "" for a key minted by hand; a value sent at create is replaced with "", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is "" for a key minted by hand.
+
+**Reach and level.** Both are chosen at create and fixed: a change to reach, workspace or projects is refused with 404, as for scope. A create is refused with 400 when the reach is incoherent, the workspace is not one the user belongs to, a project is not a live project of it, or a projects key asks for manage or own (decision:api-key-reach-and-levels). */
 export interface ApiKeysRecord {
   client_id?: string;
   created?: string;
@@ -25,13 +27,16 @@ export interface ApiKeysRecord {
   id: string;
   key_hash?: string;
   name: string;
+  projects?: string[];
+  reach?: "all" | "workspace" | "projects";
   refresh_expires?: string;
   refresh_hash?: string;
   refresh_prev_hash?: string;
   revoked?: boolean;
-  scope: "read" | "write";
+  scope: "read" | "write" | "manage" | "own";
   updated?: string;
   user: string;
+  workspace?: string;
 }
 
 /** Paginated list of `app_docs` records. */
@@ -1039,7 +1044,15 @@ export interface Paths {
   };
   "GET /api/tracker/me": {
     response: {
-      key?: { client_id: string; expires: string; id: string; scope: "read" | "write" };
+      key?: {
+        client_id: string;
+        expires: string;
+        id: string;
+        projects: string[];
+        reach: "all" | "workspace" | "projects";
+        scope: "read" | "write" | "manage" | "own";
+        workspace: string;
+      };
       unread_notifications: number;
       user: { id: string; name: string };
       workspaces: {
@@ -1202,6 +1215,8 @@ export const FIELD_TYPES = {
     id: "string",
     key_hash: "string",
     name: "string",
+    projects: "array",
+    reach: "string",
     refresh_expires: "string",
     refresh_hash: "string",
     refresh_prev_hash: "string",
@@ -1209,6 +1224,7 @@ export const FIELD_TYPES = {
     scope: "string",
     updated: "string",
     user: "string",
+    workspace: "string",
   },
   app_docs: {
     body: "string",

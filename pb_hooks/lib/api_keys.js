@@ -1,5 +1,5 @@
 /// <reference path="../../pb_data/types.d.ts" />
-// Whether request text names the api_keys collection (decision:api-key-reads-refused); require() it inside a handler body.
+// API key helpers: whether request text names api_keys (decision:api-key-reads-refused) and a key's plain request-store object; require() inside a handler body.
 
 // Checks the raw text, its percent-decoding (byte by byte, as Go reads a query, never throwing)
 // and that decoding with JSON \u escapes resolved, so no spelling PocketBase decodes slips past.
@@ -20,4 +20,18 @@ function namesApiKeys(app, text) {
   });
 }
 
-module.exports = { namesApiKeys };
+// The request-store and `me` view of a key; a key made before reach existed reads as reach all.
+function keyInfo(key) {
+  return {
+    id: key.id,
+    scope: key.getString("scope"),
+    expires: key.getString("expires"),
+    client_id: key.getString("client_id"),
+    reach: key.getString("reach") || "all",
+    workspace: key.getString("workspace"),
+    // The JSON round trip yields a plain array.
+    projects: JSON.parse(JSON.stringify(key.getStringSlice("projects"))),
+  };
+}
+
+module.exports = { namesApiKeys, keyInfo };

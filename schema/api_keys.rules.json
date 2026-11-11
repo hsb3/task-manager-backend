@@ -2,6 +2,6 @@
   "listRule": "@request.auth.id != \"\" && user = @request.auth.id",
   "viewRule": "@request.auth.id != \"\" && user = @request.auth.id",
   "createRule": "@request.auth.id != \"\" && (user = \"\" || user = @request.auth.id)",
-  "updateRule": "@request.auth.id != \"\" && user = @request.auth.id && @request.body.user:isset = false && @request.body.scope:isset = false && @request.body.key_hash:isset = false && @request.body.expires:isset = false && (@request.body.revoked:isset = false || @request.body.revoked = true) && @request.body.client_id:isset = false",
+  "updateRule": "(@request.auth.id != \"\" && user = @request.auth.id && @request.body.user:isset = false && @request.body.scope:isset = false && @request.body.key_hash:isset = false && @request.body.expires:isset = false && (@request.body.revoked:isset = false || @request.body.revoked = true) && @request.body.client_id:isset = false) && @request.body.reach:isset = false && @request.body.workspace:isset = false && @request.body.projects:isset = false",
   "deleteRule": "@request.auth.id != \"\" && user = @request.auth.id"
 }

@@ -21,21 +21,25 @@ capabilities:
     - custom(user = @request.auth.id)
     authRequired: guard
   update:
-    verbatim: '@request.auth.id != "" && user = @request.auth.id && @request.body.user:isset = false &&
+    verbatim: (@request.auth.id != "" && user = @request.auth.id && @request.body.user:isset = false &&
       @request.body.scope:isset = false && @request.body.key_hash:isset = false && @request.body.expires:isset
       = false && (@request.body.revoked:isset = false || @request.body.revoked = true) && @request.body.client_id:isset
-      = false'
+      = false) && @request.body.reach:isset = false && @request.body.workspace:isset = false && @request.body.projects:isset
+      = false
     actors:
     - custom(user = @request.auth.id)
-    authRequired: guard
+    authRequired: absent
     body_guards:
     - '@request.body.client_id:isset'
     - '@request.body.expires:isset'
     - '@request.body.key_hash:isset'
+    - '@request.body.projects:isset'
+    - '@request.body.reach:isset'
     - '@request.body.revoked'
     - '@request.body.revoked:isset'
     - '@request.body.scope:isset'
     - '@request.body.user:isset'
+    - '@request.body.workspace:isset'
     body_pins:
     - '@request.body.user:isset = false'
     - '@request.body.scope:isset = false'
@@ -44,6 +48,9 @@ capabilities:
     - '@request.body.revoked:isset = false'
     - '@request.body.revoked = true'
     - '@request.body.client_id:isset = false'
+    - '@request.body.reach:isset = false'
+    - '@request.body.workspace:isset = false'
+    - '@request.body.projects:isset = false'
   delete:
     verbatim: '@request.auth.id != "" && user = @request.auth.id'
     actors:
@@ -55,6 +62,16 @@ relations:
   cardinality: one
   required: true
   on_target_delete: cascade
+- field: workspace
+  target: workspaces
+  cardinality: one
+  required: false
+  on_target_delete: cascade
+- field: projects
+  target: projects
+  cardinality: many
+  required: false
+  on_target_delete: clear
 fields:
 - name: name
   type: text
@@ -65,6 +82,8 @@ fields:
   values:
   - read
   - write
+  - manage
+  - own
 - name: key_hash
   type: text
   required: true
@@ -90,6 +109,13 @@ fields:
   type: text
   required: false
   hidden: true
+- name: reach
+  type: select
+  required: false
+  values:
+  - all
+  - workspace
+  - projects
 field_policies:
 - 'key_hash: hidden field'
 - 'refresh_hash: hidden field'
