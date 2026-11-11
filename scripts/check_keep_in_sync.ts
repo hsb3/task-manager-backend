@@ -26,7 +26,8 @@
  *      file (or files) plus the marker's own file. Present everywhere is a live mirror; present
  *      in some and not others is exactly one side of a pair having moved. A body is the file
  *      with every KEEP IN SYNC comment run masked out, so no marker can satisfy another
- *      marker's claim with its own prose. A `KEEP IN SYNC (below)` marker narrows its own
+ *      marker's claim with its own prose, and a whole-line comment outside Markdown is not
+ *      presence either. A `KEEP IN SYNC (below)` marker narrows its own
  *      file's side to the BELOW_LINES code lines under its comment run, for a fact inlined at
  *      several sites of one file, where any other site would otherwise stand in for a moved one;
  *   4. a plain-form literal sits on at most one code line of its own file's body, since
@@ -286,6 +287,13 @@ export function audit(root: string): Report {
     }
     return bodies.get(rel)!;
   };
+  // Prose is the mirror in Markdown, where `#` and `*` open headings and bullets, not comments.
+  const code_of = (rel: string): string =>
+    rel.endsWith(".md")
+      ? body_of(rel)
+      : splitlines(body_of(rel))
+          .filter((l) => comment_prefix(l) === null)
+          .join("\n");
 
   for (const rel of files) {
     const text = texts.get(rel);
@@ -333,7 +341,7 @@ export function audit(root: string): Report {
           `${rel}:${code[0]! + 1}-${code.at(-1)! + 1} ` +
           `(the ${BELOW_LINES} code lines under the marker)`;
       }
-      const side = (m: string): string => (m === rel && below !== null ? below : body_of(m));
+      const side = (m: string): string => (m === rel && below !== null ? below : code_of(m));
       const label = (m: string): string => (m === rel ? window : m);
       const enforced_literals: string[] = [];
       const unmirrored: string[] = [];
@@ -384,7 +392,10 @@ export function audit(root: string): Report {
           "names " +
             targets.join(", ") +
             "; mirrors " +
-            enforced_literals.map((x) => py_repr(x)).join(", "),
+            enforced_literals.map((x) => py_repr(x)).join(", ") +
+            (unmirrored.length
+              ? "; not mirrored " + unmirrored.map((x) => py_repr(x)).join(", ")
+              : ""),
         ]);
       } else {
         report.rows.push([where, "unverified", "names " + targets.join(", ")]);

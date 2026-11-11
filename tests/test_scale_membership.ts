@@ -660,6 +660,8 @@ try {
     }
     // Threshold: baseline spread <= its own median, else the median is junk and the budget it
     // inflates would fail green, so the pair is INCONCLUSIVE (not judged), never red or green.
+    // Known limit: a MAJORITY of slow samples inflates the median itself, which this test passes
+    // as quiet and widens the budget; host_noise times another request, so nothing here catches it.
     const pair = `${who.split(" (")[0]}/${kind.split(" (")[0]}`;
     if (baseline.spread > baseline.median) {
       inconclusive.push(pair);
