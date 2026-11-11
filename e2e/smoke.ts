@@ -154,6 +154,37 @@ async function probe_read_key_me(): Promise<void> {
   check("read key me lists the provisioned workspace", workspaces.length >= 1, true);
 }
 
+async function probe_key_levels(): Promise<void> {
+  const session = await key_session();
+  const call = async (method: string, url: string, auth: string, body?: unknown) => {
+    const r = await fetch(BASE_URL + url, {
+      method,
+      headers: { "Content-Type": "application/json", Authorization: auth },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: r.status, json: (await r.json().catch(() => null)) as any };
+  };
+  const me = await call("GET", "/api/tracker/me", session);
+  const ws: string = me.json?.workspaces?.[0]?.id ?? "";
+  const task = await call("POST", "/api/collections/tasks/records", session, {
+    title: "smoke level probe",
+    workspace: ws,
+  });
+  const key = `Bearer ${await mint_key({ scope: "write" })}`;
+  const url = `/api/collections/tasks/records/${task.json?.id}`;
+  const refusal = (r: { status: number; json: any }) => [r.status, r.json?.data?.api_key?.code];
+  check("write key trashes a task", (await call("DELETE", url, key)).status, 204);
+  check("write key purge refused", refusal(await call("DELETE", url, key)), [403, "api_key_scope"]);
+  const uid = JSON.parse(Buffer.from(session.split(".")[1], "base64url").toString()).id;
+  check(
+    "write key transfer-ownership refused",
+    refusal(
+      await call("POST", `/api/tracker/workspaces/${ws}/transfer-ownership`, key, { user: uid }),
+    ),
+    [403, "api_key_scope"],
+  );
+}
+
 // Without the edge, the counted address is the Docker gateway that publishes the port.
 async function probe_forged_client_address(): Promise<void> {
   const signin = (headers: Record<string, string> = {}) =>
@@ -328,6 +359,7 @@ const PROBES = [
   probe_batch_upsert,
   probe_password_signup,
   probe_read_key_me,
+  probe_key_levels,
   probe_forged_client_address,
   probe_mcp_challenge,
   probe_mcp_metadata,

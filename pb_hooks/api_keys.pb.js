@@ -162,11 +162,11 @@ require(`${__hooks}/lib/routes.js`).use(
         }
       }
       let allowed = false;
+      let target = null;
       if (
         route === "/api/collections/{collection}/records" ||
         route === "/api/collections/{collection}/records/{id}"
       ) {
-        let target = null;
         try {
           target = $app.findCollectionByNameOrId(
             e.request.pathValue("collection"),
@@ -179,7 +179,7 @@ require(`${__hooks}/lib/routes.js`).use(
           target.name !== "api_keys" &&
           (target.name !== "users" || method === "GET" || method === "HEAD");
       } else {
-        // KEEP IN SYNC: scripts/gen_openapi.ts renders this allowlist (`/api/tracker/admin/`) and the read list (`/api/tracker/export`) into every route's description.
+        // KEEP IN SYNC: scripts/gen_openapi.ts renders this allowlist (`/api/tracker/admin/`) into every route's description; levels come from requiredLevel.
         allowed =
           route.startsWith("/api/files/") ||
           route === "/api/realtime" ||
@@ -193,34 +193,70 @@ require(`${__hooks}/lib/routes.js`).use(
         });
       }
 
-      const reads =
-        method === "GET" ||
-        method === "HEAD" ||
-        (method === "POST" &&
-          (route === "/api/realtime" ||
-            route === "/api/files/token" ||
-            route === "/api/tracker/export"));
-      if (key.getString("scope") === "read" && !reads) {
-        const msg = "This API key is read-only.";
+      const lib = require(`${__hooks}/lib/api_keys.js`);
+      const coll = target ? target.name : "";
+      const need = lib.requiredLevel(method, route, coll);
+      const have = key.getString("scope");
+      const keyInfo = lib.keyInfo(key);
+      const refuseLevel = (level) => {
+        const msg = lib.levelMessage(have, level);
         throw new ApiError(403, msg, {
           api_key: new ValidationError("api_key_scope", msg),
         });
+      };
+      if (need !== null && !lib.levelAtLeast(have, need)) refuseLevel(need);
+
+      // A purge or leaving needs a higher level; decided only when the key may delete the record, so one out of reach still answers 404.
+      if (
+        method === "DELETE" &&
+        route === "/api/collections/{collection}/records/{id}"
+      ) {
+        let rec = null;
+        try {
+          rec = $app.findRecordById(target, e.request.pathValue("id"));
+        } catch (_) {}
+        if (
+          rec &&
+          target.deleteRule !== null &&
+          $app.canAccessRecord(
+            rec,
+            new RequestInfo({
+              auth: owner,
+              headers: lib.reachHeaders(keyInfo),
+            }),
+            target.deleteRule,
+          )
+        ) {
+          if (
+            [
+              "tasks",
+              "decisions",
+              "documents",
+              "milestones",
+              "projects",
+            ].includes(target.name) &&
+            String(rec.get("trashed")) !== "" &&
+            !lib.levelAtLeast(have, "manage")
+          )
+            refuseLevel("manage");
+          if (
+            target.name === "workspace_members" &&
+            rec.getString("user") === owner.id &&
+            !lib.levelAtLeast(have, "own")
+          )
+            refuseLevel("own");
+        }
       }
 
       // decision:api-key-reads-refused: rules cannot tell a key from its owner, and relation joins skip api_keys rules.
-      if (
-        require(`${__hooks}/lib/api_keys.js`).namesApiKeys(
-          $app,
-          e.request.url.rawQuery,
-        )
-      ) {
+      if (lib.namesApiKeys($app, e.request.url.rawQuery)) {
         const msg = "API keys cannot read API keys.";
         throw new ApiError(403, msg, {
           api_key: new ValidationError("api_key_path", msg),
         });
       }
 
-      e.set("tmApiKey", require(`${__hooks}/lib/api_keys.js`).keyInfo(key));
+      e.set("tmApiKey", keyInfo);
       e.auth = owner;
       return e.next();
     },
@@ -228,6 +264,24 @@ require(`${__hooks}/lib/routes.js`).use(
     "tmkApiKeyAuth",
   ),
 );
+
+// A role change needs the body, which the middleware never reads; its order against membership_status.pb.js's refusals is not fixed.
+onRecordUpdateRequest((e) => {
+  require(`${__hooks}/lib/unknown_keys.js`).refuseUnknownKeys(e); // unknown key answers first
+  const lib = require(`${__hooks}/lib/api_keys.js`);
+  const k = e.get("tmApiKey");
+  if (
+    k &&
+    e.record.getString("role") !== e.record.original().getString("role") &&
+    !lib.levelAtLeast(k.scope, "own")
+  ) {
+    const msg = lib.levelMessage(k.scope, "own");
+    throw new ApiError(403, msg, {
+      api_key: new ValidationError("api_key_scope", msg),
+    });
+  }
+  return e.next();
+}, "workspace_members");
 
 // A key's realtime subscriptions arrive in the body, out of the middleware's reach.
 onRealtimeSubscribeRequest((e) => {

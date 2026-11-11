@@ -39,10 +39,11 @@ write, expirable and revocable, and a revoked or expired one is refused on its n
 
 **AC-4** A write key can be denied destructive and ownership routes while keeping its other
 writes.
-- Verdict: missing.
-- Evidence: decision:api-keys accepts that write keys reach every non-admin tracker route, which
-  includes `POST /api/tracker/workspaces/{id}/transfer-ownership` (`pb_hooks/lib/routes.js`).
-- Gap: no key setting below full write.
+- Verdict: met.
+- Evidence: `tests/test_key_levels.ts` ("aWrite purges the trashed task → 403 api_key_scope,
+  still trashed", "aManage transfer-ownership of WT to Bob → 403", "aWrite creates, edits and
+  trashes a task → 200, 200, 204"); decision:api-key-reach-and-levels.
+- Gap: none.
 
 **AC-5** Revoking a key ends that key's open realtime stream.
 - Verdict: missing.

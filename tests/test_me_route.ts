@@ -379,6 +379,7 @@ try {
   const KEYS = "/api/collections/api_keys/records";
   const [, read_key] = await api("POST", KEYS, alice, { name: "me caps read", scope: "read" });
   const [, write_key] = await api("POST", KEYS, alice, { name: "me caps write", scope: "write" });
+  const [, own_key] = await api("POST", KEYS, alice, { name: "me caps own", scope: "own" });
   const session_me = await me(alice);
   const read_me = await me(read_key.key ?? "tmk_none");
   check(
@@ -392,8 +393,13 @@ try {
     (session_me?.workspaces ?? []).map((w: any) => w.id),
   );
   check(
-    "write key me: owner workspace capabilities equal the session's",
+    "write key me: write only",
     entry(await me(write_key.key ?? "tmk_none"), A_WS)?.capabilities ?? null,
+    { write: true, manage: false, own: false },
+  );
+  check(
+    "own key me: owner workspace all true",
+    entry(await me(own_key.key ?? "tmk_none"), A_WS)?.capabilities ?? null,
     { write: true, manage: true, own: true },
   );
   check("session me unchanged", entry(session_me, A_WS)?.capabilities ?? null, {

@@ -33,6 +33,8 @@ without a key:
   the 31st 429 with `Retry-After`.
 - `probe_read_key_me`: a read key's `GET /api/tracker/me` lists the provisioned workspace with
   every capability false.
+- `probe_key_levels`: a write key trashes a task the fixture user made (204), but purging it and
+  `POST /api/tracker/workspaces/{id}/transfer-ownership` answer 403 `api_key_scope`.
 
 A smoke run copies `e2e/fixtures/smoke_key_user.js` into the image and restarts it, so the key
 probes have one approved, verified user; keyed paths beyond those probes stay battery-only.

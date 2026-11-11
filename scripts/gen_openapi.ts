@@ -29,6 +29,7 @@ const OUTPUT = path.join(REPO, "openapi.json");
 const ROUTES: Record<string, any> = createRequire(import.meta.url)(
   path.join(REPO, "pb_hooks/lib/routes.js"),
 ).ROUTES;
+const KEY_LIB = createRequire(import.meta.url)(path.join(REPO, "pb_hooks/lib/api_keys.js"));
 
 const OPENAPI_VERSION = "3.1.0";
 
@@ -550,19 +551,21 @@ function rate_limit_text(rate: RateRule): string {
   );
 }
 
-// KEEP IN SYNC: pb_hooks/api_keys.pb.js key path allowlist (`/api/tracker/admin/`) and key read list (`/api/tracker/export`).
-/** What an API key gets on this route: "refused", "read" (any key) or "write" (write scope only). */
-function key_access(method: string, p: string): "refused" | "read" | "write" {
+// KEEP IN SYNC: pb_hooks/api_keys.pb.js key path allowlist (`/api/tracker/admin/`).
+/** What an API key gets on this route: "refused", or the lowest key level that may call it. */
+function key_access(method: string, p: string): "refused" | "read" | "write" | "manage" | "own" {
   if (!p.startsWith("/api/tracker/") || p.startsWith("/api/tracker/admin/")) return "refused";
-  return method === "GET" || method === "HEAD" || (method === "POST" && p === "/api/tracker/export")
-    ? "read"
-    : "write";
+  // null is a superuser-only route, whose text the caller blanks.
+  return KEY_LIB.requiredLevel(method, p, "") ?? "read";
 }
 
 const KEY_TEXT = {
   refused: "API keys are refused here with 403.",
   read: "An API key acts as its user, so it may call this too.",
-  write: "An API key acts as its user and needs write scope here; a read-only key gets 403.",
+  write: "An API key acts as its user and needs the write level here; a read-only key gets 403.",
+  manage:
+    "An API key acts as its user and needs the manage level or above here; a lower level gets 403.",
+  own: "An API key acts as its user and needs the own level here; a lower level gets 403.",
 };
 
 function _error_resp(desc: string): any {

@@ -167,6 +167,8 @@ try {
   check("the create response carries no key_hash", "key_hash" in read_rec, false);
   const [, write_rec] = await mint(alice, "alice write", "write");
   const WRITE_KEY: string = write_rec.key ?? "";
+  const [, manage_rec] = await mint(alice, "alice manage", "manage");
+  const MANAGE_KEY: string = manage_rec.key ?? "";
   check("a second key differs from the first", WRITE_KEY !== READ_KEY && WRITE_KEY !== "", true);
   const [, bob_rec] = await mint(bob, "bob write", "write");
   const BOB_KEY: string = bob_rec.key ?? "";
@@ -178,13 +180,13 @@ try {
   );
   [s, r] = await api("GET", KEYS, alice);
   check(
-    "list by the owner: Alice sees her two keys, none carrying key or key_hash",
+    "list by the owner: Alice sees her three keys, none carrying key or key_hash",
     tup(
       s,
       r.items?.length,
       r.items?.some((i: any) => "key" in i || "key_hash" in i),
     ),
-    tup(200, 2, false),
+    tup(200, 3, false),
   );
   [s, r] = await api("GET", `${KEYS}/${read_rec.id}`, su);
   check(
@@ -200,7 +202,7 @@ try {
       sse.absent_count(created_events.length),
       created_events.some((e) => "key" in e.record || "key_hash" in e.record),
     ),
-    tup(2, false),
+    tup(3, false),
   );
   sse.stop = true;
   [s, r] = await api("PATCH", `${KEYS}/${read_rec.id}`, alice, { name: "alice read" });
@@ -363,18 +365,18 @@ try {
     tup(200, alice_id),
   );
   check(
-    "write key PATCH that workspace → 200",
-    (await api("PATCH", `${WORKSPACES}/${r.id}`, WRITE_KEY, { name: "write key ws 2" }))[0],
+    "manage key PATCH that workspace → 200",
+    (await api("PATCH", `${WORKSPACES}/${r.id}`, MANAGE_KEY, { name: "manage key ws 2" }))[0],
     200,
   );
   // e.requestInfo() in the middleware would buffer and parse this before PB's body limit.
   const big = await fetch(BASE_URL + `${WORKSPACES}/${r.id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Authorization: WRITE_KEY },
+    headers: { "Content-Type": "application/json", Authorization: MANAGE_KEY },
     body: "x".repeat(33 * 1024 * 1024),
   });
   await big.body?.cancel();
-  check("write key PATCH with a body over the size limit → 413", big.status, 413);
+  check("manage key PATCH with a body over the size limit → 413", big.status, 413);
   check(
     "read key POST /api/tracker/export → 200 (export only reads)",
     (await api("POST", "/api/tracker/export", READ_KEY, { workspace: ALICE_WS }))[0],

@@ -7,7 +7,8 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
     );
   const uid = e.auth.id;
   const k = e.get("tmApiKey");
-  const readOnly = !!k && k.scope === "read";
+  const lib = require(`${__hooks}/lib/api_keys.js`);
+  const level = k ? k.scope : "own";
   const rows = arrayOf(
     new DynamicModel({ id: "", name: "", owner: "", role: "", status: "" }),
   );
@@ -46,7 +47,7 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
         .one(res);
       counts = { projects: res.projects, open_items: res.open_items };
     }
-    // decision:role-tiers: write = items and projects, manage = settings, vocabulary, invites and purge, own = roles, transfer, workspace delete; a read key holds none.
+    // decision:role-tiers: write = items and projects, manage = settings, vocabulary, invites and purge, own = roles, transfer, workspace delete; a key holds at most its level.
     workspaces.push({
       id: w.id,
       // A suspended member cannot read the workspace, so its name is withheld here too.
@@ -55,9 +56,12 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
       status: owner ? "active" : w.status,
       counts: counts,
       capabilities: {
-        write: !readOnly && active && role !== "viewer",
-        manage: !readOnly && active && (role === "owner" || role === "admin"),
-        own: !readOnly && owner,
+        write: active && role !== "viewer" && lib.levelAtLeast(level, "write"),
+        manage:
+          active &&
+          (role === "owner" || role === "admin") &&
+          lib.levelAtLeast(level, "manage"),
+        own: owner && level === "own",
       },
     });
   }
