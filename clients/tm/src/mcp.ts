@@ -18,7 +18,7 @@ export const VERSION: string = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 ).version;
 
-export type Scope = "read" | "write";
+export type Scope = "read" | "write" | "manage" | "own";
 
 type ToolDef = {
   name: string;
@@ -151,7 +151,7 @@ export const TOOLS: ToolDef[] = [
 
 /** The catalog in order, without `run`; a read scope keeps only the read-only tools. */
 export function tools_for(scope: Scope): Omit<ToolDef, "run">[] {
-  return TOOLS.filter((t) => scope === "write" || t.annotations.readOnlyHint === true).map(
+  return TOOLS.filter((t) => scope !== "read" || t.annotations.readOnlyHint === true).map(
     ({ run, ...tool }) => tool,
   );
 }
@@ -244,7 +244,6 @@ export function make_server(cfg: Config, scope_of: () => Promise<Scope>): Server
 function scope_from_me(cfg: Config): () => Promise<Scope> {
   return async () => {
     try {
-      // shortcut: a manage or own key gets the read-only tool list until tools_for learns the levels.
       return ((await api(cfg, "GET /api/tracker/me", {})).key?.scope ?? "write") as Scope;
     } catch {
       return "write";

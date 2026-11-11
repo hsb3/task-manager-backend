@@ -262,9 +262,15 @@ const ROUTES = {
             properties: { id: { type: "string" }, name: { type: "string" } },
             required: ["id", "name"],
           },
-          unread_notifications: { type: "integer" },
+          unread_notifications: {
+            type: "integer",
+            description:
+              "Under an API key limited to a workspace or to projects, counts only the unread notifications in that reach.",
+          },
           workspaces: {
             type: "array",
+            description:
+              "Under an API key limited to one workspace, lists only that workspace; projects-limited keys count only those projects and the open items in them.",
             items: {
               type: "object",
               properties: {
@@ -351,7 +357,7 @@ const ROUTES = {
   },
   "POST /api/tracker/notifications/read-all": {
     summary:
-      "Marks the caller's unread notifications as read, optionally only those of one workspace.",
+      "Marks the caller's unread notifications as read, optionally only those of one workspace. An API key limited to one workspace marks only that workspace's notifications, and a key limited to projects only those tied to work in those projects.",
     auth: "any",
     query: {
       workspace: {
@@ -420,7 +426,7 @@ const ROUTES = {
   },
   "GET /api/tracker/search": {
     summary:
-      "Searches the tasks, decisions, documents, milestones and projects the caller can read by title and text.",
+      "Searches the tasks, decisions, documents, milestones and projects the caller can read by title and text. An API key limited to one workspace matches only in that workspace, and a key limited to projects only the items and projects among those.",
     auth: "any",
     query: {
       q: {
@@ -475,7 +481,11 @@ const ROUTES = {
         type: "object",
         properties: {
           user: { type: "string", description: "The caller's name." },
-          total: { type: "integer" },
+          total: {
+            type: "integer",
+            description:
+              "Under an API key limited to one workspace, counts only that workspace's tasks; a key limited to projects counts only those projects' tasks.",
+          },
           byStatus: {
             type: "object",
             description: "Task count per status id.",
@@ -737,6 +747,8 @@ const ROUTES = {
           truncated: { type: "boolean" },
           items: {
             type: "array",
+            description:
+              "Under an API key limited to a workspace, lists only that workspace.",
             items: { $ref: "#/components/schemas/WorkspacesRecord" },
           },
         },

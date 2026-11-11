@@ -37,7 +37,7 @@ export const MIGRATIONS = path.join(REPO, "pb_migrations");
 // The NEWEST app_docs seed migration is the corpus's current source; a re-seed moves this.
 // .gitattributes is generated from this constant, so a re-seed moves `merge=binary` onto the new
 // seed and the superseded one drops out of it; gen_gitattributes.ts --check blesses that move.
-export const DEFAULT_OUTPUT = path.join(REPO, "pb_migrations", "1785190500_seed_app_docs.js");
+export const DEFAULT_OUTPUT = path.join(REPO, "pb_migrations", "1785190700_seed_app_docs.js");
 
 // The seed's prose has no other source, so a value edit is caught against this committed digest.
 export const DIGEST = path.join(REPO, "scripts", "app_docs_seed.sha256");

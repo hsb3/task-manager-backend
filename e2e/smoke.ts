@@ -234,6 +234,18 @@ async function probe_key_reach(): Promise<void> {
   );
 }
 
+async function probe_oauth_scopes(): Promise<void> {
+  const as: any = await fetch(BASE_URL + "/.well-known/oauth-authorization-server").then((r) =>
+    r.json(),
+  );
+  check("authorization server scopes_supported: read, write, manage, own", as.scopes_supported, [
+    "read",
+    "write",
+    "manage",
+    "own",
+  ]);
+}
+
 // Without the edge, the counted address is the Docker gateway that publishes the port.
 async function probe_forged_client_address(): Promise<void> {
   const signin = (headers: Record<string, string> = {}) =>
@@ -448,6 +460,7 @@ const PROBES = [
   probe_read_key_me,
   probe_key_levels,
   probe_key_reach,
+  probe_oauth_scopes,
   probe_forged_client_address,
   probe_mcp_challenge,
   probe_mcp_metadata,

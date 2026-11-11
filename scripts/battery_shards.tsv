@@ -98,6 +98,7 @@
 3	2	test_check_migration_citations
 2	2	test_constants_checker
 4	2	test_invitation_limits
+3	2	test_oauth_key_limits
 1	2	test_owner_defaults
 4	2	test_item_list_filters
 2	2	test_item_write_refusals

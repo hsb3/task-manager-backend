@@ -35,6 +35,11 @@ relations:
   cardinality: one
   required: true
   on_target_delete: cascade
+- field: workspace
+  target: workspaces
+  cardinality: one
+  required: false
+  on_target_delete: cascade
 fields:
 - name: code_hash
   type: text
@@ -57,9 +62,17 @@ fields:
   values:
   - read
   - write
+  - manage
+  - own
 - name: expires
   type: date
   required: true
+- name: reach
+  type: select
+  required: false
+  values:
+  - all
+  - workspace
 field_policies: []
 unique_indexes:
 - CREATE UNIQUE INDEX `idx_oauth_codes_code_hash` ON `oauth_codes` (`code_hash`)

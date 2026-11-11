@@ -107,7 +107,7 @@
       "type": "text"
     },
     {
-      "help": "The access the person granted.",
+      "help": "The level the person granted: read, write, manage or own.",
       "hidden": false,
       "id": "select4300100007",
       "maxSelect": 1,
@@ -118,7 +118,9 @@
       "type": "select",
       "values": [
         "read",
-        "write"
+        "write",
+        "manage",
+        "own"
       ]
     },
     {
@@ -142,6 +144,35 @@
       "presentable": false,
       "system": false,
       "type": "autodate"
+    },
+    {
+      "help": "Every workspace, or the one workspace the person chose; empty means every workspace.",
+      "hidden": false,
+      "id": "select4300100010",
+      "maxSelect": 1,
+      "name": "reach",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "select",
+      "values": [
+        "all",
+        "workspace"
+      ]
+    },
+    {
+      "cascadeDelete": true,
+      "collectionId": "pbc_300100001",
+      "help": "The workspace the person chose, or empty for every workspace.",
+      "hidden": false,
+      "id": "relation4300100011",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "workspace",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "relation"
     }
   ],
   "indexes": [
