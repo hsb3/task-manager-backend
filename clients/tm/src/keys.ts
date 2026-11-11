@@ -35,12 +35,13 @@ export function status_of(row: KeyRow): string {
   return row.revoked ? "revoked" : expired(row) ? "expired" : row.current ? "active*" : "active";
 }
 
-/** C0/C1, line separators, bidi and zero-width characters as \uXXXX (lower-case hex) and a backslash doubled, so a stored name cannot forge rows, escapes, colours or hidden text. */
+/** Controls, format characters (bidi, zero-width, tags), lone surrogates, line separators and Hangul fillers as \uXXXX or \u{XXXXX} (lower-case hex), a backslash doubled: a stored name cannot forge rows, escapes or colours, and what it hides is shown. */
 export const escaped = (s: string): string =>
-  s.replace(
-    /[\\\u0000-\u001f\u007f-\u009f\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g,
-    (c) => (c === "\\" ? "\\\\" : "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0")),
-  );
+  s.replace(/[\\\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}\u115f\u1160\u3164\uffa0]/gu, (c) => {
+    if (c === "\\") return "\\\\";
+    const n = c.codePointAt(0)!;
+    return n > 0xffff ? `\\u{${n.toString(16)}}` : "\\u" + n.toString(16).padStart(4, "0");
+  });
 
 // by code point, so a cut never splits a surrogate pair
 const pad = (s: string, n: number) => {

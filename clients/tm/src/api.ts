@@ -9,7 +9,9 @@ import { os_clear, os_delete, os_get, os_set, type Store, store_mode } from "./s
 export type Config = { url: string; key: string; headers?: Record<string, string> };
 
 export function config_path(): string {
-  const xdg = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+  const env = process.env.XDG_CONFIG_HOME;
+  // the XDG spec says a relative path is ignored
+  const xdg = env && path.isAbsolute(env) ? env : path.join(os.homedir(), ".config");
   return path.join(xdg, "tm", "config.json");
 }
 
@@ -55,10 +57,14 @@ export async function save_config(cfg: {
   return { file, store };
 }
 
-/** Ends the saved login on this machine: its store entry and the file. */
-export async function forget_config(url: string): Promise<void> {
-  fs.rmSync(config_path(), { force: true }); // first: a store refusal must not keep the login
-  if (store_mode() === "os") await os_delete(url);
+/** Ends the saved login on this machine: the file, temp files a killed save left, then the store entry in any mode; false when that entry could not be cleared. */
+export async function forget_config(url: string): Promise<boolean> {
+  const file = config_path();
+  fs.rmSync(file, { force: true }); // first: a store refusal must not keep the login
+  const dir = path.dirname(file);
+  for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : [])
+    if (/^config\.json\.\d+\.tmp$/.test(f)) fs.rmSync(path.join(dir, f), { force: true }); // may hold the key
+  return os_clear(url);
 }
 
 /** The saved login alone (TM_URL and TM_API_KEY ignored); strict removes a broken file and refuses. */
@@ -77,7 +83,7 @@ export async function saved_login(strict: boolean): Promise<Config | null> {
     throw e;
   }
   const url = saved.url.replace(/\/+$/, "");
-  const stored = mode === "os" ? await os_get(url) : null;
+  const stored = mode === "os" ? await os_get(url).catch(() => null) : null;
   return { url, key: stored || (typeof saved.key === "string" ? saved.key : "") };
 }
 
@@ -112,10 +118,12 @@ export async function load_config(): Promise<Config> {
   const file = config_path();
   const saved = read_saved(file);
   const url = process.env.TM_URL || saved.url || "";
+  const saved_url = typeof saved.url === "string" ? saved.url.replace(/\/+$/, "") : "";
   let raw: unknown = process.env.TM_API_KEY;
   let from = "TM_API_KEY";
-  if (!raw && mode === "os" && typeof url === "string" && url) {
-    raw = await os_get(url);
+  // only the saved login's entry: one logout could not clear must never come back
+  if (!raw && mode === "os" && saved_url && String(url).replace(/\/+$/, "") === saved_url) {
+    raw = await os_get(saved_url);
     from = "the credential store";
   }
   if (!raw) {

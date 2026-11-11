@@ -190,7 +190,14 @@ async function browser_login(v: {
     keys: true,
     open_browser: !v["no-browser"],
   });
-  const { file, store } = await save_config({ url, key });
+  let saved: Awaited<ReturnType<typeof save_config>>;
+  try {
+    saved = await save_config({ url, key });
+  } catch (e) {
+    await revoke_self({ url, key }); // never printed nor saved, so it would be an orphan
+    throw e;
+  }
+  const { file, store } = saved;
   await retire(previous, key);
   let me: Awaited<ReturnType<typeof api<"GET /api/tracker/me">>>;
   try {
@@ -284,21 +291,25 @@ async function login(url: string | undefined): Promise<{ file: string; store: st
   if (!pasted) throw new UsageError("no key was pasted");
   const key = check_key(pasted, "the paste");
   const previous = await saved_login(false);
-  const server = url || process.env.TM_URL || previous?.url;
-  if (!server) throw new UsageError("login needs --url the first time");
-  const saved = await save_config({ url: server, key });
+  const raw = url || process.env.TM_URL || previous?.url;
+  if (!raw) throw new UsageError("login needs --url the first time");
+  const saved = await save_config({ url: server_url(raw), key });
   await retire(previous, key);
   return saved;
 }
 
-/** Revokes the replaced login's key through itself when it may manage keys; it is being replaced, so failures are ignored. */
-async function retire(previous: Config | null, new_key: string): Promise<void> {
-  if (!previous || !previous.key || previous.key === new_key) return;
+/** Revokes a key through itself (only one that may manage keys, if asked); it is being dropped, so failures are ignored. */
+async function revoke_self(cfg: Config, manage_only = false): Promise<void> {
   try {
-    const { key } = await api(previous, "GET /api/tracker/me", {});
-    if (key?.manage_keys)
-      await api(previous, "POST /api/tracker/keys/{id}/revoke", { path: { id: key.id } });
+    const { key } = await api(cfg, "GET /api/tracker/me", {});
+    if (key && (!manage_only || key.manage_keys))
+      await api(cfg, "POST /api/tracker/keys/{id}/revoke", { path: { id: key.id } });
   } catch {}
+}
+
+/** Revokes the replaced login's key when it may manage keys. */
+async function retire(previous: Config | null, new_key: string): Promise<void> {
+  if (previous?.key && previous.key !== new_key) await revoke_self(previous, true);
 }
 
 /** Revokes the saved key where it may, then removes the saved login whatever the server said. */
@@ -326,8 +337,9 @@ async function logout(json: boolean): Promise<number> {
         1,
       ];
   }
-  await forget_config(saved.url);
+  if (reason) reason = keys.escaped(reason);
   const where = `logged out of ${saved.url}`;
+  // printed before the removal: a filesystem error there still leaves the revoke outcome on record
   if (json) console.log(JSON.stringify({ url: saved.url, key_id, revoked }));
   else if (revoked) console.log(`${where}; key ${key_id} revoked`);
   else if (!key_id)
@@ -335,6 +347,10 @@ async function logout(json: boolean): Promise<number> {
       `${where}; the saved key ${reason ? `was not revoked: ${reason}` : "was already invalid"}`,
     );
   else console.log(`${where}; key ${key_id} was not revoked: ${reason}`);
+  if (!(await forget_config(saved.url)))
+    console.error(
+      `tm: warning: the credential store could not be reached to remove the key saved for ${saved.url}; tm no longer uses it`,
+    );
   return code;
 }
 
@@ -381,6 +397,11 @@ async function main(argv: string[]): Promise<number> {
     if (v["with-key"] && (v.scope !== undefined || v["no-browser"]))
       throw new UsageError("--with-key cannot be combined with --scope or --no-browser");
     if (!v["with-key"]) return browser_login(v);
+    // the ignored text is never echoed: it may be a key
+    if (rest.length)
+      console.error(
+        "tm: warning: text after login was ignored; the key is read from the prompt or standard input",
+      );
     const { file, store } = await login(v.url);
     const where = store === "os" ? " (key in the system credential store)" : "";
     console.log(v.json ? JSON.stringify({ saved: file, store }) : `saved to ${file}${where}`);
@@ -459,6 +480,11 @@ try {
   if (e instanceof UsageError) {
     console.error(`tm: ${e.message}\n${HELP}`);
     process.exit(2);
+  }
+  // a filesystem or system error: its message names a path, never a key
+  if (e instanceof Error && typeof (e as any).code === "string" && (e as any).syscall) {
+    console.error(`tm: ${e.message}`);
+    process.exit(1);
   }
   throw e;
 }

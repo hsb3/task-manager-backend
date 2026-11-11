@@ -13,7 +13,7 @@ const html = (s: string) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
   );
 
-/** Opens the page in the default browser; a missing opener is ignored, as the URL is printed too. */
+/** Opens the page in the default browser, without TM_ variables (TM_API_KEY may hold a key); a missing opener is ignored, as the URL is printed too. */
 function open_page(url: string): void {
   const [cmd, args] =
     process.platform === "darwin"
@@ -22,7 +22,10 @@ function open_page(url: string): void {
         ? ["rundll32", ["url.dll,FileProtocolHandler", url]]
         : ["xdg-open", [url]];
   try {
-    const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => !k.startsWith("TM_")),
+    );
+    const child = spawn(cmd, args, { detached: true, stdio: "ignore", env });
     child.on("error", () => {});
     child.unref();
   } catch {}

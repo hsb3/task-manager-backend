@@ -109,7 +109,9 @@ already have put on main.
     (https://bun.com/docs/runtime/secrets, fetched 2026-11-10); see Risks. Under Node
     (`globalThis.Bun` undefined) the file is used.
 16. **`TM_CREDENTIAL_STORE`** (`os` default, `file`) lets suites and operators keep the key out
-    of the store. Suites set `file`, so no suite writes a developer's keychain.
+    of the store. Suites set `file`, so no suite stores a key in a developer's keychain; `logout`
+    still deletes the saved URL's entry in either mode (root ruling 2026-11-11), so a suite's
+    logout deletes the never-created entry for its room URL.
 17. **Module layout.** `clients/tm/src/store.ts` (where the key lives), `clients/tm/src/keys.ts`
     (key route calls), `clients/tm/src/oauth.ts` (browser sign-in), all importable without the
     MCP SDK; `clients/tm/tm.ts` parses and prints. Keeps `clients/tm/src/mcp.ts` and
@@ -584,8 +586,10 @@ form `8112/8113 = test_file_storage` uses).
     - `async function os_get(url): Promise<string | null | undefined>`, `os_set(url, key):
       Promise<boolean>`, `os_delete(url): Promise<void>`: `undefined`/`false` when
       `globalThis.Bun?.secrets` is absent or a call rejects with `code ===
-      "ERR_SECRETS_PLATFORM_ERROR"`; any other rejection: see below. Service `"tm"`, name `url` (the URL with trailing slashes removed). Every `os_*`
-      call is made only when `store_mode() === "os"`; in `file` mode they are not called at all.
+      "ERR_SECRETS_PLATFORM_ERROR"`; any other rejection: see below. Service `"tm"`, name `url` (the URL with trailing slashes removed). `os_get`,
+      `os_set` and `os_delete` are called only when `store_mode() === "os"`; `os_clear(url):
+      Promise<boolean>` (best-effort delete, never throws, `false` when a store exists but could
+      not be reached or refused) is the one call `file` mode makes, from `forget_config`.
       A rejection with any other code is wrapped as `ConfigError("the credential store refused:
       <message>")` (exit 1).
       A test seam: `export const backend = { secrets: () => (globalThis as any).Bun?.secrets }`,
@@ -596,16 +600,25 @@ form `8112/8113 = test_file_storage` uses).
       `store_mode() === "os"` and `await os_set(url, key)` → write `{ url }`, return `os`; else
       write `{ url, key }`, print `tm: no credential store is available; the key is saved in
       <file>, readable only by this user` on stderr (only when the mode was `os`), return `file`. (root ruling 2026-11-11: that fallback then removes the store entry for the URL, best effort; when the store cannot be reached it prints one `tm: warning:` line, so an older stored key never wins over the file.)
-      File written with `{ mode: 0o600 }` then `chmodSync(file, 0o600)` as today.
+      The file is written to a temp file `config.json.<pid>.tmp` (flag `wx`, i.e. O_EXCL, mode
+      0o600, then `chmodSync` 0o600) and renamed over `config.json`, so a symlink there is
+      replaced, never written through, and no half file is left; a failed write removes the temp.
     - `load_config(): Promise<Config>` (now async): first `store_mode()` (so a bad
       `TM_CREDENTIAL_STORE` is refused on every run); `url` = `TM_URL` ‖ saved URL; key =
-      `TM_API_KEY` ‖ (mode `os` and `url` non-empty ? `await os_get(url)` : null) ‖ `saved.key` ‖ "". Messages unchanged. `check_key`'s `from` is
+      `TM_API_KEY` ‖ (mode `os`, a saved file exists, and `url` equals the saved URL ?
+      `await os_get(saved url)` : null) ‖ `saved.key` ‖ "": the store is read only for the saved
+      login, so an entry `logout` could not clear is never used. Messages unchanged. `check_key`'s `from` is
       `TM_API_KEY`, `the credential store` or the file path.
     - `save_config` also calls `os_delete(<previous saved url>)` when a saved URL exists and
       differs from the new one, so no store entry outlives its login.
-    - `forget_config(url: string): Promise<void>`: `os_delete(url)`, then `fs.rmSync(file, { force: true })`.
+    - `forget_config(url: string): Promise<boolean>`: `fs.rmSync(file, { force: true })` first (a
+      store refusal must not keep the login), then removes any `config.json.<digits>.tmp` a killed
+      save left beside it (it may hold the key), then `os_clear(url)` in either mode (root ruling
+      2026-11-11); returns whether the store entry was cleared and never throws for the store.
+      `logout` prints one `tm: warning:` line naming the URL when it returns `false`.
     - `saved_login(strict: boolean): Promise<Config | null>`: ignores `TM_URL`/`TM_API_KEY`;
-      `{url, key}` when both are found (key from the store entry for that URL, else the file);
+      `{url, key}` when both are found (key from the store entry for that URL, else the file; a
+      store read failure counts as no entry);
       `{url, key: ""}` when only the URL is; null when there is no file; a malformed file →
       null when `strict` is false (login); when true (logout) the file is removed and
       `ConfigError` is thrown with `load_config`'s wording (exit 1), so the login is removed in
@@ -634,8 +647,9 @@ form `8112/8113 = test_file_storage` uses).
       saved key was already invalid` (exit 0); any other `ApiError` → reason = its
       message, exit 1 after cleanup. `/oauth/revoke` is not used: ruling 2 makes the manage-keys
       permission the way a key is revoked from `tm`, and a pasted hand-minted key would answer
-      `unsupported_token_type` there anyway (hosted-mcp-endpoint contract, Revocation request). Then `await forget_config(saved.url)`; print
-      per the contract.
+      `unsupported_token_type` there anyway (hosted-mcp-endpoint contract, Revocation request). Then
+      print per the contract (the reason through `keys.escaped`), then `await
+      forget_config(saved.url)`, so a filesystem error after the line ends in `tm: <message>`, exit 1.
   - `tests/test_tm_cli.ts`: every `tm(["login", ...], ..., <key>)` becomes `tm(["login",
     "--with-key", ...])`; `tm_pty` login calls the same; the env of `tm()` and `tm_pty()` gains
     `TM_CREDENTIAL_STORE: "file"`; the expected `--json` of login gains `store: "file"`.
@@ -645,8 +659,8 @@ form `8112/8113 = test_file_storage` uses).
     "ERR_SECRETS_PLATFORM_ERROR"}` → `save_config` returns `file`, file holds the key, stderr note);
     `os store used` (in-memory backend → returns `os`, file is `{url}` only, `load_config` returns
     the key); `other rejection` (`{code: "EACCES"}` → `save_config` rejects with `ConfigError` `the credential store refused: <message>`);
-    `TM_CREDENTIAL_STORE=file` → backend never called by `save_config`, `load_config`,
-    `saved_login` or `forget_config`; `TM_CREDENTIAL_STORE=bogus` → ConfigError
+    `TM_CREDENTIAL_STORE=file` → backend never called by `save_config`, `load_config` or
+    `saved_login`, and `forget_config` only deletes; `TM_CREDENTIAL_STORE=bogus` → ConfigError
     with the contract text; `old file still read` (`{url, key}` file, empty backend → key from the
     file); `directory tightened` (dir pre-made 0755 → 0700 after save); `no Bun` (backend returns
     undefined → `file`); `under Node` (the suite runs `bun build --target=node
@@ -839,6 +853,8 @@ form `8112/8113 = test_file_storage` uses).
   request's success path and logs on failure.
 - **Callback port probing.** Another local process could hit the listener; it gets 400 without
   our random `state`, and PKCE binds the code to this `tm` (RFC 8252 §8.1).
+- **`chmod 0700` follows a symlinked `$XDG_CONFIG_HOME/tm`** (accepted): a symlinked directory is
+  the user's choice, and tm keeps the directory that holds its login private wherever it lives.
 - **Metadata issuer not compared with the URL** (accepted, root ruling 2026-11-11). `tm` checks
   the callback's `iss` against the metadata `issuer` but does not compare that `issuer` with the
   URL the metadata came from (RFC 8414 §3.3): the server's issuer is `PB_PUBLIC_URL`, which a

@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 /**
  * tm credential store (clients/tm/src/store.ts): the key goes to the system store when one answers,
- * else to the config file with a note; TM_CREDENTIAL_STORE=file never touches the store; the
- * config directory is tightened to 0700; a Node build falls back to the file. No server, no port.
+ * else to the config file with a note; TM_CREDENTIAL_STORE=file touches the store only to clear it
+ * at logout; logout leaves no usable key behind; the config directory is tightened to 0700; a Node
+ * build falls back to the file. No server, no port.
  */
 
 import fs from "node:fs";
@@ -182,11 +183,129 @@ try {
       check("load_config reads the file", await load_config(), { url: URL_B, key: KEY });
       check("saved_login reads the file", await saved_login(true), { url: URL_B, key: KEY });
       await save_config({ url: URL_A, key: KEY });
+      check("save, load and saved_login never call the backend", tup(touched, m.calls), tup(0, []));
       await forget_config(URL_B);
       check("forget_config removes the file", fs.existsSync(file), false);
-      check("the backend was never called", tup(touched, m.calls), tup(0, []));
+      check("forget_config clears the store entry even here", m.calls, ["delete"]);
     });
   }
+
+  {
+    const m = mem();
+    await run_case("os login, then logout in file mode", undefined, m.api, async ({ file }) => {
+      await save_config({ url: URL_B, key: KEY });
+      process.env.TM_CREDENTIAL_STORE = "file";
+      check(
+        "forget_config clears the os entry and says so",
+        tup(await forget_config(URL_B), m.entries.size, fs.existsSync(file)),
+        tup(true, 0, false),
+      );
+    });
+  }
+
+  {
+    const old = "tmk_" + "O".repeat(40);
+    const entries = new Map([[`tm|${URL_B}`, old]]);
+    const stuck = {
+      get: async (o: any) => entries.get(`${o.service}|${o.name}`) ?? null,
+      set: async () => {},
+      delete: async () => {
+        throw coded("EACCES", "denied");
+      },
+    };
+    await run_case(
+      "store refuses the delete at logout",
+      undefined,
+      stuck,
+      async ({ file, stderr }) => {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ url: URL_B }));
+        const tmp = `${file}.4242.tmp`;
+        fs.writeFileSync(tmp, JSON.stringify({ url: URL_B, key: old }));
+        const kept = path.join(path.dirname(file), "notes.tmp");
+        fs.writeFileSync(kept, "mine");
+        const got = await forget_config(URL_B).then(
+          (r) => r,
+          (e) => `threw: ${e}`,
+        );
+        check(
+          "forget_config does not throw, returns false; file and leftover temp gone, other files kept",
+          tup(got, fs.existsSync(file), fs.existsSync(tmp), fs.existsSync(kept)),
+          tup(false, false, false, true),
+        );
+        check("saved_login then finds nothing", await saved_login(true), null);
+        process.env.TM_URL = URL_B;
+        try {
+          check(
+            "load_config with TM_URL set refuses; the stranded store key is never read",
+            await refusal(load_config()),
+            "no server or key configured: run `tm login` or set TM_URL and TM_API_KEY",
+          );
+        } finally {
+          delete process.env.TM_URL;
+        }
+        check("nothing printed", stderr(), "");
+      },
+    );
+  }
+
+  {
+    const k1 = "tmk_" + "1".repeat(40);
+    const m = mem();
+    m.entries.set(`tm|${URL_B}`, k1);
+    await run_case(
+      "the store is read only for the saved login's URL",
+      undefined,
+      m.api,
+      async ({ file }) => {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ url: URL_A }));
+        process.env.TM_URL = URL_B;
+        try {
+          check(
+            "TM_URL names another server: its store entry is not used",
+            await refusal(load_config()),
+            "no server or key configured: run `tm login` or set TM_URL and TM_API_KEY",
+          );
+        } finally {
+          delete process.env.TM_URL;
+        }
+      },
+    );
+  }
+
+  {
+    const failing_get = {
+      get: async () => {
+        throw coded("EACCES", "the keychain is locked");
+      },
+      set: async () => {},
+      delete: async () => true,
+    };
+    await run_case(
+      "saved_login survives a store read failure",
+      undefined,
+      failing_get,
+      async ({ file }) => {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ url: URL_B, key: KEY }));
+        check(
+          "saved_login falls back to the file's key",
+          await saved_login(true).catch((e) => `threw: ${e}`),
+          { url: URL_B, key: KEY },
+        );
+      },
+    );
+  }
+
+  await run_case("relative XDG_CONFIG_HOME", "file", undefined, async () => {
+    process.env.XDG_CONFIG_HOME = "relative/xdg";
+    check(
+      "ignored, as the XDG spec says: ~/.config is used",
+      config_path(),
+      path.join(os.homedir(), ".config", "tm", "config.json"),
+    );
+  });
 
   await run_case("TM_CREDENTIAL_STORE=bogus", "bogus", mem().api, async ({ file }) => {
     const want = "TM_CREDENTIAL_STORE must be os or file";
@@ -285,23 +404,6 @@ try {
       },
     );
   }
-
-  const deny_delete = {
-    get: async () => null,
-    set: async () => {},
-    delete: async () => {
-      throw coded("EACCES", "denied");
-    },
-  };
-  await run_case("store refuses the delete at logout", undefined, deny_delete, async ({ file }) => {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ url: URL_B }));
-    check(
-      "forget_config reports the refusal and the file is gone anyway",
-      tup(await refusal(forget_config(URL_B)), fs.existsSync(file)),
-      tup("the credential store refused: denied", false),
-    );
-  });
 
   await run_case("a failed save leaves no temporary file", "file", undefined, async ({ file }) => {
     fs.mkdirSync(path.join(file, "occupied"), { recursive: true }); // rename onto a full directory fails

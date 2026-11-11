@@ -88,6 +88,7 @@ const mode: {
   me_fail?: boolean;
 } = {};
 let hits = 0;
+const revoked_ids: string[] = [];
 let challenge = "";
 let redirect = "";
 const fake = Bun.serve({
@@ -139,6 +140,11 @@ const fake = Bun.serve({
         scope: "read write keys",
       });
     }
+    const rv = /^\/api\/tracker\/keys\/([^/]+)\/revoke$/.exec(u.pathname);
+    if (rv && req.method === "POST") {
+      revoked_ids.push(rv[1]);
+      return Response.json({ id: rv[1], name: "x", revoked: true, current: true });
+    }
     if (u.pathname === "/api/tracker/me" && mode.me_fail)
       return Response.json({ status: 500, message: "boom", data: {} }, { status: 500 });
     if (u.pathname === "/api/tracker/me")
@@ -164,11 +170,16 @@ const fake = Bun.serve({
 type Run = { code: number; stdout: string; stderr: string; json: any };
 
 /** Starts tm; `url` resolves to the printed authorization URL (null if none is printed). */
-function start(args: string[], xdg = XDG, cmd = [process.execPath, TM]) {
+function start(
+  args: string[],
+  xdg = XDG,
+  cmd = [process.execPath, TM],
+  extra: Record<string, string> = {},
+) {
   const { TM_API_KEY, TM_URL, ...clean } = process.env;
   const proc = Bun.spawn([...cmd, ...args], {
     cwd: S,
-    env: { ...clean, HOME: S, XDG_CONFIG_HOME: xdg, TM_CREDENTIAL_STORE: "file" },
+    env: { ...clean, HOME: S, XDG_CONFIG_HOME: xdg, TM_CREDENTIAL_STORE: "file", ...extra },
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -656,6 +667,62 @@ try {
   }
   delete mode.me_fail;
   for (const k of Object.keys(mode)) delete (mode as any)[k];
+
+  console.log("\n── fake server: the login cannot be saved, so the minted key is revoked ──");
+  {
+    const UXDG = path.join(S, "unsavable-xdg");
+    fs.mkdirSync(path.join(UXDG, "tm", "config.json", "occupied"), { recursive: true });
+    revoked_ids.length = 0;
+    const ut = start(["login", "--no-browser", "--url", FAKE], UXDG);
+    await fake_browser(await ut.url);
+    const uo = await ut.done;
+    const last = uo.stderr.trimEnd().split("\n").at(-1) ?? "";
+    check(
+      "exit 1, the last stderr line starts tm:, no stack trace, the key never shown",
+      tup(
+        uo.code,
+        last.startsWith("tm: "),
+        uo.stderr.includes("    at "),
+        uo.stderr.includes(FAKE_KEY),
+      ),
+      tup(1, true, false, false),
+    );
+    check("the fake saw the minted key revoked through itself", revoked_ids, ["fakekey00000001"]);
+  }
+
+  console.log("\n── the browser opener never sees TM_ variables ──");
+  {
+    const BIN = path.join(S, "fake-bin");
+    const ENV_OUT = path.join(S, "opener-env.txt");
+    fs.mkdirSync(BIN, { recursive: true });
+    for (const name of ["open", "xdg-open"])
+      fs.writeFileSync(
+        path.join(BIN, name),
+        `#!/bin/sh\nenv > "${ENV_OUT}.part"\nmv "${ENV_OUT}.part" "${ENV_OUT}"\n`,
+        {
+          mode: 0o755,
+        },
+      );
+    const OXDG = path.join(S, "opener-xdg");
+    const ot = start(["login", "--url", FAKE], OXDG, undefined, {
+      PATH: `${BIN}:${process.env.PATH}`,
+      TM_API_KEY: "tmk_" + "e".repeat(40),
+    });
+    await fake_browser(await ot.url);
+    const oo = await ot.done;
+    for (let i = 0; i < 50 && !fs.existsSync(ENV_OUT); i++) await Bun.sleep(100);
+    const lines = (read(ENV_OUT) ?? "").split("\n");
+    check(
+      "login exits 0; the fake opener ran and saw PATH but no TM_ variable",
+      tup(
+        oo.code,
+        lines.some((l) => l.startsWith("PATH=")),
+        lines.filter((l) => l.startsWith("TM_")),
+      ),
+      tup(0, true, []),
+    );
+  }
+
   mode.no_meta = true;
   o = await tm(["login", "--no-browser", "--url", FAKE], FXDG);
   check(

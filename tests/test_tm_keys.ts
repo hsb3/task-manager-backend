@@ -306,6 +306,18 @@ try {
     o.stdout,
     `revoked ${sneaky.id} "${"x".repeat(23)}😀\\u2028FAKE ad\\u200bmin"\n`,
   );
+  console.log("\n── invisible tag and filler characters ──");
+  const tagged = await su_key({ name: "t\u{E0041}⁡ㅤ" });
+  const TAGGED_SHOWN = "t\\u{e0041}\\u2061\\u3164";
+  o = await tm(["keys", "list"]);
+  const tagged_row = o.stdout.split("\n").find((l) => l.startsWith(tagged.id)) ?? "";
+  check(
+    "the row shows them escaped, none raw",
+    tup(tagged_row.includes(TAGGED_SHOWN), /[\u{E0041}⁡ㅤ]/u.test(o.stdout)),
+    tup(true, false),
+  );
+  o = await tm(["keys", "revoke", tagged.id]);
+  check("the revoke line escapes them", o.stdout, `revoked ${tagged.id} "${TAGGED_SHOWN}"\n`);
   for (const id of [".", ".."]) {
     o = await tm(["keys", "revoke", id]);
     check(

@@ -760,6 +760,58 @@ try {
     tup(1, false, false),
   );
 
+  console.log("\n── login --with-key: positionals, a bad URL, a config that cannot be written ──");
+  const POS_XDG = { XDG_CONFIG_HOME: path.join(S, "pos-xdg") };
+  const pos_cfg = path.join(POS_XDG.XDG_CONFIG_HOME, "tm", "config.json");
+  o = await tm(
+    ["login", "--with-key", "--url", BASE_URL, "tmk_onthecommandline"],
+    POS_XDG,
+    `${WRITE_KEY}\n`,
+  );
+  check(
+    "a key on the command line → warned, never echoed, the pasted key saved",
+    tup(
+      o.code,
+      o.stderr.trim(),
+      (o.stdout + o.stderr).includes("tmk_onthecommandline"),
+      read_cfg(pos_cfg)?.key,
+    ),
+    tup(
+      0,
+      "tm: warning: text after login was ignored; the key is read from the prompt or standard input",
+      false,
+      WRITE_KEY,
+    ),
+  );
+  const BADURL = { XDG_CONFIG_HOME: path.join(S, "badurl-xdg") };
+  o = await tm(["login", "--with-key", "--url", "notaurl"], BADURL, `${WRITE_KEY}\n`);
+  check(
+    "login --with-key --url notaurl → exit 1, not a URL, nothing saved",
+    tup(o.code, o.stderr.trim(), fs.existsSync(path.join(BADURL.XDG_CONFIG_HOME, "tm"))),
+    tup(1, 'tm: the server URL "notaurl" is not a URL', false),
+  );
+  const DIRX = { XDG_CONFIG_HOME: path.join(S, "dir-xdg") };
+  fs.mkdirSync(path.join(DIRX.XDG_CONFIG_HOME, "tm", "config.json", "occupied"), {
+    recursive: true,
+  });
+  o = await tm(["login", "--with-key", "--url", BASE_URL], DIRX, `${WRITE_KEY}\n`);
+  check(
+    "config.json is a directory: login → exit 1, tm: first, no stack trace, no key",
+    tup(
+      o.code,
+      o.stderr.startsWith("tm: "),
+      o.stderr.includes("    at "),
+      (o.stdout + o.stderr).includes(WRITE_KEY),
+    ),
+    tup(1, true, false, false),
+  );
+  o = await tm(["logout"], DIRX);
+  check(
+    "config.json is a directory: logout → exit 1, tm: first, no stack trace",
+    tup(o.code, o.stderr.startsWith("tm: "), o.stderr.includes("    at ")),
+    tup(1, true, false),
+  );
+
   console.log("\n── the command line is checked before any saved login is needed ──");
   const NOWHERE = { HOME: path.join(S, "nohome"), XDG_CONFIG_HOME: path.join(S, "noxdg") };
   for (const args of [
