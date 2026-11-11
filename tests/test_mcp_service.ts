@@ -465,6 +465,29 @@ try {
       [404, "application/json", -32601],
     );
   }
+  {
+    const { id: _, ...note } = msg("subscriptions/listen", {
+      notifications: {},
+      _meta: META_2026(),
+    });
+    const r = await fetch(`${MCP}/mcp`, {
+      method: "POST",
+      signal: AbortSignal.timeout(10_000),
+      headers: {
+        Accept: ACCEPT,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${W}`,
+        "MCP-Protocol-Version": "2026-07-28",
+        "Mcp-Method": "subscriptions/listen",
+      },
+      body: JSON.stringify(note),
+    });
+    check(
+      "listen_notification_202: subscriptions/listen without an id → 202, empty body",
+      [r.status, await r.text()],
+      [202, ""],
+    );
+  }
 
   console.log("\n── scope gate and tool results ──");
   x = await call_2025(R, "tm_create", { title: "t", project: PROJECT });

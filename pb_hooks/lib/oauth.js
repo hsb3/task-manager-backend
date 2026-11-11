@@ -165,15 +165,25 @@ function resolve_client(app, client_id) {
       message:
         "The app asking to sign in could not be verified right now. Try again in a minute.",
     };
-    const as_client = (c) => ({
-      ok: true,
-      client: {
-        client_id: c.client_id,
-        client_name: c.client_name,
-        redirect_uris: c.redirect_uris,
-        registered: false,
-      },
-    });
+    const invalid = {
+      ok: false,
+      message: "The app asking to sign in could not be verified.",
+    };
+    // Printable ASCII only: a Unicode host would be shown as a lookalike of another.
+    const printable = (u) => typeof u === "string" && /^[\x21-\x7e]+$/.test(u);
+    if (!printable(client_id)) return invalid;
+    const as_client = (c) =>
+      c.redirect_uris.every(printable)
+        ? {
+            ok: true,
+            client: {
+              client_id: client_id,
+              client_name: c.client_name.slice(0, 200),
+              redirect_uris: c.redirect_uris,
+              registered: false,
+            },
+          }
+        : invalid;
     const key = "cimd:" + client_id;
     const hit = app.store().get(key);
     if (hit && hit.exp > Date.now()) return as_client(hit.client);
@@ -196,7 +206,15 @@ function resolve_client(app, client_id) {
       return unavailable;
     }
     if (res.statusCode === 200) {
-      const client = res.json.client;
+      const client = res.json && res.json.client;
+      if (
+        !client ||
+        typeof client.client_name !== "string" ||
+        !Array.isArray(client.redirect_uris) ||
+        !client.redirect_uris.length ||
+        !client.redirect_uris.every((u) => typeof u === "string")
+      )
+        return unavailable;
       if (res.json.max_age > 0)
         app.store().set(key, {
           client: client,
@@ -204,11 +222,7 @@ function resolve_client(app, client_id) {
         });
       return as_client(client);
     }
-    if (res.statusCode === 422)
-      return {
-        ok: false,
-        message: "The app asking to sign in could not be verified.",
-      };
+    if (res.statusCode === 422) return invalid;
     return unavailable;
   }
   return {

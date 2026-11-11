@@ -116,9 +116,13 @@ Request: `POST {MCP_INTERNAL_URL}/internal/client-metadata`, headers
 Rules, in order (each failure is 422 with the quoted reason unless marked 503):
 
 1. URL (`check_client_id_url`), checked on the **raw string** before any parsing normalises it:
+   every character is printable ASCII (`\x21`-`\x7e`: no space, control character or non-ASCII
+   character, so an internationalised host is accepted only as punycode, and is shown as
+   punycode; slice-3 review item 1: a Unicode host was fetched as punycode but shown raw, so
+   `https://сlaude.ai/...` with a Cyrillic `с` read as `claude.ai` on the consent page);
    starts with `https://`; contains no `#`, no `?`, and no `@` before the first `/` after the
    scheme; the raw path (from the first `/` after `https://`) is not empty or `/`; no raw path
-   segment, compared case-insensitively, is `.`, `..`, `%2e` or `%2e%2e`; and `new URL(raw)`
+   segment, compared case-insensitively, is `.`, `..`, `%2e`, `%2e%2e`, `.%2e` or `%2e.`; and `new URL(raw)`
    succeeds, and the raw string is at most 2000 characters. Any failure: "client_id is not a
    valid metadata URL". The raw string is what
    rule 6 compares; the parsed URL supplies host, port and path for rules 2-3.
@@ -135,7 +139,8 @@ Rules, in order (each failure is 422 with the quoted reason unless marked 503):
 6. JSON object, else "document is not a JSON object". `client_id` must equal the URL string
    exactly ("client_id does not match the URL"). `client_name` a non-empty string, cut to 200
    characters ("client_name missing or invalid" when absent, empty or not a string).
-   `redirect_uris` a non-empty array of strings, each parsing with `new URL()` to
+   `redirect_uris` a non-empty array of strings, each printable ASCII as in rule 1, holding no
+   `#` (RFC 6749 3.1.2: a redirection endpoint has no fragment), and parsing with `new URL()` to
    protocol `https:`, or to protocol `http:` with hostname exactly `localhost` or `127.0.0.1`,
    and each at most 2000 characters ("redirect_uris missing or invalid").
    `token_endpoint_auth_method` absent or `"none"`; `client_secret` absent ("client is not a
@@ -237,7 +242,8 @@ the same reading the API uses), else Bun's `server.requestIP(req).address`. Sing
    `Content-Type` whose media type is not `application/json` (parameters allowed), unparsable
    JSON, a JSON array, or a non-object: 400 JSON-RPC `{"jsonrpc":"2.0","id":null,"error":
    {"code":-32600,"message":"The body must be one JSON-RPC message."}}`.
-   Then a `subscriptions/listen` request answers JSON-RPC `-32601` "Method not found" with its
+   Then a `subscriptions/listen` notification (no `id` member) answers 202 with no body; a
+   `subscriptions/listen` request answers JSON-RPC `-32601` "Method not found" with its
    `id` (404 on a 2026-07-28 request, 200 on the 2025 leg) before the SDK, so no SSE stream is
    ever opened (slice-2 review item D); for that one method this answers ahead of the SDK's
    protocol-header checks (`-32020`, `-32022`).
@@ -435,6 +441,13 @@ oauth_codes WHERE expires < {:now}` through `$app.db().newQuery(...).bind({ now 
 no cron is added.
 
 Metadata documents are cached in `$app.store()` under `cimd:<client_id>` as `{ client, exp }`.
+PocketBase does not rely on the service for what the consent page shows (slice-3 review items
+1-4): an `https://` `client_id` with any character outside printable ASCII (`\x21`-`\x7e`) is
+refused as "could not be verified." before any call to the service; a 200 whose `client` lacks a
+string `client_name` or a non-empty `redirect_uris` array of strings is "right now" (and is not
+cached); a returned redirect URI outside printable ASCII makes the client "could not be
+verified."; the client keeps the `client_id` PocketBase asked for, whatever id the service
+returns; and `client_name` is cut to 200 characters on the PocketBase side too.
 OTP wrong-guess counts live under `oauth_otp_tries:<otp id>`. The page-signing secret is
 `oauthFlowSecret`, set once per boot with `$security.randomString(40)` in `onBootstrap`, the
 pattern of `pb_hooks/mail.pb.js:19` (`signupMailSecret`).
@@ -1358,7 +1371,9 @@ and removes scratch, exit 1 on any failure.
     "X-TM-Internal": secret, "Content-Type": "application/json" }, body: JSON.stringify({
     client_id: id }), timeout: 8 })`; 200: store `{ client: res.json.client, exp: Date.now() +
     res.json.max_age * 1000 }` when `max_age > 0`, return it; 422: "could not be verified"; any
-    other status or a thrown error: "right now".
+    other status or a thrown error: "right now". The guards of D13's last paragraph (printable
+    ASCII id and redirect URIs, the 200's shape, the requested id kept, the 200-character name)
+    wrap this branch.
 - **Tests** (`tests/test_mcp_cimd.ts`, no port; fake `lookup` and `fetch`; write
   `refuses_private_address` first):
   - `url_rules`: `http://x/a`, `https://u@x/a`, `https://x`, `https://x/`, `https://x/a#f`,

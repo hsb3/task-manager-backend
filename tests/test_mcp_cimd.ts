@@ -95,14 +95,42 @@ for (const u of [
   "https://x/a/../b",
   "https://x/./a",
   "https://x/a/%2E%2E/b",
+  "https://x/a/.%2e/b",
+  "https://x/a/%2E./b",
+  "https://\u0441laude.ai/oauth/meta",
+  "https://x.exa\tmple/a",
+  "https://x/a b",
+  "https://x/a\u00a0",
 ])
   check(
     `url_rules: ${u} → reason`,
     check_client_id_url(u),
     "client_id is not a valid metadata URL",
   );
-for (const u of ["https://x/a", "https://x:8443/a"])
+for (const u of ["https://x/a", "https://x:8443/a", "https://xn--laude-0ye.ai/a"])
   check(`url_rules: ${u} → null`, check_client_id_url(u), null);
+
+{
+  const f = fakes(PUBLIC);
+  const r = await run("https://\u0441laude.ai/oauth/meta", f);
+  check(
+    "non_ascii_host: Cyrillic client id → 422, fetch never called",
+    [r.status, r.body, f.seen.length],
+    [422, { error: "client_id is not a valid metadata URL" }, 0],
+  );
+}
+{
+  const u = "https://xn--laude-0ye.ai/a";
+  const r = await run(
+    u,
+    fakes(PUBLIC, () => doc_response({}, u)),
+  );
+  check(
+    "punycode_host: accepted, returned as punycode → 200",
+    [r.status, (r.body as any).client?.client_id],
+    [200, u],
+  );
+}
 
 console.log("\n── the pinned fetch ──");
 {
@@ -201,6 +229,18 @@ console.log("\n── document rules ──");
 for (const [label, over, reason] of [
   ["client_id_mismatch", { client_id: "https://x/b" }, "client_id does not match the URL"],
   ["no_redirect_uris", { redirect_uris: [] }, "redirect_uris missing or invalid"],
+  [
+    "redirect_non_ascii",
+    { redirect_uris: ["https://\u0441laude.ai/cb"] },
+    "redirect_uris missing or invalid",
+  ],
+  ["redirect_control", { redirect_uris: ["https://x/cb\n"] }, "redirect_uris missing or invalid"],
+  [
+    "redirect_tab_host",
+    { redirect_uris: ["https://x.exa\tmple/cb"] },
+    "redirect_uris missing or invalid",
+  ],
+  ["redirect_fragment", { redirect_uris: ["https://x/cb#f"] }, "redirect_uris missing or invalid"],
   ["secret_client", { client_secret: "s" }, "client is not a public client"],
   [
     "jwt_auth_method",

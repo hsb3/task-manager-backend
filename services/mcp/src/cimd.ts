@@ -14,11 +14,19 @@ const DEFAULT_DEPS: Deps = {
 };
 const MAX_BYTES = 5120;
 const BAD_URL = "client_id is not a valid metadata URL";
-const DOT_SEGMENTS = new Set([".", "..", "%2e", "%2e%2e"]);
+const DOT_SEGMENTS = new Set([".", "..", "%2e", "%2e%2e", ".%2e", "%2e."]);
+// Printable ASCII only: a Unicode host would be fetched as punycode but shown as a lookalike.
+const PRINTABLE_ASCII = /^[\x21-\x7e]+$/;
 
 /** The rule-1 reason for a raw client_id string, or null when it may be fetched. */
 export function check_client_id_url(s: string): string | null {
-  if (s.length > 2000 || !s.startsWith("https://") || s.includes("#") || s.includes("?"))
+  if (
+    s.length > 2000 ||
+    !PRINTABLE_ASCII.test(s) ||
+    !s.startsWith("https://") ||
+    s.includes("#") ||
+    s.includes("?")
+  )
     return BAD_URL;
   const rest = s.slice("https://".length);
   const slash = rest.indexOf("/");
@@ -136,7 +144,8 @@ const refuse = (error: string): Result => ({ status: 422, body: { error } });
 const transient = (error: string): Result => ({ status: 503, body: { error } });
 
 function redirect_uri_ok(u: unknown): boolean {
-  if (typeof u !== "string" || u.length > 2000) return false;
+  if (typeof u !== "string" || u.length > 2000 || !PRINTABLE_ASCII.test(u) || u.includes("#"))
+    return false;
   try {
     const p = new URL(u);
     return (

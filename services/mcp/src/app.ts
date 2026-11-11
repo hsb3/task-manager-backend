@@ -209,6 +209,8 @@ export function make_app(env: Env): { fetch(req: Request, ip: string): Promise<R
       return rpc_error(400, "The body must be one JSON-RPC message.");
 
     // The SDK would hold an SSE stream open for this; the service sends none.
+    if (body.method === "subscriptions/listen" && !("id" in body))
+      return new Response(null, { status: 202 });
     if (body.method === "subscriptions/listen")
       return rpc_error(
         (await isLegacyRequest(req, body)) ? 200 : 404,
