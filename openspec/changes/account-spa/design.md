@@ -110,6 +110,14 @@ there reach the static handler's 200, 301 and 404 answers, that the static handl
 overwrite `Cache-Control`, and that `POST /account/` answers 404 JSON with no policy header (the
 static route is GET and HEAD only).
 
+- Dot segments: PocketBase's static handler resolves a `.` or `..` segment itself, so a
+  percent-encoded one (`/api/..%2faccount/`, `/api/%2e%2e/account/`) would reach `/account`'s
+  files past a prefix check. The middleware therefore first answers 404 `File not found.`
+  (what a server without the app answers) to any GET or HEAD whose matched route is the static
+  wildcard and whose decoded path holds such a segment; routes the API matches are untouched.
+  A missing file under `/account/assets/` gets `no-cache`, not the immutable value
+  (`tests/test_account_app.ts` cases 12 to 14).
+
 - Alternatives: a `<meta http-equiv>` policy in `index.html` (MDN: `frame-ancestors` "is not
   supported in the `<meta>` element"); no policy.
 - Policy choice: `script-src 'self'` holds because Vite's build emits only external module
