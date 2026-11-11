@@ -160,11 +160,56 @@ function resolve_client(app, client_id) {
     };
   }
   if (String(client_id).startsWith("https://")) {
-    return {
+    const unavailable = {
       ok: false,
       message:
         "The app asking to sign in could not be verified right now. Try again in a minute.",
     };
+    const as_client = (c) => ({
+      ok: true,
+      client: {
+        client_id: c.client_id,
+        client_name: c.client_name,
+        redirect_uris: c.redirect_uris,
+        registered: false,
+      },
+    });
+    const key = "cimd:" + client_id;
+    const hit = app.store().get(key);
+    if (hit && hit.exp > Date.now()) return as_client(hit.client);
+    const url = $os.getenv("MCP_INTERNAL_URL").replace(/\/+$/, "");
+    const secret = $os.getenv("MCP_INTERNAL_SECRET");
+    if (!url || !secret) return unavailable;
+    let res;
+    try {
+      res = $http.send({
+        url: url + "/internal/client-metadata",
+        method: "POST",
+        headers: {
+          "X-TM-Internal": secret,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ client_id: client_id }),
+        timeout: 8,
+      });
+    } catch (_) {
+      return unavailable;
+    }
+    if (res.statusCode === 200) {
+      const client = res.json.client;
+      if (res.json.max_age > 0)
+        app.store().set(key, {
+          client: client,
+          exp: Date.now() + res.json.max_age * 1000,
+        });
+      return as_client(client);
+    }
+    if (res.statusCode === 422)
+      return {
+        ok: false,
+        message: "The app asking to sign in could not be verified.",
+      };
+    return unavailable;
   }
   return {
     ok: false,

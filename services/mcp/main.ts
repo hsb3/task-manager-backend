@@ -2,6 +2,7 @@
 
 import type { Server } from "bun";
 import { load_env, make_app, type Env } from "./src/app.ts";
+import { internal_handler } from "./src/cimd.ts";
 
 /** Railway's edge sets X-Real-IP; its rightmost token is the one the API reads too. */
 function client_ip(req: Request, server: Server<undefined>): string {
@@ -29,6 +30,6 @@ console.log(`listening on ${hostname}:${pub.port}`);
 const internal = Bun.serve({
   hostname,
   port: Number(process.env.MCP_INTERNAL_PORT || 8081),
-  fetch: () => new Response(null, { status: 404 }),
+  fetch: internal_handler(env),
 });
 console.log(`listening on ${hostname}:${internal.port}`);

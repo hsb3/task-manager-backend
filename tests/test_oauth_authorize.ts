@@ -5,7 +5,7 @@
  * malformed request answers an error page or an error redirect.
  *
  * Fully self-contained clean-room server. Port 8202 + PB_PORT_OFFSET; SMTP sink on
- * 8203 + PB_PORT_OFFSET.
+ * 8203 + PB_PORT_OFFSET; a stub of the MCP service's private listener on 8204 + PB_PORT_OFFSET.
  */
 
 import fs from "node:fs";
@@ -32,6 +32,7 @@ const SMTP_SINK = path.join(REPO_ROOT, "scripts", "smtp_sink.ts");
 const PORT_OFFSET = roomkit.py_int(process.env.PB_PORT_OFFSET ?? "0"); // shifts every port this file binds
 const PORT = 8202 + PORT_OFFSET;
 const SINK_PORT = 8203 + PORT_OFFSET;
+const STUB_PORT = 8204 + PORT_OFFSET;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const SU_EMAIL = "probe@example.com";
 const SU_PASSWORD = "probe123456";
@@ -160,9 +161,39 @@ for (const name of fs.readdirSync(MIG_DIR)) {
   if (name.endsWith("superuser_mfa.js")) fs.rmSync(path.join(MIG_DIR, name));
 }
 
+const CC_URL = "https://claude.ai/oauth/claude-code-client-metadata";
+const STUB_ANSWERS: Record<string, [number, object]> = {
+  [CC_URL]: [
+    200,
+    {
+      client: {
+        client_id: CC_URL,
+        client_name: "Claude Code",
+        redirect_uris: ["http://localhost/callback", "http://127.0.0.1/callback"],
+      },
+      max_age: 300,
+    },
+  ],
+  "https://bad.example/meta": [422, { error: "client_id does not match the URL" }],
+  "https://flaky.example/meta": [503, { error: "host did not answer" }],
+};
+const stub_seen: { client_id: string; secret: string | null }[] = [];
+
 let server: roomkit.Room | null = null;
 let sink: Bun.Subprocess | null = null;
+let stub: ReturnType<typeof Bun.serve> | null = null;
 try {
+  await roomkit.require_free_port(STUB_PORT);
+  stub = Bun.serve({
+    hostname: "127.0.0.1",
+    port: STUB_PORT,
+    async fetch(req) {
+      const id = String(((await req.json().catch(() => ({}))) as any).client_id);
+      stub_seen.push({ client_id: id, secret: req.headers.get("X-TM-Internal") });
+      const [status, body] = STUB_ANSWERS[id] ?? [404, { error: "not_found" }];
+      return Response.json(body, { status });
+    },
+  });
   run_checked(
     [
       PB_BIN,
@@ -178,6 +209,8 @@ try {
     { cwd: REPO_ROOT, capture_output: true },
   );
   process.env.MCP_PUBLIC_URL = "http://mcp.test";
+  process.env.MCP_INTERNAL_URL = `http://127.0.0.1:${STUB_PORT}`;
+  process.env.MCP_INTERNAL_SECRET = "s3cret";
   server = await roomkit.serve(PORT, DATA_DIR, MIG_DIR, roomkit.hooks_dir(S));
   const [, su_r] = await api("POST", "/api/collections/_superusers/auth-with-password", null, {
     identity: SU_EMAIL,
@@ -547,6 +580,69 @@ try {
     tup(200, true, false),
   );
 
+  console.log("\n── metadata-document clients ──");
+  {
+    const cc = authorize_params({
+      client_id: CC_URL,
+      redirect_uri: "http://localhost:7777/callback",
+    });
+    const consent = await consent_page(cc);
+    const { code } = await sign_in_and_approve(BASE_URL, cc, ALICE);
+    const ex = await exchange(BASE_URL, code, cc);
+    const [, me] = await api("GET", "/api/tracker/me", ex.body?.access_token ?? "tmk_none");
+    check(
+      "cimd_claude_code: consent names Claude Code and claude.ai; exchange 200; key client_id the URL",
+      tup(
+        consent.includes("Claude Code wants to use your Task Tracker account."),
+        consent.includes("It identifies itself as claude.ai."),
+        ex.status,
+        me?.key?.client_id,
+      ),
+      tup(true, true, 200, CC_URL),
+    );
+    const before = stub_seen.filter((r) => r.client_id === CC_URL).length;
+    a = await get(cc);
+    check(
+      "cimd_cached: a second GET → 200 sign-in, stub not asked again",
+      tup(a.status, stub_seen.filter((r) => r.client_id === CC_URL).length),
+      tup(200, before),
+    );
+    a = await get({ ...cc, redirect_uri: "https://claude.ai/other" });
+    check(
+      "cimd_redirect_not_listed: redirect_uri https://claude.ai/other → 400 'has not registered'",
+      tup(a.status, a.text.includes("has not registered")),
+      tup(400, true),
+    );
+    a = await get({ ...cc, client_id: "https://bad.example/meta" });
+    check(
+      "cimd_invalid_page: 422 from the service → 400 'could not be verified.'",
+      tup(a.status, a.text.includes("could not be verified."), a.text.includes("right now")),
+      tup(400, true, false),
+    );
+    a = await get({ ...cc, client_id: "https://flaky.example/meta" });
+    check(
+      "cimd_unavailable_page: 503 from the service → 400 'right now'",
+      tup(a.status, a.text.includes("could not be verified right now")),
+      tup(400, true),
+    );
+    check(
+      "cimd_secret_sent: every stub request carried X-TM-Internal s3cret",
+      tup(
+        stub_seen.length > 0,
+        stub_seen.every((r) => r.secret === "s3cret"),
+      ),
+      tup(true, true),
+    );
+    await stub.stop(true);
+    stub = null;
+    a = await get({ ...cc, client_id: "https://down.example/meta" });
+    check(
+      "cimd_unavailable_page: service down, uncached URL → 400 'right now'",
+      tup(a.status, a.text.includes("could not be verified right now")),
+      tup(400, true),
+    );
+  }
+
   console.log("\n── code purge ──");
   const [s_old, old] = await api("POST", CODES, su, {
     code_hash: "0".repeat(64),
@@ -565,6 +661,7 @@ try {
     tup(200, 404),
   );
 } finally {
+  if (stub !== null) await stub.stop(true);
   if (server !== null) await roomkit.stop(server);
   await stop_sink(sink);
   fs.rmSync(S, { recursive: true, force: true });
