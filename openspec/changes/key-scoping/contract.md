@@ -195,7 +195,9 @@ subscription that asks for `expand` in its options is refused with 403 `api_key_
 
 `tools/list` on the hosted endpoint and in `tm mcp` lists the read tools for a `read` key and
 every tool for any other level. A tool call the key's level or reach refuses is a tool failure
-carrying the API's status and code (403 `api_key_scope`, 403 `api_key_reach`, 404 `not_found`).
+carrying the API's status and code (403 `api_key_scope`, 403 `api_key_reach`, 404 `not_found`),
+except that the hosted endpoint answers a `read` key's call to a write tool with HTTP 403
+`insufficient_scope` before the call, as the hosted-mcp-endpoint contract requires.
 
 ## Errors
 
