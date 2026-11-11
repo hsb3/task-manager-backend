@@ -313,6 +313,8 @@ const PARAMS = [
   "scope",
   "state",
   "resource",
+  "key_name",
+  "key_expires",
 ];
 
 // The request parameters a flow token binds (D14).
@@ -326,6 +328,8 @@ function flow_q(p) {
       v("scope"),
       v("state"),
       v("resource"),
+      v("key_name"),
+      v("key_expires"),
     ]),
   );
 }
@@ -349,7 +353,12 @@ function validate_request(app, p) {
     p.code_challenge_method !== "S256"
   )
     return { redirect: "invalid_request" };
-  if (parse_scope(p.scope) === null) return { redirect: "invalid_scope" };
+  const asked = split_keys(p.scope);
+  if (asked.keys && r.client.client_id !== "tm")
+    return { redirect: "invalid_scope" };
+  if (parse_scope(asked.scope) === null) return { redirect: "invalid_scope" };
+  if (r.client.client_id === "tm" && tm_params(p).error)
+    return { redirect: "invalid_request" };
   if (!resource_ok(p.resource)) return { redirect: "invalid_target" };
   return { ok: r.client };
 }
@@ -381,6 +390,8 @@ const LEVEL_LABELS = {
 function render_stage(e, app, client, p, stage, message, uid, otp) {
   const params = {};
   PARAMS.forEach((k) => (params[k] = p[k] || ""));
+  const level = parse_scope(split_keys(p.scope).scope);
+  const tm = client.client_id === "tm" ? tm_params(p).ok : null;
   const host = (uri) => {
     const m = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^@/?#]*@)?([^/?#:]*)/.exec(uri);
     return m ? m[1].toLowerCase() : uri;
@@ -393,11 +404,19 @@ function render_stage(e, app, client, p, stage, message, uid, otp) {
     Registered: client.registered,
     RedirectHost: host(p.redirect_uri),
     Loopback: is_loopback(p.redirect_uri),
-    Levels: offered_levels(parse_scope(p.scope)).map((v) => ({
+    Levels: offered_levels(level).map((v) => ({
       Value: v,
       Label: LEVEL_LABELS[v],
-      Checked: v === parse_scope(p.scope),
+      Checked: v === level,
     })),
+    Tm: !!tm,
+    KeyName: tm ? tm.key_name : "",
+    KeyExpires: tm
+      ? tm.key_expires
+        ? tm.key_expires.slice(0, 16) + " UTC"
+        : "never"
+      : "",
+    AskKeys: !!tm && split_keys(p.scope).keys,
     Workspaces: uid
       ? consent_workspaces(app, uid).map((w) => ({ Id: w.id, Name: w.name }))
       : [],
@@ -424,7 +443,8 @@ function sign_in_refusal(app, u) {
 }
 
 // Purges expired codes, stores a new one's fingerprint, and returns the code.
-function issue_code(app, user, client, p, scope, reach, workspace) {
+// tm: {key_name, key_expires, manage_keys} for the tm client, else null.
+function issue_code(app, user, client, p, scope, reach, workspace, tm) {
   app
     .db()
     .newQuery("DELETE FROM oauth_codes WHERE expires < {:now}")
@@ -441,6 +461,11 @@ function issue_code(app, user, client, p, scope, reach, workspace) {
   rec.set("scope", scope);
   rec.set("reach", reach);
   rec.set("workspace", workspace);
+  if (tm) {
+    rec.set("key_name", tm.key_name);
+    rec.set("key_expires", tm.key_expires);
+    rec.set("manage_keys", tm.manage_keys);
+  }
   rec.set(
     "expires",
     new Date(Date.now() + 600000).toISOString().replace("T", " "),

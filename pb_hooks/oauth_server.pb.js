@@ -537,11 +537,19 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
     if (refusal) return show("signin", refusal);
     const workspace = p.workspace || "";
     if (
-      lib.offered_levels(lib.parse_scope(p.scope)).indexOf(p.access) < 0 ||
+      lib
+        .offered_levels(lib.parse_scope(lib.split_keys(p.scope).scope))
+        .indexOf(p.access) < 0 ||
       (workspace !== "" &&
         !lib.consent_workspaces($app, u.id).some((w) => w.id === workspace))
     )
       return show("consent", "Choose one of the options shown.", flow.uid);
+    const tm =
+      client.client_id === "tm"
+        ? Object.assign({}, lib.tm_params(p).ok, {
+            manage_keys: lib.split_keys(p.scope).keys && p.manage_keys === "1",
+          })
+        : null;
     const code = lib.issue_code(
       $app,
       u,
@@ -550,6 +558,7 @@ require(`${__hooks}/lib/routes.js`).add("POST /oauth/authorize", (e) => {
       p.access,
       workspace ? "workspace" : "all",
       workspace,
+      tm,
     );
     return back(["code", code]);
   } catch (err) {

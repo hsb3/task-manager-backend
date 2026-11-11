@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 /**
  * decision:api-key-manages-keys: the tm client's grants at the token endpoint mint a key with the
- * name, expiry and manage-keys permission asked for, and no refresh token.
+ * name, expiry and manage-keys permission asked for, and no refresh token; the consent page shows
+ * them and offers the permission only to tm.
  *
  * Fully self-contained clean-room server, --hooksDir from a pb_hooks copy, fixtures by name.
  * Port 8221 + PB_PORT_OFFSET.
@@ -13,7 +14,14 @@ import path from "node:path";
 import { py_repr, run_checked, tup } from "../scripts/_py.ts";
 import * as roomkit from "./roomkit.ts";
 import { copy_tree } from "../scripts/_scratch_copy.ts";
-import { exchange, PKCE } from "./oauthkit.ts";
+import {
+  approve_with,
+  authorize_params,
+  exchange,
+  PKCE,
+  post_consent,
+  sign_in_to_consent,
+} from "./oauthkit.ts";
 
 const REPO_ROOT = roomkit.REPO_ROOT;
 const PB_BIN = roomkit.pb_bin();
@@ -250,6 +258,139 @@ try {
     "tm key revoked at /oauth/revoke → 200, the key then 401 api_key_invalid",
     tup(s7, s7b, r7b.data?.api_key?.code),
     tup(200, 401, "api_key_invalid"),
+  );
+
+  console.log("\n── the tm client on the authorization page ──");
+  const who = { email: "alice@example.com", password: "test123456" };
+  const base = authorize_params({
+    client_id: "tm",
+    redirect_uri: TM_REDIRECT,
+    scope: "write keys",
+  });
+  const page = (await sign_in_to_consent(BASE_URL, base, who)).html;
+  check(
+    "tm page shown: client, registration, loopback warning, key name, expiry, ticked box",
+    [
+      "tm (command line)",
+      "registered with Task Tracker as tm",
+      "This app runs on your own computer",
+      "Key name: tm",
+      "Expires: never",
+      '<input type="checkbox" name="manage_keys" value="1" checked>',
+    ].map((t) => page.includes(t)),
+    [true, true, true, true, true, true],
+  );
+
+  const a1 = await approve_with(BASE_URL, base, who, {
+    access: "write",
+    workspace: "",
+    manage_keys: "1",
+  });
+  const loc = new URL(a1.location).searchParams;
+  const t1 = await exchange(BASE_URL, a1.code, base);
+  check(
+    "tm approve with keys → 302 with code, state, iss; token scope read write keys; record manage_keys true",
+    tup(
+      !!loc.get("code"),
+      loc.get("state"),
+      loc.get("iss"),
+      t1.body?.scope,
+      (await record(t1.body?.access_token)).manage_keys,
+    ),
+    tup(true, base.state, BASE_URL, "read write keys", true),
+  );
+  const a2 = await approve_with(BASE_URL, base, who, { access: "write", workspace: "" });
+  const t2 = await exchange(BASE_URL, a2.code, base);
+  check(
+    "tm approve with the box unticked → scope read write, record manage_keys false",
+    tup(t2.body?.scope, (await record(t2.body?.access_token)).manage_keys),
+    tup("read write", false),
+  );
+
+  const exp = new Date(Date.now() + 2 * 86400_000);
+  exp.setUTCMilliseconds(0);
+  const expText = exp.toISOString().replace(".000Z", "Z");
+  const named = { ...base, key_name: "ci bot", key_expires: expText };
+  const namedPage = (await sign_in_to_consent(BASE_URL, named, who)).html;
+  const a3 = await approve_with(BASE_URL, named, who, { access: "write", workspace: "" });
+  const r3b = await record((await exchange(BASE_URL, a3.code, named)).body?.access_token);
+  check(
+    "tm key_name and key_expires shown on the page and carried to the key",
+    tup(
+      namedPage.includes("Key name: ci bot"),
+      namedPage.includes(`Expires: ${expText.slice(0, 16).replace("T", " ")} UTC`),
+      r3b.name,
+      Date.parse(String(r3b.expires).replace(" ", "T")) === exp.getTime(),
+    ),
+    tup(true, true, "ci bot", true),
+  );
+
+  const redirected = async (params: Record<string, string>): Promise<string | null> => {
+    const q = new URLSearchParams(params).toString();
+    const r = await fetch(`${BASE_URL}/oauth/authorize?${q}`, { redirect: "manual" });
+    await r.body?.cancel();
+    const l = r.headers.get("Location");
+    return r.status === 302 && l ? new URL(l).searchParams.get("error") : `status ${r.status}`;
+  };
+  check(
+    "key_expires past, key_name of 201 characters, key_name of spaces, key_expires=tomorrow → invalid_request",
+    [
+      await redirected({ ...base, key_expires: "2020-01-01T00:00:00Z" }),
+      await redirected({ ...base, key_name: "x".repeat(201) }),
+      await redirected({ ...base, key_name: "  " }),
+      await redirected({ ...base, key_expires: "tomorrow" }),
+    ],
+    ["invalid_request", "invalid_request", "invalid_request", "invalid_request"],
+  );
+
+  const mgr = { ...base, scope: "manage keys" };
+  const a4 = await approve_with(BASE_URL, mgr, who, {
+    access: "manage",
+    workspace: "",
+    manage_keys: "1",
+  });
+  const t4 = await exchange(BASE_URL, a4.code, mgr);
+  check(
+    "tm at manage → token scope read write manage keys, record scope manage",
+    tup(t4.body?.scope, (await record(t4.body?.access_token)).scope),
+    tup("read write manage keys", "manage"),
+  );
+
+  const cursor = authorize_params({
+    client_id: "cursor",
+    redirect_uri: "http://localhost:5555/callback",
+    scope: "read keys",
+  });
+  check("keys from another client → invalid_scope", await redirected(cursor), "invalid_scope");
+  const cursorNamed = authorize_params({
+    client_id: "cursor",
+    redirect_uri: "http://localhost:5555/callback",
+    key_name: "x",
+  });
+  const cursorPage = (await sign_in_to_consent(BASE_URL, cursorNamed, who)).html;
+  const a5 = await approve_with(BASE_URL, cursorNamed, who, { access: "write", workspace: "" });
+  const p5 = await record((await exchange(BASE_URL, a5.code, cursorNamed)).body?.access_token);
+  check(
+    "key_name ignored for another client: no Key name on the page, the key is named Cursor",
+    tup(cursorPage.includes("Key name"), p5.name),
+    tup(false, "Cursor"),
+  );
+
+  const c6 = await sign_in_to_consent(BASE_URL, base, who);
+  const p6 = await post_consent(BASE_URL, { ...base, key_name: "changed" }, c6.flow, {
+    action: "approve",
+    access: "write",
+    workspace: "",
+  });
+  const html6 = await p6.text();
+  check(
+    "flow binds key_name: a changed key_name re-renders the page, no code",
+    tup(
+      p6.status,
+      p6.headers.get("Location"),
+      html6.includes("This sign-in took too long or was changed. Start again."),
+    ),
+    tup(200, null, true),
   );
 } finally {
   if (server !== null) await roomkit.stop(server);

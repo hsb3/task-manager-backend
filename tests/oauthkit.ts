@@ -85,12 +85,12 @@ export async function sign_in_to_consent(
   const signin = await page.text();
   if (page.status !== 200 || field(signin, "flow") === null)
     throw new Error(`authorize page: ${page.status} ${signin.slice(0, 200)}`);
-  const pw = await post_page(base, signin, { action: "password", ...who });
+  const pw = await post_page(base, signin, { ...params, action: "password", ...who });
   const html = await pw.text();
   return { status: pw.status, html, flow: field(html, "flow") ?? "" };
 }
 
-/** POST /oauth/authorize with the eight parameters, `flow` and `fields`; redirects not followed. */
+/** POST /oauth/authorize with the eight parameters plus every entry of `params`, `flow` and `fields`; redirects not followed. */
 export async function post_consent(
   base: string,
   params: Record<string, string>,
@@ -99,6 +99,7 @@ export async function post_consent(
 ): Promise<Response> {
   const form: Record<string, string> = { flow };
   for (const n of PARAMS) form[n] = params[n] ?? "";
+  Object.assign(form, params);
   return fetch(base + "/oauth/authorize", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -119,7 +120,7 @@ export async function sign_in_and_approve(
     throw new Error(`password stage: ${status} ${consent.slice(0, 400)}`);
   const extra: Record<string, string> = { action: "approve", access: o.access ?? "write" };
   if (o.workspace !== undefined) extra.workspace = o.workspace;
-  const ap = await post_page(base, consent, extra);
+  const ap = await post_page(base, consent, { ...params, ...extra });
   const location = ap.headers.get("Location") ?? "";
   const code = location ? new URL(location).searchParams.get("code") : null;
   if (ap.status !== 302 || !code) throw new Error(`consent stage: ${ap.status} ${location}`);
@@ -151,4 +152,19 @@ export async function exchange(
     body = { _raw: text };
   }
   return { status: r.status, body };
+}
+
+/** Signs in, then approves with `fields` (access, workspace, manage_keys, ...); throws unless a code comes back. */
+export async function approve_with(
+  base: string,
+  params: Record<string, string>,
+  who: { email: string; password: string },
+  fields: Record<string, string>,
+): Promise<{ code: string; location: string }> {
+  const c = await sign_in_to_consent(base, params, who);
+  const r = await post_consent(base, params, c.flow, { action: "approve", ...fields });
+  const location = r.headers.get("Location") ?? "";
+  const code = location ? new URL(location).searchParams.get("code") : null;
+  if (r.status !== 302 || !code) throw new Error("approve_with: no code");
+  return { code, location };
 }
