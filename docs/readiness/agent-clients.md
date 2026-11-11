@@ -107,12 +107,11 @@ description of the API.
 
 **AC-12** Under a key, a request to a route that does not exist is distinguishable from a
 forbidden one.
-- Verdict: missing.
-- Evidence: `pb_hooks/api_keys.pb.js` tests the matched `e.request.pattern`, so an unmatched
-  path fails the allowlist. Room probe: with a key, `/api/docs`, `/api/tracker/nope` and
-  `/api/tracker/me/nope` answer 403 `api_key_path`; with a user token, the same tracker paths
-  answer 404.
-- Gap: no not-found answer for any unknown path under a key.
+- Verdict: met.
+- Evidence: `pb_hooks/api_keys.pb.js` answers 404 for an unmatched route or a missing collection
+  under a key; `tests/test_api_keys.ts` cases `key_unknown_path_404`,
+  `key_unknown_collection_404`, `key_closed_route_403`.
+- Gap: none.
 
 **AC-13** An MCP tool failure returns the server's status and error code in structured form.
 - Verdict: missing.

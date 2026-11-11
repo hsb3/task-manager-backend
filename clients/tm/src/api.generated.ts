@@ -15,13 +15,19 @@ export interface ApiKeysListResult {
 
 **Issuing.** The create response carries the key, `tmk_` followed by 40 random letters and digits, exactly once, as `key`. Only its hash is stored; a key_hash sent by the client is overwritten. No later list, view, update or realtime payload carries the key, and key_hash is hidden from every caller but a superuser, so a filter on it is refused with 400 rather than answering as an oracle.
 
-A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys. */
+A key cannot reach this collection: every api_keys route answers 403 to a key, so a key can never mint, read or revoke keys. An expand, filter, sort or realtime subscription that names api_keys from another collection is refused to a key the same way (decision:api-key-reads-refused). See concept:api-keys and decision:api-keys.
+
+**Sign-in fields.** client_id (text, up to 2000 characters) names the app a sign-in minted the key for and is "" for a key minted by hand; a value sent at create is replaced with "", and a later change to it is refused with 404 like a change to scope. Three HIDDEN fields serve a sign-in's refresh: refresh_hash, refresh_expires and refresh_prev_hash. A key minted by an app's sign-in carries that app in client_id; a refresh replaces its key value and moves expires forward, keeping its id. Revoking or deleting it ends the sign-in. client_id is "" for a key minted by hand. */
 export interface ApiKeysRecord {
+  client_id?: string;
   created?: string;
   expires?: string;
   id: string;
   key_hash?: string;
   name: string;
+  refresh_expires?: string;
+  refresh_hash?: string;
+  refresh_prev_hash?: string;
   revoked?: boolean;
   scope: "read" | "write";
   updated?: string;
@@ -398,6 +404,29 @@ export interface NotificationsRecord {
   updated?: string;
   user: string;
   workspace?: string;
+}
+
+/** Paginated list of `oauth_codes` records. */
+export interface OauthCodesListResult {
+  items: OauthCodesRecord[];
+  page: number;
+  perPage: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+/** A row per approved sign-in, written by the server when a person approves an app on the sign-in page and deleted when the app exchanges it, within ten minutes. Fields: code_hash (a fingerprint of the code, never the code), user, client_id, client_name, redirect_uri, code_challenge (PKCE S256), scope (read or write), expires. No client rule opens it: only the server reads or writes it. */
+export interface OauthCodesRecord {
+  client_id: string;
+  client_name: string;
+  code_challenge: string;
+  code_hash: string;
+  created?: string;
+  expires: string;
+  id: string;
+  redirect_uri: string;
+  scope: "read" | "write";
+  user: string;
 }
 
 /** Paginated list of `project_items` records. */
@@ -938,6 +967,7 @@ export const COLLECTIONS = [
   "labels",
   "milestones",
   "notifications",
+  "oauth_codes",
   "project_items",
   "project_stats",
   "projects",
@@ -1009,6 +1039,7 @@ export interface Paths {
   };
   "GET /api/tracker/me": {
     response: {
+      key?: { client_id: string; expires: string; id: string; scope: "read" | "write" };
       unread_notifications: number;
       user: { id: string; name: string };
       workspaces: {
@@ -1165,11 +1196,15 @@ export interface Paths {
 
 export const FIELD_TYPES = {
   api_keys: {
+    client_id: "string",
     created: "string",
     expires: "string",
     id: "string",
     key_hash: "string",
     name: "string",
+    refresh_expires: "string",
+    refresh_hash: "string",
+    refresh_prev_hash: "string",
     revoked: "boolean",
     scope: "string",
     updated: "string",
@@ -1299,6 +1334,18 @@ export const FIELD_TYPES = {
     updated: "string",
     user: "string",
     workspace: "string",
+  },
+  oauth_codes: {
+    client_id: "string",
+    client_name: "string",
+    code_challenge: "string",
+    code_hash: "string",
+    created: "string",
+    expires: "string",
+    id: "string",
+    redirect_uri: "string",
+    scope: "string",
+    user: "string",
   },
   project_items: {
     active_admins: "string",

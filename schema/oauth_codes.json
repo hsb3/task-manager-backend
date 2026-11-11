@@ -1,0 +1,151 @@
+{
+  "name": "oauth_codes",
+  "type": "base",
+  "fields": [
+    {
+      "autogeneratePattern": "[a-z0-9]{15}",
+      "help": "",
+      "hidden": false,
+      "id": "text3208210256",
+      "max": 15,
+      "min": 15,
+      "name": "id",
+      "pattern": "^[a-z0-9]+$",
+      "presentable": false,
+      "primaryKey": true,
+      "required": true,
+      "system": true,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "A fingerprint of the one-time code, never the code itself.",
+      "hidden": false,
+      "id": "text4300100001",
+      "max": 64,
+      "min": 0,
+      "name": "code_hash",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "cascadeDelete": true,
+      "collectionId": "_pb_users_auth_",
+      "help": "The account that approved the sign-in.",
+      "hidden": false,
+      "id": "relation4300100002",
+      "maxSelect": 1,
+      "minSelect": 0,
+      "name": "user",
+      "presentable": false,
+      "required": true,
+      "system": false,
+      "type": "relation"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "The app the code was issued to.",
+      "hidden": false,
+      "id": "text4300100003",
+      "max": 2000,
+      "min": 0,
+      "name": "client_id",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "The app's name, which becomes the key's name.",
+      "hidden": false,
+      "id": "text4300100004",
+      "max": 200,
+      "min": 0,
+      "name": "client_name",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "Where the app asked to be sent back; the exchange must name the same address.",
+      "hidden": false,
+      "id": "text4300100005",
+      "max": 2000,
+      "min": 0,
+      "name": "redirect_uri",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "The app's PKCE challenge (S256).",
+      "hidden": false,
+      "id": "text4300100006",
+      "max": 43,
+      "min": 43,
+      "name": "code_challenge",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": true,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "help": "The access the person granted.",
+      "hidden": false,
+      "id": "select4300100007",
+      "maxSelect": 1,
+      "name": "scope",
+      "presentable": false,
+      "required": true,
+      "system": false,
+      "type": "select",
+      "values": [
+        "read",
+        "write"
+      ]
+    },
+    {
+      "help": "Ten minutes after issue; an expired code is refused and later purged.",
+      "hidden": false,
+      "id": "date4300100008",
+      "max": "",
+      "min": "",
+      "name": "expires",
+      "presentable": false,
+      "required": true,
+      "system": false,
+      "type": "date"
+    },
+    {
+      "hidden": false,
+      "id": "autodate4300100009",
+      "name": "created",
+      "onCreate": true,
+      "onUpdate": false,
+      "presentable": false,
+      "system": false,
+      "type": "autodate"
+    }
+  ],
+  "indexes": [
+    "CREATE UNIQUE INDEX `idx_oauth_codes_code_hash` ON `oauth_codes` (`code_hash`)",
+    "CREATE INDEX `idx_oauth_codes_expires` ON `oauth_codes` (`expires`)"
+  ]
+}

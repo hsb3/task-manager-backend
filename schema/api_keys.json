@@ -63,7 +63,7 @@
     },
     {
       "autogeneratePattern": "",
-      "help": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced and a later change is refused.",
+      "help": "A fingerprint of the key, filled by the server and never shown to clients; a value sent at create is replaced, a client's later change is refused, and a sign-in's refresh replaces it.",
       "hidden": true,
       "id": "text4200600004",
       "max": 64,
@@ -77,7 +77,7 @@
       "type": "text"
     },
     {
-      "help": "When the key stops working, or empty for a key that never expires; it can be set only at create.",
+      "help": "When the key stops working, or empty for a key that never expires; a client sets it only at create, and a sign-in's refresh moves it forward.",
       "hidden": false,
       "id": "date4200600005",
       "max": "",
@@ -117,10 +117,69 @@
       "presentable": false,
       "system": false,
       "type": "autodate"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "The app a sign-in minted this key for, or empty for a key minted by hand; set by the server, and a later change is refused.",
+      "hidden": false,
+      "id": "text4200600009",
+      "max": 2000,
+      "min": 0,
+      "name": "client_id",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "A fingerprint of the sign-in's current refresh token, filled by the server and never shown to clients.",
+      "hidden": true,
+      "id": "text4200600010",
+      "max": 64,
+      "min": 0,
+      "name": "refresh_hash",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
+    },
+    {
+      "help": "When the sign-in's current refresh token stops working; set by the server.",
+      "hidden": true,
+      "id": "date4200600011",
+      "max": "",
+      "min": "",
+      "name": "refresh_expires",
+      "presentable": false,
+      "required": false,
+      "system": false,
+      "type": "date"
+    },
+    {
+      "autogeneratePattern": "",
+      "help": "A fingerprint of the refresh token the current one replaced, kept so a replayed token ends the sign-in.",
+      "hidden": true,
+      "id": "text4200600012",
+      "max": 64,
+      "min": 0,
+      "name": "refresh_prev_hash",
+      "pattern": "",
+      "presentable": false,
+      "primaryKey": false,
+      "required": false,
+      "system": false,
+      "type": "text"
     }
   ],
   "indexes": [
     "CREATE UNIQUE INDEX `idx_api_keys_key_hash` ON `api_keys` (`key_hash`)",
-    "CREATE INDEX `idx_api_keys_user` ON `api_keys` (`user`)"
+    "CREATE INDEX `idx_api_keys_user` ON `api_keys` (`user`)",
+    "CREATE UNIQUE INDEX `idx_api_keys_refresh_hash` ON `api_keys` (`refresh_hash`) WHERE `refresh_hash` != ''",
+    "CREATE INDEX `idx_api_keys_refresh_prev_hash` ON `api_keys` (`refresh_prev_hash`) WHERE `refresh_prev_hash` != ''"
   ]
 }

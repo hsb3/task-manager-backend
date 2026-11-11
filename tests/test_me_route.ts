@@ -374,6 +374,25 @@ try {
   check("…so the count fell", (await me(bob))?.unread_notifications < pre_trash, true);
   [s] = await api("POST", "/api/tracker/notifications/read-all", bob);
   check("after read-all → 0", (await me(bob))?.unread_notifications, 0);
+
+  console.log("\n── the key a request carries is reported under key ──");
+  const KEYS = "/api/collections/api_keys/records";
+  let [, k] = await api("POST", KEYS, alice, { name: "me read", scope: "read" });
+  r = await me(k.key ?? "tmk_none");
+  check(
+    "me_key_read: key.id, key.scope, key.expires, key.client_id",
+    [r?.key?.id, r?.key?.scope, r?.key?.expires, r?.key?.client_id],
+    [k.id, "read", "", ""],
+  );
+  const tomorrow = new Date(Date.now() + 86_400_000).toISOString().replace("T", " ");
+  [, k] = await api("POST", KEYS, alice, { name: "me expiring", scope: "read", expires: tomorrow });
+  const stored_expires = (await api("GET", `${KEYS}/${k.id}`, su))[1].expires;
+  check(
+    "me_key_expiry: key.expires equals the record's expires",
+    [(await me(k.key ?? "tmk_none"))?.key?.expires, stored_expires !== ""],
+    [stored_expires, true],
+  );
+  check("me_session_no_key: a user token has no key property", "key" in (await me(alice)), false);
 } finally {
   if (server !== null) await roomkit.stop(server);
   fs.rmSync(S, { recursive: true, force: true });

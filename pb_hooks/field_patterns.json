@@ -34,6 +34,9 @@
   "notifications": {
     "id": "^[a-z0-9]+$"
   },
+  "oauth_codes": {
+    "id": "^[a-z0-9]+$"
+  },
   "projects": {
     "id": "^[a-z0-9]+$",
     "key": "^[A-Z][A-Z0-9]{0,7}$"

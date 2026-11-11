@@ -75,9 +75,12 @@ require(`${__hooks}/lib/routes.js`).add("GET /api/tracker/me", (e) => {
     )
     .filter((n) => e.app.canAccessRecord(n, info, rule)).length;
 
-  return e.json(200, {
+  const answer = {
     user: { id: uid, name: e.auth.getString("name") },
     unread_notifications: unread,
     workspaces: workspaces,
-  });
+  };
+  const k = e.get("tmApiKey");
+  if (k) answer.key = k;
+  return e.json(200, answer);
 });

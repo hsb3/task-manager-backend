@@ -476,6 +476,37 @@ try {
     tup(200, true),
   );
 
+  // oauth_server.pb.js: its metadata route is registered (a missing file 404s).
+  let as_meta: any;
+  [status, as_meta] = await api("GET", "/.well-known/oauth-authorization-server");
+  check(
+    "oauth_server.pb.js: GET /.well-known/oauth-authorization-server is registered",
+    tup(status, as_meta?.issuer === BASE_URL),
+    tup(200, true),
+  );
+
+  // internal_caller.pb.js: a forged sentinel X-Real-IP is dropped, so the log records the caller.
+  const marker = `hookload${Date.now()}`;
+  const forged = await fetch(`${BASE_URL}/api/health?${marker}`, {
+    headers: { "X-Real-IP": "192.0.2.254" },
+  });
+  await forged.body?.cancel();
+  let logged: any = null;
+  for (let i = 0; i < 60 && !logged; i++) {
+    const [, lg] = await api(
+      "GET",
+      `/api/logs?${urlencode({ filter: `data.url~'${marker}'` })}`,
+      su,
+    );
+    logged = lg.items?.[0] ?? null;
+    if (!logged) await Bun.sleep(250);
+  }
+  check(
+    "internal_caller.pb.js: a forged sentinel X-Real-IP is not the logged address",
+    tup(!!logged, logged?.data?.userIP === "192.0.2.254"),
+    tup(true, false),
+  );
+
   console.log("\n── §3 every hook file is dispositioned ──");
   const probed = new Set([
     "activity.pb.js",
@@ -484,6 +515,7 @@ try {
     "author.pb.js",
     "counts.pb.js",
     "cycles.pb.js",
+    "internal_caller.pb.js",
     "invitations.pb.js",
     "item_list.pb.js",
     "keys.pb.js",
@@ -493,6 +525,7 @@ try {
     "membership_status.pb.js",
     "names.pb.js",
     "notify.pb.js",
+    "oauth_server.pb.js",
     "ordinal.pb.js",
     "owner.pb.js",
     "precondition.pb.js",

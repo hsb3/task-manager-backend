@@ -262,6 +262,8 @@ try {
     ["user → Bob", { user: bob_id }, true],
     // PB drops a hidden field from a non-superuser body, so this PATCH succeeds as a no-op.
     ["key_hash → x", { key_hash: "x" }, false],
+    ["client_id → x", { client_id: "x" }, true],
+    ["refresh_hash → x", { refresh_hash: "x" }, false],
   ] as [string, any, boolean][]) {
     const before = await stored(read_rec.id);
     [s] = await api("PATCH", `${KEYS}/${read_rec.id}`, alice, body);
@@ -382,6 +384,77 @@ try {
     "write key POST /api/tracker/notifications/read-all → 200",
     (await api("POST", "/api/tracker/notifications/read-all", WRITE_KEY, {}))[0],
     200,
+  );
+
+  console.log("\n── AC-12: an unknown path or collection under a key answers 404 ──");
+  [s, r] = await api("GET", "/api/tracker/nope", READ_KEY);
+  check(
+    "key_unknown_path_404: read key GET /api/tracker/nope → 404, data {}",
+    tup(s, r.data),
+    tup(404, {}),
+  );
+  check(
+    "key_unknown_path_post_404: write key POST /api/tracker/nope → 404",
+    (await api("POST", "/api/tracker/nope", WRITE_KEY, {}))[0],
+    404,
+  );
+  check(
+    "key_unknown_collection_404: read key GET /api/collections/nope/records → 404",
+    (await api("GET", "/api/collections/nope/records", READ_KEY))[0],
+    404,
+  );
+  check(
+    "key_unknown_collection_other_routes_404: GET /api/collections/nope, POST …/nope/auth-with-password → 404",
+    tup(
+      (await api("GET", "/api/collections/nope", READ_KEY))[0],
+      (await api("POST", "/api/collections/nope/auth-with-password", WRITE_KEY, {}))[0],
+    ),
+    tup(404, 404),
+  );
+  check(
+    "key_known_collection_meta_403: read key GET /api/collections/tasks → 403 api_key_path",
+    await refusal("GET", "/api/collections/tasks", READ_KEY),
+    tup(403, "api_key_path"),
+  );
+  check(
+    "key_closed_route_403: read key GET /api/tracker/admin/pending-users → 403 api_key_path",
+    await refusal("GET", "/api/tracker/admin/pending-users", READ_KEY),
+    tup(403, "api_key_path"),
+  );
+  check(
+    "key_system_collection_403: read key GET /api/collections/_superusers/records → 403 api_key_path",
+    await refusal("GET", "/api/collections/_superusers/records", READ_KEY),
+    tup(403, "api_key_path"),
+  );
+  check(
+    "bad_key_unknown_path_401: tmk_ + 40 x on /api/tracker/nope → 401 api_key_invalid",
+    await refusal("GET", "/api/tracker/nope", `tmk_${"x".repeat(40)}`),
+    tup(401, "api_key_invalid"),
+  );
+  check(
+    "oauth_path_skips_key: Bearer tmk_bogus GET /oauth/x → 404 (not 401)",
+    (await api("GET", "/oauth/x", "Bearer tmk_bogus"))[0],
+    404,
+  );
+
+  console.log("\n── grant fields: client_id is server-owned, refresh fields hidden ──");
+  [s, r] = await mint(alice, "alice client", "read", { client_id: "evil" });
+  check(
+    'create_client_id_blanked: a create naming client_id → 200, stored client_id ""',
+    tup(s, (await stored(r.id ?? "none")).client_id ?? null),
+    tup(200, ""),
+  );
+  [s, r] = await api("GET", KEYS, alice);
+  check(
+    "hidden_refresh_fields: Alice's key list carries no refresh_hash, refresh_expires, refresh_prev_hash",
+    tup(
+      s,
+      (r.items?.length ?? 0) > 0,
+      r.items?.some((i: any) =>
+        ["refresh_hash", "refresh_expires", "refresh_prev_hash"].some((f) => f in i),
+      ),
+    ),
+    tup(200, true, false),
   );
 
   console.log("\n── auth and admin paths refuse every key → 403 api_key_path ──");

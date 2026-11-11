@@ -99,6 +99,13 @@ const ACCEPTED_PAIRS = new Map<string, string>([
     "null rules on every operation — only invitations.pb.js writes it, copied from the " +
       "invitation's already-folded key (decision:invitation-send-limit-and-decline-block)",
   ],
+  ...["code_hash", "client_id", "client_name", "redirect_uri", "code_challenge"].map(
+    (f): [string, string] => [
+      pair_key("oauth_codes", f),
+      "null rules on every operation — only the OAuth authorization server's own code " +
+        "issue writes it (contract: hosted-mcp-endpoint)",
+    ],
+  ),
 ]);
 
 // PB normalizes a thrown BadRequestError message — first letter upper, trailing period.
