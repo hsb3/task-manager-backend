@@ -55,7 +55,10 @@ Subjects, bodies, button texts and token lifetimes are unchanged.
 
 ### Response headers on `/account` and every path under it
 
-Set on every GET and HEAD answer, whatever its status:
+Set on every GET and HEAD answer, whatever its status, except one: a path whose decoded form holds
+a `.` or `..` segment (raw or percent-encoded, under `/account` or any other prefix) and that no
+route matches answers as a server without the app does, 404 `{"data":{},"message":"File not
+found.","status":404}` without these headers, and never serves the app's files.
 
 | Header | Value |
 | --- | --- |
@@ -63,7 +66,7 @@ Set on every GET and HEAD answer, whatever its status:
 | `X-Frame-Options` | `DENY` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `no-referrer` |
-| `Cache-Control` | `public, max-age=31536000, immutable` under `/account/assets/`; `no-cache` on every other path |
+| `Cache-Control` | `public, max-age=31536000, immutable` on a file served under `/account/assets/`; `no-cache` on every other answer, a 404 under `/account/assets/` included |
 
 ### Server calls behind each screen
 

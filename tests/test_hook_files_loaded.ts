@@ -516,8 +516,18 @@ try {
     tup(true, false),
   );
 
+  // account_app.pb.js: a path under /account answers with its frame policy, not PocketBase's SAMEORIGIN.
+  const account = await fetch(`${BASE_URL}/account/`);
+  await account.text();
+  check(
+    "account_app.pb.js: GET /account/ carries X-Frame-Options DENY",
+    account.headers.get("x-frame-options"),
+    "DENY",
+  );
+
   console.log("\n── §3 every hook file is dispositioned ──");
   const probed = new Set([
+    "account_app.pb.js",
     "activity.pb.js",
     "api_key_manage.pb.js",
     "api_keys.pb.js",

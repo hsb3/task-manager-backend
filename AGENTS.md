@@ -32,7 +32,8 @@ commit, push, merge and tag, and the final gates. A **manager** leads one lane; 
 make setup                         # pinned runtimes, deps, pre-commit hook; scripts/verification-env.sh checks them
 make dev                           # PocketBase on 8090 + seed; ignores PB_PORT_OFFSET: use `make dev PB_PORT=<n>`
 make                               # lists the documented targets (`make otp` = dashboard OTP)
-make check                         # THE gate: check-static, then the battery (every suite; CI runs it sharded)
+make check                         # THE gate: check-static, web-check (the account app), then the battery (every suite; CI runs it sharded)
+make web-check                     # the account app's gate (web/account): install, lint, build, typecheck, unit tests
 make check-static                  # server-free half: format, typecheck, gen_*.ts --check, check_*.ts
 make smoke                         # live probes against the production Docker image (e2e/smoke.ts); needs Docker
 make next-migration-slot           # next free migration timestamp

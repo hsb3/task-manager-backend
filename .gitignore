@@ -15,9 +15,13 @@ pb_data/
 pb.log
 *.zip
 
-# Installed and downloaded artifacts: bun install (clients/tm/ is a workspace with its own), CI's battery shard manifests.
+# Installed and downloaded artifacts: bun install (clients/tm/ is a workspace with its own), CI's battery shard manifests, the account app's build output, generated route tree and browser-test reports.
 node_modules/
 battery-manifests/
+web/account/dist/
+web/account/src/route-tree.gen.ts
+web/account/test-results/
+web/account/playwright-report/
 
 # Machine state: in-project linked worktrees (a machine without the owner's global git ignore still needs this), the atelier handoff mtime, Finder metadata.
 .worktrees/

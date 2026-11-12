@@ -698,6 +698,8 @@ run_suite "test_key_reach_live" bun tests/test_key_reach_live.ts
 run_suite "test_oauth_key_limits" bun tests/test_oauth_key_limits.ts
 run_suite "test_key_management" bun tests/test_key_management.ts
 run_suite "test_tm_oauth_client" bun tests/test_tm_oauth_client.ts
+run_suite "test_account_app" bun tests/test_account_app.ts
+run_suite "test_account_flows" bun tests/test_account_flows.ts
 run_suite "test_tm_store" bun tests/test_tm_store.ts
 run_suite "test_tm_keys" bun tests/test_tm_keys.ts
 run_suite "test_tm_login_browser" bun tests/test_tm_login_browser.ts

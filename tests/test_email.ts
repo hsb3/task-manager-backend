@@ -15,8 +15,9 @@ the branded subject lines/bodies actually get sent; verify-then-login
 (403 before / 200 after) and request-otp/auth-with-otp round trips work;
 request-verification always returns 204 regardless of account state
 (PocketBase's anti-enumeration invariant); the verification and
-password-reset emails link to PocketBase's own /_/#/auth/... confirmation
-pages under the server's public URL (pb_hooks/mail.pb.js); request-password-reset
+password-reset emails link to the account app's /account/#/auth/... screens
+under the server's public URL (pb_hooks/mail.pb.js,
+decision:account-app-mail-links); request-password-reset
 round-trips end to end (old password rejected, new password accepted)
 and is equally anti-enumerating.
 
@@ -192,10 +193,11 @@ check(
   "Finish creating your Task Tracker account",
 );
 check(
-  "its link points at PocketBase's own set-password page",
-  signup_content.includes(`${APP_URL}/_/#/auth/confirm-password-reset/`),
+  "its link points at the account app's set-password screen",
+  signup_content.includes(`${APP_URL}/account/#/auth/password-reset-confirm?token=`),
   true,
 );
+check("its link no longer points at the dashboard", signup_content.includes("/_/#/auth/"), false);
 baseline = count_eml();
 // A signup carries no password (decision:password-signup-verify-first); the superuser plants one so login is judged by the authRule alone.
 [s] = await api("PATCH", `/api/collections/users/records/${tw_id}`, su, {
@@ -232,16 +234,23 @@ check(
 );
 
 check(
-  "verification link points at PocketBase's own confirmation page",
-  verify_content.includes(`${APP_URL}/_/#/auth/confirm-verification/`),
+  "verification link points at the account app's confirm screen",
+  verify_content.includes(`${APP_URL}/account/#/auth/email-verification-confirm?token=`),
   true,
+);
+check(
+  "verification link no longer points at the dashboard",
+  verify_content.includes("/_/#/auth/"),
+  false,
 );
 check(
   "verification link does NOT point at an app-side /verify-email route",
   verify_content.includes("/verify-email?token="),
   false,
 );
-let m: RegExpExecArray | null = /confirm-verification\/([A-Za-z0-9._-]+)/.exec(verify_content);
+let m: RegExpExecArray | null = /email-verification-confirm\?token=([A-Za-z0-9._-]+)/.exec(
+  verify_content,
+);
 const token = m ? m[1]! : null;
 check("verification token extracted", !!token, true);
 
@@ -304,17 +313,18 @@ const reset_content = decode_eml(reset_eml);
 const reset_subject = extract_subject(reset_content);
 check("reset subject (branded)", reset_subject, "Reset your Task Tracker password");
 check(
-  "reset link points at PocketBase's own confirmation page",
-  reset_content.includes(`${APP_URL}/_/#/auth/confirm-password-reset/`),
+  "reset link points at the account app's set-password screen",
+  reset_content.includes(`${APP_URL}/account/#/auth/password-reset-confirm?token=`),
   true,
 );
+check("reset link no longer points at the dashboard", reset_content.includes("/_/#/auth/"), false);
 check(
   "reset link does NOT point at an app-side /reset-password route",
   reset_content.includes("/reset-password?token="),
   false,
 );
 
-m = /confirm-password-reset\/([A-Za-z0-9._-]+)/.exec(reset_content);
+m = /password-reset-confirm\?token=([A-Za-z0-9._-]+)/.exec(reset_content);
 const reset_token = m ? m[1]! : null;
 check("reset token extracted", !!reset_token, true);
 

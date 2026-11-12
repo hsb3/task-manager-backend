@@ -33,7 +33,7 @@ command -v sqlite3 >/dev/null || { echo "$@: needs sqlite3 to tell whether pb_da
 endef
 
 .DEFAULT_GOAL := help
-.PHONY: help dev backend seed seed-if-fresh superuser superuser-password superuser-if-missing reset clean setup stop status env pocketbase next-migration-slot check check-static battery ci-battery-verify openapi local-up local-down local-logs smoke change
+.PHONY: help dev backend seed seed-if-fresh superuser superuser-password superuser-if-missing reset clean setup stop status env pocketbase next-migration-slot check check-static web-check battery ci-battery-verify openapi local-up local-down local-logs smoke change
 
 help: ## list targets
 	@grep -E '^[a-z][a-zA-Z0-9_-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-12s %s\n", $$1, $$2}'
@@ -174,7 +174,7 @@ next-migration-slot: ## print the next free pb_migrations timestamp (step 100; r
 GENERATORS := $(sort $(wildcard scripts/gen_*.ts))
 CHECKERS   := $(sort $(filter-out scripts/check_historical_migrations.ts,$(wildcard scripts/check_*.ts)))
 
-check: check-static battery ## the gate: check-static, then the whole suite battery (BATTERY_SHARD=i/N runs one shard)
+check: check-static web-check battery ## the gate: check-static, the account app's gate, then the whole suite battery (BATTERY_SHARD=i/N runs one shard)
 
 check-static: pocketbase ## format, typecheck, every generator --check, every scripts/check_*.ts gate (no server)
 	bun run format:check
@@ -183,6 +183,13 @@ check-static: pocketbase ## format, typecheck, every generator --check, every sc
 	bun scripts/model/extract_current.ts --check
 	@for c in $(CHECKERS); do echo "· $$c"; bun "$$c" || exit 1; done
 	bun scripts/check_historical_migrations.ts --staged
+
+web-check: ## the account app's gate: frozen install, lint, build, typecheck, unit tests (web/account)
+	cd web/account && bun install --frozen-lockfile
+	cd web/account && bun run lint
+	cd web/account && bun run build
+	cd web/account && bun run typecheck
+	cd web/account && bun run test
 
 battery: ## the whole suite battery; BATTERY_SHARD=i/N runs one shard of scripts/battery_shards.tsv
 	bash scripts/run_suite_battery.sh

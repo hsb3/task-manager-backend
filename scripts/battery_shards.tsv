@@ -41,6 +41,7 @@
 3	6	test_priority_vocab
 2	6	test_roles
 3	6	test_agent_probe
+3	6	test_account_flows
 3	5	test_api_keys
 3	5	test_tm_cli
 4	5	test_auth_rules
@@ -122,6 +123,7 @@
 4	2	test_oauth_token
 3	2	test_key_create
 1	2	test_key_levels
+1	2	test_account_app
 1	1	test_app_docs_seed_idempotent
 1	1	test_tm_mcp
 1	1	test_tm_client_gen

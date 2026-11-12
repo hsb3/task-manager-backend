@@ -22,6 +22,18 @@ answers 404, never the app's page.
 - **WHEN** a client requests `/api/nope`
 - **THEN** the server answers 404 with a JSON body, as before
 
+### Requirement: A dot-segment path never reaches the account app
+
+A GET or HEAD path whose decoded form holds a `.` or `..` segment (raw or percent-encoded, under
+`/account` or any other prefix) and that no route matches SHALL answer as a server without the
+app does, 404 `File not found.` without the security headers, and SHALL never serve the app's
+files. This is the one exception to the headers on paths under `/account`.
+
+#### Scenario: An encoded parent segment
+
+- **WHEN** a client requests `/api/..%2faccount/`
+- **THEN** the server answers 404 `{"data":{},"message":"File not found.","status":404}` with no `Content-Security-Policy`
+
 ### Requirement: Account mail links to the account app
 
 The signup mail, the password-reset mail and the verification mail SHALL link to the account

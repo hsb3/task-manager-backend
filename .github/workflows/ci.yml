@@ -1,7 +1,8 @@
 name: CI
 
-# The repo's one gate is `make check`: its static part runs here as `static`, its battery as the
-# four `battery` shards, and `battery-verify` proves the shards together ran every suite once.
+# The repo's one gate is `make check`: its static part runs here as `static`, the account app's gate
+# as `web`, its battery as the four `battery` shards, and `battery-verify` proves the shards
+# together ran every suite once.
 on:
   # One run per commit, never two: branch commits are covered by the PR run, `main` by the push run.
   push:
@@ -38,6 +39,18 @@ jobs:
 
       - name: Run the static checks
         run: make check-static
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.3"
+
+      - run: make web-check
 
   battery:
     runs-on: ubuntu-latest
